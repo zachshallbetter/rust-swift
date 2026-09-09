@@ -1,0 +1,11 @@
+[package]
+name = "rust-swift-codegen"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+rust-swift-ir = { path = "../rust-swift-ir" }
+serde = { workspace = true }
+serde_json = { workspace = true }

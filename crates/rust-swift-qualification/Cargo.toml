@@ -1,0 +1,14 @@
+[package]
+name = "rust-swift-qualification"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+rust-swift-ir = { path = "../rust-swift-ir" }
+rust-swift-frontend = { path = "../rust-swift-frontend" }
+rust-swift-codegen = { path = "../rust-swift-codegen" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }

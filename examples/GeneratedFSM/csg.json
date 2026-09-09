@@ -1,0 +1,98 @@
+{
+  "schema_version": "rr-csg-0.1",
+  "provenance": {
+    "kind": "compiler",
+    "compiler": "rust-swift-compiler",
+    "backend": "swift",
+    "extractor": "rust-swift-frontend",
+    "source_hash": "sha256:3a56ecb7c3df388c3ca9b3754d9019aa4c4b4096687cb089db196655195b06b8"
+  },
+  "nodes": [
+    {
+      "id": "crate::fsm_example",
+      "name": "fsm_example",
+      "kind": "crate",
+      "span": {
+        "file": "fsm_example.rs",
+        "start_line": 1,
+        "end_line": 1
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::fsm_example::PlayerState",
+      "name": "PlayerState",
+      "kind": "enum",
+      "span": {
+        "file": "examples/fsm_example.rs",
+        "start_line": 3,
+        "end_line": 9
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::fsm_example::PlayerAction",
+      "name": "PlayerAction",
+      "kind": "enum",
+      "span": {
+        "file": "examples/fsm_example.rs",
+        "start_line": 11,
+        "end_line": 17
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::fsm_example::update_player",
+      "name": "update_player",
+      "kind": "function",
+      "span": {
+        "file": "examples/fsm_example.rs",
+        "start_line": 19,
+        "end_line": 30
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::fsm_example::calculate_score",
+      "name": "calculate_score",
+      "kind": "function",
+      "span": {
+        "file": "examples/fsm_example.rs",
+        "start_line": 32,
+        "end_line": 35
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    }
+  ],
+  "edges": [
+    {
+      "from": "crate::fsm_example",
+      "to": "crate::fsm_example::PlayerState",
+      "relationship": "contains_item",
+      "minimum_access": "public"
+    },
+    {
+      "from": "crate::fsm_example",
+      "to": "crate::fsm_example::PlayerAction",
+      "relationship": "contains_item",
+      "minimum_access": "public"
+    },
+    {
+      "from": "crate::fsm_example",
+      "to": "crate::fsm_example::update_player",
+      "relationship": "contains_item",
+      "minimum_access": "public"
+    },
+    {
+      "from": "crate::fsm_example",
+      "to": "crate::fsm_example::calculate_score",
+      "relationship": "contains_item",
+      "minimum_access": "public"
+    }
+  ]
+}

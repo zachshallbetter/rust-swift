@@ -1,0 +1,44 @@
+{
+  "format": "1",
+  "projectId": "rust-swift",
+  "resources": [
+    {
+      "id": "rust-swift-docs",
+      "kind": "specification",
+      "required": true,
+      "version": "0.1.0",
+      "revisionOrDigest": "v0.1.0",
+      "canonicalSource": "docs/01-product-definition.md",
+      "mountOrAddress": "docs",
+      "authorityRole": "compiler-specification",
+      "inventory": [
+        "docs/01-product-definition.md",
+        "docs/02-architecture.md",
+        "docs/03-semantic-contract.md",
+        "docs/04-language-matrix.md",
+        "docs/05-validation.md",
+        "docs/06-implementation-plan.md",
+        "docs/07-rfc.md"
+      ]
+    },
+    {
+      "id": "reflective-rust-csg",
+      "kind": "schema",
+      "required": true,
+      "version": "0.1.0",
+      "revisionOrDigest": "rr-csg-0.1",
+      "canonicalSource": "../reflective-rust/crates/reflective-rust-csg",
+      "mountOrAddress": "../reflective-rust/crates/reflective-rust-csg",
+      "authorityRole": "compiler-semantic-graph-exchange",
+      "inventory": [
+        "../reflective-rust/crates/reflective-rust-csg/src/lib.rs"
+      ]
+    }
+  ],
+  "integrityPolicy": {
+    "requireCanonicalSource": true,
+    "preferImmutableRevisionOrDigest": true,
+    "rejectRemoteLatestForRequiredResources": true,
+    "rejectGeneratedContextAsAuthority": true
+  }
+}
