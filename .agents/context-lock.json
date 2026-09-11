@@ -5,8 +5,8 @@
   "validityBasis": "aggregate-source-digest",
   "selectedPaths": [],
   "sourceSelection": {
-    "includedCount": 106,
-    "includedBytes": 596839,
+    "includedCount": 107,
+    "includedBytes": 600324,
     "excludedCounts": {
       "excluded-directory": 7727,
       "excluded-path": 1,
@@ -20,14 +20,14 @@
     "repositories": [
       {
         "path": ".",
-        "commit": "f3faa144eb30d30f3c7e8b87898c42d28c17026b",
-        "branch": "main",
+        "commit": "a704dc0168d94ded938ab7274dafb369c2c02cdf",
+        "branch": "feature/ci-workflow",
         "dirty": true,
         "remote": "https://github.com/zachshallbetter/rust-swift.git"
       }
     ]
   },
-  "aggregateSourceDigest": "50068f6c7863ee5639a8631645d442787226d7b594b3cb7453da2f6d0aba1fcc",
+  "aggregateSourceDigest": "e4275e618db885e6838d25885beded8f3392f3d80763ad0872d86666bef04cde",
   "sources": [
     {
       "path": ".agents/rules/ci.md",
@@ -83,6 +83,11 @@
       "path": ".formal-bootstrap.json",
       "bytes": 296,
       "sha256": "19eb168cc988e074ab77b6ab34fc562ac6ab956a0c1f9a663e8b56ff40025b75"
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "bytes": 813,
+      "sha256": "85c14a5a0e3e2059de1c5e8368a7fcc8bd327bd4dc5382ef6509edd757cb0173"
     },
     {
       "path": "AGENTS.md",
@@ -151,8 +156,8 @@
     },
     {
       "path": "crates/rust-swift-cli/src/main.rs",
-      "bytes": 8219,
-      "sha256": "2beddd2e78990bc4b071ed7d17149d1e9bcfd25166fe4953d0856b0d353a75ed"
+      "bytes": 8573,
+      "sha256": "521481893c9d6dd7cce938184fd4cade739ea3fec20b5103500789b844f103ee"
     },
     {
       "path": "crates/rust-swift-codegen/Cargo.toml",
@@ -161,8 +166,8 @@
     },
     {
       "path": "crates/rust-swift-codegen/src/lib.rs",
-      "bytes": 24945,
-      "sha256": "4ac5148f61aa381bbd94ca9f39b2f1a89a09f065fbc48eb46f2561b766165617"
+      "bytes": 25434,
+      "sha256": "6697d26b34df1d172d88feeae448e7abd96adf5cddffb8ce8d80e96d5e9a1f54"
     },
     {
       "path": "crates/rust-swift-frontend/Cargo.toml",
@@ -176,8 +181,8 @@
     },
     {
       "path": "crates/rust-swift-frontend/src/lib.rs",
-      "bytes": 38388,
-      "sha256": "a41834c234dea8f4615cb4779ee0844092bb7d408b499fe39705aceee23ecf52"
+      "bytes": 39199,
+      "sha256": "438ed15c176b42263f5efa5d89a592822e0f0c85e50bf274909d056d2749dfcf"
     },
     {
       "path": "crates/rust-swift-ir/Cargo.toml",
@@ -187,7 +192,7 @@
     {
       "path": "crates/rust-swift-ir/src/lib.rs",
       "bytes": 13726,
-      "sha256": "7057bfe434971cb1d2f30451e234de76ddc9a18398870e0751e43008dffeee39"
+      "sha256": "3088934b58c17a136a87f3f799565f0909025081c9ee7d2ece5e2706a5044af1"
     },
     {
       "path": "crates/rust-swift-qualification/Cargo.toml",
@@ -196,8 +201,8 @@
     },
     {
       "path": "crates/rust-swift-qualification/src/differential.rs",
-      "bytes": 16740,
-      "sha256": "a308e395674ff543d0851ff15a09705083b41f1318b789a9832d9ff75d09efa7"
+      "bytes": 17758,
+      "sha256": "a89d3a449926fb01ada60622f9ee643f57039585e1cb8648ec30135960fb0a4b"
     },
     {
       "path": "crates/rust-swift-qualification/src/lib.rs",

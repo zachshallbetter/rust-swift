@@ -5,7 +5,7 @@
 //! and maps directly to the Compiler Semantic Graph (CSG) exchange model.
 
 use reflective_rust_csg::{
-    CsgEdge, CsgNode, CsgNodeKind, CompilerSemanticGraph, GraphProvenance, SourceSpan as CsgSpan,
+    CompilerSemanticGraph, CsgEdge, CsgNode, CsgNodeKind, GraphProvenance, SourceSpan as CsgSpan,
 };
 use reflective_rust_protocol::AccessLevel;
 use serde::{Deserialize, Serialize};

@@ -11,7 +11,11 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 #[derive(Parser, Debug)]
-#[command(name = "rust-swift", version = "0.1.0", about = "Rust to Swift Source Compiler")]
+#[command(
+    name = "rust-swift",
+    version = "0.1.0",
+    about = "Rust to Swift Source Compiler"
+)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -61,7 +65,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             emit_csg,
             emit_ir,
         } => {
-            compile_command(&input, &output_dir, package_name.as_deref(), emit_csg, emit_ir)?;
+            compile_command(
+                &input,
+                &output_dir,
+                package_name.as_deref(),
+                emit_csg,
+                emit_ir,
+            )?;
         }
         Commands::DiffTest { output_dir } => {
             diff_test_command(&output_dir)?;
@@ -126,7 +136,11 @@ fn compile_command(
         fs::write(output_dir.join("csg.json"), csg_json)?;
     }
 
-    println!("Successfully compiled {} to Swift package at {}", input.display(), output_dir.display());
+    println!(
+        "Successfully compiled {} to Swift package at {}",
+        input.display(),
+        output_dir.display()
+    );
     println!("  Package name: {}", manifest.package_name);
     println!("  Generated files: {}", manifest.generated_files.join(", "));
     println!("  Source hash: sha256:{}", source_hash);
@@ -148,7 +162,10 @@ fn diff_test_command(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>
     println!("\n[1/3] Running Finite State Machine differential test...");
     match runner.test_fsm(output_dir) {
         Ok(report) => {
-            println!("  Status: {} ({} of {} cases passed)", report.status, report.cases_passed, report.cases_tested);
+            println!(
+                "  Status: {} ({} of {} cases passed)",
+                report.status, report.cases_passed, report.cases_tested
+            );
             reports.push(report);
         }
         Err(e) => {
@@ -160,7 +177,10 @@ fn diff_test_command(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>
     println!("\n[2/3] Running Wrapping Arithmetic differential test...");
     match runner.test_wrapping_arithmetic(output_dir) {
         Ok(report) => {
-            println!("  Status: {} ({} of {} cases passed)", report.status, report.cases_passed, report.cases_tested);
+            println!(
+                "  Status: {} ({} of {} cases passed)",
+                report.status, report.cases_passed, report.cases_tested
+            );
             reports.push(report);
         }
         Err(e) => {
@@ -173,7 +193,10 @@ fn diff_test_command(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>
     match runner.test_negative_rejections() {
         Ok(neg_reports) => {
             for r in neg_reports {
-                println!("  Fixture '{}': {} (Cases passed: {}/{})", r.fixture_name, r.status, r.cases_passed, r.cases_tested);
+                println!(
+                    "  Fixture '{}': {} (Cases passed: {}/{})",
+                    r.fixture_name, r.status, r.cases_passed, r.cases_tested
+                );
                 reports.push(r);
             }
         }
@@ -184,7 +207,11 @@ fn diff_test_command(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>
 
     // Record evidence in records/evidence.jsonl
     let evidence_path = Path::new("records/evidence.jsonl");
-    if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(evidence_path) {
+    if let Ok(mut file) = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(evidence_path)
+    {
         for report in &reports {
             let record = serde_json::json!({
                 "type": "differential_qualification",
@@ -200,7 +227,10 @@ fn diff_test_command(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>
             });
             let _ = writeln!(file, "{}", record);
         }
-        println!("\nAppended {} qualification receipt(s) to records/evidence.jsonl", reports.len());
+        println!(
+            "\nAppended {} qualification receipt(s) to records/evidence.jsonl",
+            reports.len()
+        );
     }
 
     println!("\n============================================================");
