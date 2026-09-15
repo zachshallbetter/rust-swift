@@ -611,6 +611,216 @@ fn main() {
         })
     }
 
+    /// Run the Type System (struct methods, payload enums, tuples) differential test
+    pub fn test_types(
+        &self,
+        out_dir: &Path,
+    ) -> Result<QualificationReport, Box<dyn std::error::Error>> {
+        let types_source = r#"
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct Counter {
+    pub count: i64,
+}
+
+impl Counter {
+    pub fn new(initial: i64) -> Counter {
+        Counter { count: initial }
+    }
+
+    pub fn increment(&mut self, delta: i64) {
+        self.count = self.count + delta;
+    }
+
+    pub fn get(&self) -> i64 {
+        self.count
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Action {
+    Stop,
+    Move(i64, i64),
+    Teleport { x: i64, y: i64 },
+}
+
+pub fn apply_action(action: Action) -> (i64, i64) {
+    match action {
+        Action::Stop => (0, 0),
+        Action::Move(dx, dy) => (dx, dy),
+        Action::Teleport { x, y } => (x, y),
+    }
+}
+
+pub fn execute_workflow(initial: i64, delta: i64, action: Action) -> (i64, i64, i64) {
+    let mut c = Counter::new(initial);
+    c.increment(delta);
+    let coords = apply_action(action);
+    (c.get(), coords.0, coords.1)
+}
+"#;
+
+        let source_hash = Self::compute_sha256(types_source);
+        let (rustc_ver, swift_ver) = Self::toolchain_versions();
+
+        // 1. Lower to IR
+        let mut frontend = Frontend::new("types.rs");
+        let module = frontend
+            .parse_and_lower(types_source)
+            .map_err(|diags| format!("Frontend rejected types fixture: {:?}", diags))?;
+
+        // 2. Generate Swift package
+        let pkg_dir = out_dir.join("types_pkg");
+        let mut generator = SwiftGenerator::new();
+        generator.emit_package(&module, &pkg_dir, "TypesModule")?;
+
+        // 3. Create a Swift test runner executable
+        let runner_swift = r#"
+import Foundation
+
+@main
+struct TypesRunner {
+    static func main() {
+        let test_cases: [(Int64, Int64, Action)] = [
+            (0, 5, .Stop),
+            (10, -3, .Move(4, 7)),
+            (100, 25, .Teleport(x: -12, y: 88)),
+            (-50, 50, .Move(-10, -20)),
+            (42, 0, .Stop),
+        ]
+
+        for (initial, delta, action) in test_cases {
+            let res = execute_workflow(initial, delta, action)
+            print("\(initial),\(delta)->(\(res.0),\(res.1),\(res.2))")
+        }
+    }
+}
+"#;
+        let sources_dir = pkg_dir.join("Sources").join("TypesModule");
+        let main_swift_path = sources_dir.join("main.swift");
+        fs::write(&main_swift_path, runner_swift)?;
+
+        // 4. Compile and execute Swift code
+        let swift_source = sources_dir.join("types.swift");
+        let swiftc_out = Command::new("swiftc")
+            .arg("-parse-as-library")
+            .arg("-emit-executable")
+            .arg(&swift_source)
+            .arg(&main_swift_path)
+            .arg("-o")
+            .arg(pkg_dir.join("types_runner"))
+            .output()?;
+
+        if !swiftc_out.status.success() {
+            return Err(format!(
+                "Failed to compile Swift Types runner: {}",
+                String::from_utf8_lossy(&swiftc_out.stderr)
+            )
+            .into());
+        }
+
+        let exec_out = Command::new(pkg_dir.join("types_runner")).output()?;
+        let swift_results = String::from_utf8(exec_out.stdout)?;
+
+        // 5. Compute expected results using Rust implementation
+        struct RustCounter {
+            count: i64,
+        }
+        impl RustCounter {
+            fn new(initial: i64) -> Self {
+                Self { count: initial }
+            }
+            fn increment(&mut self, delta: i64) {
+                self.count += delta;
+            }
+            fn get(&self) -> i64 {
+                self.count
+            }
+        }
+        enum RustAction {
+            Stop,
+            Move(i64, i64),
+            Teleport { x: i64, y: i64 },
+        }
+        fn rust_apply(action: RustAction) -> (i64, i64) {
+            match action {
+                RustAction::Stop => (0, 0),
+                RustAction::Move(dx, dy) => (dx, dy),
+                RustAction::Teleport { x, y } => (x, y),
+            }
+        }
+        fn rust_workflow(initial: i64, delta: i64, action: RustAction) -> (i64, i64, i64) {
+            let mut c = RustCounter::new(initial);
+            c.increment(delta);
+            let coords = rust_apply(action);
+            (c.get(), coords.0, coords.1)
+        }
+
+        let test_cases = [
+            (0, 5, RustAction::Stop),
+            (10, -3, RustAction::Move(4, 7)),
+            (100, 25, RustAction::Teleport { x: -12, y: 88 }),
+            (-50, 50, RustAction::Move(-10, -20)),
+            (42, 0, RustAction::Stop),
+        ];
+
+        let mut rust_lines = Vec::new();
+        for (initial, delta, action) in test_cases {
+            let res = rust_workflow(initial, delta, action);
+            rust_lines.push(format!(
+                "{},{}->({},{},{})",
+                initial, delta, res.0, res.1, res.2
+            ));
+        }
+
+        let swift_lines: Vec<&str> = swift_results
+            .lines()
+            .map(|l| l.trim())
+            .filter(|l| !l.is_empty())
+            .collect();
+
+        let total = rust_lines.len();
+        let mut cases_passed = 0;
+        let mut details = Vec::new();
+
+        for (idx, expected) in rust_lines.iter().enumerate() {
+            if idx < swift_lines.len() && expected == swift_lines[idx] {
+                cases_passed += 1;
+                details.push(format!("Vector #{}: PASS ({})", idx + 1, expected));
+            } else {
+                let actual = if idx < swift_lines.len() {
+                    swift_lines[idx]
+                } else {
+                    "<missing>"
+                };
+                details.push(format!(
+                    "Vector #{}: FAIL (Expected: {}, Got: {})",
+                    idx + 1,
+                    expected,
+                    actual
+                ));
+            }
+        }
+
+        let status = if cases_passed == total {
+            "PASSED"
+        } else {
+            "FAILED"
+        };
+
+        Ok(QualificationReport {
+            fixture_name: "types_methods_and_payload_enums".into(),
+            source_hash,
+            rustc_version: rustc_ver,
+            swift_version: swift_ver,
+            cases_tested: total,
+            cases_passed,
+            cases_failed: total - cases_passed,
+            status: status.into(),
+            timestamp: "2026-10-13T20:00:00Z".into(),
+            details,
+        })
+    }
+
     /// Run negative rejection tests asserting exact stable diagnostic codes
     pub fn test_negative_rejections(
         &self,
@@ -682,8 +892,8 @@ fn main() {
         reports.push(QualificationReport {
             fixture_name: "rejected_raw_pointers".into(),
             source_hash: Self::compute_sha256(ptr_src),
-            rustc_version: rustc_ver,
-            swift_version: swift_ver,
+            rustc_version: rustc_ver.clone(),
+            swift_version: swift_ver.clone(),
             cases_tested: 1,
             cases_passed: if p3 { 1 } else { 0 },
             cases_failed: if p3 { 0 } else { 1 },
@@ -694,6 +904,58 @@ fn main() {
             },
             timestamp: "2026-10-13T20:00:00Z".into(),
             details: vec!["Verified E0003_RAW_POINTER_REJECTED emitted".into()],
+        });
+
+        // 4. Complex trait rejection
+        let trait_src = "pub struct Foo; impl Bar for Foo {}";
+        let mut f4 = Frontend::new("trait_impl.rs");
+        let res4 = f4.parse_and_lower(trait_src);
+        let p4 = res4.is_err()
+            && res4
+                .unwrap_err()
+                .iter()
+                .any(|d| d.code == DiagnosticCode::ComplexTraitRejected);
+        reports.push(QualificationReport {
+            fixture_name: "rejected_complex_traits".into(),
+            source_hash: Self::compute_sha256(trait_src),
+            rustc_version: rustc_ver.clone(),
+            swift_version: swift_ver.clone(),
+            cases_tested: 1,
+            cases_passed: if p4 { 1 } else { 0 },
+            cases_failed: if p4 { 0 } else { 1 },
+            status: if p4 {
+                "REJECTED_AS_EXPECTED".into()
+            } else {
+                "FAILED".into()
+            },
+            timestamp: "2026-10-13T20:00:00Z".into(),
+            details: vec!["Verified E0006_COMPLEX_TRAIT_REJECTED emitted".into()],
+        });
+
+        // 5. Dynamic dispatch rejection
+        let dyn_src = "pub fn call_dyn(x: &dyn Display) {}";
+        let mut f5 = Frontend::new("dyn_trait.rs");
+        let res5 = f5.parse_and_lower(dyn_src);
+        let p5 = res5.is_err()
+            && res5
+                .unwrap_err()
+                .iter()
+                .any(|d| d.code == DiagnosticCode::DynamicDispatchRejected);
+        reports.push(QualificationReport {
+            fixture_name: "rejected_dynamic_dispatch".into(),
+            source_hash: Self::compute_sha256(dyn_src),
+            rustc_version: rustc_ver,
+            swift_version: swift_ver,
+            cases_tested: 1,
+            cases_passed: if p5 { 1 } else { 0 },
+            cases_failed: if p5 { 0 } else { 1 },
+            status: if p5 {
+                "REJECTED_AS_EXPECTED".into()
+            } else {
+                "FAILED".into()
+            },
+            timestamp: "2026-10-13T20:00:00Z".into(),
+            details: vec!["Verified E0005_DYNAMIC_DISPATCH_REJECTED emitted".into()],
         });
 
         Ok(reports)
@@ -735,6 +997,7 @@ mod tests {
         let reports = runner
             .test_negative_rejections()
             .expect("Negative rejections should pass");
+        assert_eq!(reports.len(), 5);
         for r in reports {
             assert_eq!(r.status, "REJECTED_AS_EXPECTED");
         }
@@ -750,6 +1013,19 @@ mod tests {
             .expect("Contract differential test should pass");
         assert_eq!(report.status, "PASSED");
         assert_eq!(report.cases_passed, 7);
+        assert_eq!(report.cases_failed, 0);
+    }
+
+    #[test]
+    fn test_types_differential_passes() {
+        let runner = DifferentialRunner::new(".");
+        let temp_dir = std::env::temp_dir().join("types_diff_test");
+        let _ = fs::create_dir_all(&temp_dir);
+        let report = runner
+            .test_types(&temp_dir)
+            .expect("Types differential test should pass");
+        assert_eq!(report.status, "PASSED");
+        assert_eq!(report.cases_passed, 5);
         assert_eq!(report.cases_failed, 0);
     }
 }

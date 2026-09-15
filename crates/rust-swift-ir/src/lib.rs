@@ -163,6 +163,11 @@ pub enum Pattern {
         enum_name: Option<String>,
         variant: String,
     },
+    EnumVariantPayload {
+        enum_name: Option<String>,
+        variant: String,
+        patterns: Vec<Pattern>,
+    },
     Tuple(Vec<Pattern>),
     Struct {
         name: String,
@@ -318,12 +323,82 @@ pub struct StructDef {
     pub span: SourceSpan,
 }
 
-/// Fieldless Enum definition.
+/// Variant payload data representation.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum VariantPayload {
+    Unit,
+    Tuple(Vec<Type>),
+    Struct(Vec<FieldDef>),
+}
+
+/// Enum variant representation with optional payload.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EnumVariant {
+    pub name: String,
+    pub payload: VariantPayload,
+}
+
+/// Enum definition supporting fieldless and payload-carrying variants.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EnumDef {
     pub name: String,
-    pub variants: Vec<String>,
+    pub variants: Vec<EnumVariant>,
     pub is_public: bool,
+    pub span: SourceSpan,
+}
+
+impl EnumDef {
+    pub fn is_fieldless(&self) -> bool {
+        self.variants
+            .iter()
+            .all(|v| matches!(v.payload, VariantPayload::Unit))
+    }
+}
+
+impl From<&str> for EnumVariant {
+    fn from(name: &str) -> Self {
+        Self {
+            name: name.to_string(),
+            payload: VariantPayload::Unit,
+        }
+    }
+}
+
+impl From<String> for EnumVariant {
+    fn from(name: String) -> Self {
+        Self {
+            name,
+            payload: VariantPayload::Unit,
+        }
+    }
+}
+
+/// Method receiver mutability and reference mode.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ReceiverKind {
+    Value,
+    Ref,
+    MutRef,
+}
+
+/// Method declaration inside an impl block.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Method {
+    pub name: String,
+    pub receiver: Option<ReceiverKind>,
+    pub params: Vec<Param>,
+    pub return_type: Type,
+    pub body: Expr,
+    pub is_public: bool,
+    pub span: SourceSpan,
+}
+
+/// Inherent implementation block for a struct or enum type.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ImplBlock {
+    pub target_type: String,
+    pub methods: Vec<Method>,
     pub span: SourceSpan,
 }
 
@@ -334,6 +409,7 @@ pub enum Item {
     Function(Function),
     Struct(StructDef),
     Enum(EnumDef),
+    Impl(ImplBlock),
 }
 
 /// Top-level compilation unit module.
@@ -454,10 +530,56 @@ impl Module {
                     });
                     edges.push(CsgEdge {
                         from: root_id.clone(),
-                        to: enum_id,
+                        to: enum_id.clone(),
                         relationship: "contains_item".into(),
                         minimum_access: AccessLevel::Public,
                     });
+
+                    for variant in &enm.variants {
+                        let variant_id = format!("{}::{}", enum_id, variant.name);
+                        nodes.push(CsgNode {
+                            id: variant_id.clone(),
+                            name: variant.name.clone(),
+                            kind: CsgNodeKind::Field,
+                            span: enm.span.clone().into(),
+                            minimum_access: if enm.is_public {
+                                AccessLevel::Public
+                            } else {
+                                AccessLevel::Owner
+                            },
+                            size_bytes: None,
+                        });
+                        edges.push(CsgEdge {
+                            from: enum_id.clone(),
+                            to: variant_id,
+                            relationship: "contains_variant".into(),
+                            minimum_access: AccessLevel::Public,
+                        });
+                    }
+                }
+                Item::Impl(imp) => {
+                    let impl_id = format!("{}::{}", root_id, imp.target_type);
+                    for method in &imp.methods {
+                        let method_id = format!("{}::{}", impl_id, method.name);
+                        nodes.push(CsgNode {
+                            id: method_id.clone(),
+                            name: method.name.clone(),
+                            kind: CsgNodeKind::Function,
+                            span: method.span.clone().into(),
+                            minimum_access: if method.is_public {
+                                AccessLevel::Public
+                            } else {
+                                AccessLevel::Owner
+                            },
+                            size_bytes: None,
+                        });
+                        edges.push(CsgEdge {
+                            from: root_id.clone(),
+                            to: method_id,
+                            relationship: "contains_item".into(),
+                            minimum_access: AccessLevel::Public,
+                        });
+                    }
                 }
             }
         }
