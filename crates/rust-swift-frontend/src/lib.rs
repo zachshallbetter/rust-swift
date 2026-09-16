@@ -401,10 +401,47 @@ impl Frontend {
                         "u128" => Type::U128,
                         "usize" => Type::Usize,
                         "bool" => Type::Bool,
+                        "Vec" => {
+                            if let syn::PathArguments::AngleBracketed(args) = &segment.arguments {
+                                if let Some(syn::GenericArgument::Type(inner_ty)) =
+                                    args.args.first()
+                                {
+                                    let elem = self.lower_type(inner_ty);
+                                    return Type::Array {
+                                        element: Box::new(elem),
+                                        size: None,
+                                    };
+                                }
+                            }
+                            Type::Named("Vec".into())
+                        }
                         name => Type::Named(name.into()),
                     }
                 } else {
                     Type::Unit
+                }
+            }
+            syn::Type::Array(arr) => {
+                let elem = self.lower_type(&arr.elem);
+                let size = if let syn::Expr::Lit(syn::ExprLit {
+                    lit: syn::Lit::Int(li),
+                    ..
+                }) = &arr.len
+                {
+                    li.base10_parse::<usize>().ok()
+                } else {
+                    None
+                };
+                Type::Array {
+                    element: Box::new(elem),
+                    size,
+                }
+            }
+            syn::Type::Slice(sl) => {
+                let elem = self.lower_type(&sl.elem);
+                Type::Array {
+                    element: Box::new(elem),
+                    size: None,
                 }
             }
             syn::Type::Tuple(t) if t.elems.is_empty() => Type::Unit,
@@ -871,6 +908,16 @@ impl Frontend {
                 );
                 Expr::new(ExprKind::Literal(Literal::Unit), Type::Unit)
             }
+            syn::Expr::Array(arr) => {
+                let elems = arr.elems.iter().map(|e| self.lower_expr(e)).collect();
+                Expr::new(
+                    ExprKind::Array(elems),
+                    Type::Array {
+                        element: Box::new(Type::Unit),
+                        size: None,
+                    },
+                )
+            }
             syn::Expr::Macro(m) => self.lower_macro_expr(&m.mac),
             other => {
                 self.reject(
@@ -1024,12 +1071,26 @@ impl Frontend {
                 };
                 Expr::new(ExprKind::Panic(message), Type::Unit)
             }
+            "vec" => {
+                let parser = Punctuated::<syn::Expr, Token![,]>::parse_terminated;
+                let elems = match parser.parse2(mac.tokens.clone()) {
+                    Ok(args) => args.iter().map(|a| self.lower_expr(a)).collect(),
+                    _ => Vec::new(),
+                };
+                Expr::new(
+                    ExprKind::Array(elems),
+                    Type::Array {
+                        element: Box::new(Type::Unit),
+                        size: None,
+                    },
+                )
+            }
             _ => {
                 self.reject(
                     DiagnosticCode::MacroRejected,
                     format!("Macro '{macro_name}!' in expression position is rejected in v0.1"),
                     mac,
-                    Some("Only panic! is admitted in expression position"),
+                    Some("Only panic! and vec! are admitted in expression position"),
                 );
                 Expr::new(ExprKind::Literal(Literal::Unit), Type::Unit)
             }
