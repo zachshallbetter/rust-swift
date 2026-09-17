@@ -1218,6 +1218,250 @@ struct EventTraceRunner {
         })
     }
 
+    /// Run data semantics differential tests (Option, Result, UTF-8 byte slicing)
+    pub fn test_data_semantics(
+        &self,
+        out_dir: &Path,
+    ) -> Result<QualificationReport, Box<dyn std::error::Error>> {
+        let data_source = r#"
+pub enum MathError {
+    DivideByZero,
+}
+
+pub fn safe_divide(a: i64, b: i64) -> Result<i64, MathError> {
+    if b == 0 {
+        Err(MathError::DivideByZero)
+    } else {
+        Ok(a / b)
+    }
+}
+
+pub fn process_option(opt: Option<i64>) -> i64 {
+    match opt {
+        Some(v) => v * 2,
+        None => -1,
+    }
+}
+
+pub fn slice_greeting(s: String) -> String {
+    let sub = &s[0..5];
+    sub
+}
+
+pub fn slice_emoji(s: String) -> String {
+    let sub = &s[6..10];
+    sub
+}
+
+pub fn string_byte_length(s: String) -> i64 {
+    s.len() as i64
+}
+"#;
+
+        let source_hash = Self::compute_sha256(data_source);
+        let (rustc_ver, swift_ver) = Self::toolchain_versions();
+
+        // 1. Lower to IR
+        let mut frontend = Frontend::new("data_semantics.rs");
+        let module = frontend
+            .parse_and_lower(data_source)
+            .map_err(|diags| format!("Frontend rejected data semantics fixture: {:?}", diags))?;
+
+        // 2. Generate Swift package
+        let pkg_dir = out_dir.join("data_pkg");
+        let mut generator = SwiftGenerator::new();
+        generator.emit_package(&module, &pkg_dir, "DataModule")?;
+
+        // 3. Create Swift test runner
+        let runner_swift = r#"
+import Foundation
+
+@main
+struct DataRunner {
+    static func main() {
+        // Case 1: Result Success
+        let r1 = safe_divide(100, 5)
+        print("case1:\(r1.is_ok()):\(r1.unwrap())")
+
+        // Case 2: Result Failure
+        let r2 = safe_divide(100, 0)
+        let r2_str: String
+        switch r2 {
+        case .success(let val): r2_str = "ok:\(val)"
+        case .failure: r2_str = "err"
+        }
+        print("case2:\(r2.is_err()):\(r2_str)")
+
+        // Case 3: Option Some
+        let o1: Int64? = .some(21)
+        print("case3:\(o1.is_some()):\(process_option(o1))")
+
+        // Case 4: Option None
+        let o2: Int64? = nil
+        print("case4:\(o2.is_none()):\(process_option(o2))")
+
+        // Case 5: UTF-8 String Slicing (ASCII)
+        let s = "Hello 🌍 world"
+        let sub1 = slice_greeting(s)
+        print("case5:\(sub1)")
+
+        // Case 6: UTF-8 String Slicing (Multi-byte Unicode Emoji: 4 bytes)
+        let sub2 = slice_emoji(s)
+        print("case6:\(sub2)")
+
+        // Case 7: UTF-8 Byte Length
+        let l = string_byte_length(s)
+        print("case7:\(l)")
+    }
+}
+"#;
+        let sources_dir = pkg_dir.join("Sources").join("DataModule");
+        let main_swift_path = sources_dir.join("main.swift");
+        fs::write(&main_swift_path, runner_swift)?;
+
+        // 4. Compile and execute Swift code
+        let swift_source = sources_dir.join("data_semantics.swift");
+        let rust_compat = sources_dir.join("RustCompat.swift");
+        let swiftc_out = Command::new("swiftc")
+            .arg("-parse-as-library")
+            .arg("-emit-executable")
+            .arg(&swift_source)
+            .arg(&rust_compat)
+            .arg(&main_swift_path)
+            .arg("-o")
+            .arg(pkg_dir.join("data_runner"))
+            .output()?;
+
+        if !swiftc_out.status.success() {
+            return Err(format!(
+                "Failed to compile Swift DataSemantics runner: {}",
+                String::from_utf8_lossy(&swiftc_out.stderr)
+            )
+            .into());
+        }
+
+        let exec_out = Command::new(pkg_dir.join("data_runner")).output()?;
+        let swift_results = String::from_utf8(exec_out.stdout)?;
+
+        // 5. Compute expected results using Rust implementation
+        #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+        enum MathError {
+            DivideByZero,
+        }
+        fn rust_safe_divide(a: i64, b: i64) -> Result<i64, MathError> {
+            if b == 0 {
+                Err(MathError::DivideByZero)
+            } else {
+                Ok(a / b)
+            }
+        }
+        fn rust_process_option(opt: Option<i64>) -> i64 {
+            match opt {
+                Some(v) => v * 2,
+                None => -1,
+            }
+        }
+        fn rust_slice_greeting(s: &str) -> String {
+            s[0..5].to_string()
+        }
+        fn rust_slice_emoji(s: &str) -> String {
+            s[6..10].to_string()
+        }
+        fn rust_string_byte_length(s: &str) -> i64 {
+            s.len() as i64
+        }
+
+        let mut rust_lines = Vec::new();
+        // Case 1
+        let r1 = rust_safe_divide(100, 5);
+        rust_lines.push(format!("case1:{}:{}", r1.is_ok(), r1.unwrap()));
+        // Case 2
+        let r2 = rust_safe_divide(100, 0);
+        let r2_str = match r2 {
+            Ok(v) => format!("ok:{}", v),
+            Err(_) => "err".to_string(),
+        };
+        rust_lines.push(format!("case2:{}:{}", r2.is_err(), r2_str));
+        // Case 3
+        let o1 = Some(21);
+        rust_lines.push(format!(
+            "case3:{}:{}",
+            o1.is_some(),
+            rust_process_option(o1)
+        ));
+        // Case 4
+        let o2 = None;
+        rust_lines.push(format!(
+            "case4:{}:{}",
+            o2.is_none(),
+            rust_process_option(o2)
+        ));
+        // Case 5, 6, 7
+        let s = "Hello 🌍 world";
+        rust_lines.push(format!("case5:{}", rust_slice_greeting(s)));
+        rust_lines.push(format!("case6:{}", rust_slice_emoji(s)));
+        rust_lines.push(format!("case7:{}", rust_string_byte_length(s)));
+
+        let swift_lines: Vec<&str> = swift_results
+            .lines()
+            .map(|l| l.trim())
+            .filter(|l| !l.is_empty())
+            .collect();
+
+        let total = rust_lines.len();
+        let mut cases_passed = 0;
+        let mut details = Vec::new();
+
+        for (idx, expected) in rust_lines.iter().enumerate() {
+            if idx < swift_lines.len() && expected == swift_lines[idx] {
+                cases_passed += 1;
+                details.push(format!("Case #{}: PASS ({})", idx + 1, expected));
+            } else {
+                let actual = if idx < swift_lines.len() {
+                    swift_lines[idx]
+                } else {
+                    "<missing>"
+                };
+                details.push(format!(
+                    "Case #{}: FAIL (Expected: {}, Got: {})",
+                    idx + 1,
+                    expected,
+                    actual
+                ));
+            }
+        }
+
+        let rust_full = rust_lines.join("\n");
+        let swift_full = swift_lines.join("\n");
+        let rust_digest = Self::compute_sha256(&rust_full);
+        let swift_digest = Self::compute_sha256(&swift_full);
+
+        let digests_match = rust_digest == swift_digest;
+        details.push(format!(
+            "Data trace digest verification: Rust={}, Swift={}, Equal={}",
+            rust_digest, swift_digest, digests_match
+        ));
+
+        let status = if cases_passed == total && digests_match {
+            "PASSED"
+        } else {
+            "FAILED"
+        };
+
+        Ok(QualificationReport {
+            fixture_name: "data_semantics_option_result_strings".into(),
+            source_hash,
+            rustc_version: rustc_ver,
+            swift_version: swift_ver,
+            cases_tested: total,
+            cases_passed,
+            cases_failed: total - cases_passed,
+            status: status.into(),
+            timestamp: "2026-10-13T20:00:00Z".into(),
+            details,
+        })
+    }
+
     /// Run negative rejection tests asserting exact stable diagnostic codes
     pub fn test_negative_rejections(
         &self,
@@ -1341,8 +1585,8 @@ struct EventTraceRunner {
         reports.push(QualificationReport {
             fixture_name: "rejected_dynamic_dispatch".into(),
             source_hash: Self::compute_sha256(dyn_src),
-            rustc_version: rustc_ver,
-            swift_version: swift_ver,
+            rustc_version: rustc_ver.clone(),
+            swift_version: swift_ver.clone(),
             cases_tested: 1,
             cases_passed: if p5 { 1 } else { 0 },
             cases_failed: if p5 { 0 } else { 1 },
@@ -1353,6 +1597,32 @@ struct EventTraceRunner {
             },
             timestamp: "2026-10-13T20:00:00Z".into(),
             details: vec!["Verified E0005_DYNAMIC_DISPATCH_REJECTED emitted".into()],
+        });
+
+        // 6. Generic rejection
+        let gen_src = "pub fn identity<T>(x: T) -> T { x }";
+        let mut f6 = Frontend::new("generic.rs");
+        let res6 = f6.parse_and_lower(gen_src);
+        let p6 = res6.is_err()
+            && res6
+                .unwrap_err()
+                .iter()
+                .any(|d| d.code == DiagnosticCode::UnspecializableGenericRejected);
+        reports.push(QualificationReport {
+            fixture_name: "rejected_generics".into(),
+            source_hash: Self::compute_sha256(gen_src),
+            rustc_version: rustc_ver,
+            swift_version: swift_ver,
+            cases_tested: 1,
+            cases_passed: if p6 { 1 } else { 0 },
+            cases_failed: if p6 { 0 } else { 1 },
+            status: if p6 {
+                "REJECTED_AS_EXPECTED".into()
+            } else {
+                "FAILED".into()
+            },
+            timestamp: "2026-10-13T20:00:00Z".into(),
+            details: vec!["Verified E0011_UNSPECIALIZABLE_GENERIC_REJECTED emitted".into()],
         });
 
         Ok(reports)
@@ -1394,7 +1664,7 @@ mod tests {
         let reports = runner
             .test_negative_rejections()
             .expect("Negative rejections should pass");
-        assert_eq!(reports.len(), 5);
+        assert_eq!(reports.len(), 6);
         for r in reports {
             assert_eq!(r.status, "REJECTED_AS_EXPECTED");
         }
@@ -1436,6 +1706,19 @@ mod tests {
             .expect("Event trace differential test should pass");
         assert_eq!(report.status, "PASSED");
         assert_eq!(report.cases_passed, 50);
+        assert_eq!(report.cases_failed, 0);
+    }
+
+    #[test]
+    fn test_data_semantics_differential_passes() {
+        let runner = DifferentialRunner::new(".");
+        let temp_dir = std::env::temp_dir().join("data_semantics_diff_test");
+        let _ = fs::create_dir_all(&temp_dir);
+        let report = runner
+            .test_data_semantics(&temp_dir)
+            .expect("Data semantics differential test should pass");
+        assert_eq!(report.status, "PASSED");
+        assert_eq!(report.cases_passed, 7);
         assert_eq!(report.cases_failed, 0);
     }
 }
