@@ -113,13 +113,27 @@ impl Frontend {
                 None
             }
             syn::Item::Impl(imp) => {
-                if imp.trait_.is_some() {
-                    self.reject(
-                        DiagnosticCode::ComplexTraitRejected,
-                        "Trait implementations are rejected in v0.1",
-                        imp,
-                        Some("Use standalone pure functions or inherent methods"),
-                    );
+                if let Some((_, trait_path, _)) = &imp.trait_ {
+                    let trait_name = trait_path
+                        .segments
+                        .last()
+                        .map(|s| s.ident.to_string())
+                        .unwrap_or_default();
+                    if trait_name == "Drop" {
+                        self.reject(
+                            DiagnosticCode::CustomDropRejected,
+                            "Custom Drop implementations are rejected in v0.1",
+                            imp,
+                            Some("Rely on deterministic value semantics and lexical scoping"),
+                        );
+                    } else {
+                        self.reject(
+                            DiagnosticCode::ComplexTraitRejected,
+                            "Trait implementations are rejected in v0.1",
+                            imp,
+                            Some("Use standalone pure functions or inherent methods"),
+                        );
+                    }
                     None
                 } else {
                     let target_type = match &*imp.self_ty {
@@ -218,11 +232,12 @@ impl Frontend {
                             "arg".into()
                         }
                     };
+                    let ty = self.lower_type(&pat_type.ty);
+                    let is_ref_mut = matches!(&ty, Type::Ref { mutable: true, .. });
                     let mutable = match &*pat_type.pat {
                         syn::Pat::Ident(id) => id.mutability.is_some(),
                         _ => false,
-                    };
-                    let ty = self.lower_type(&pat_type.ty);
+                    } || is_ref_mut;
                     params.push(Param {
                         name: param_name,
                         ty,
@@ -274,11 +289,12 @@ impl Frontend {
                         syn::Pat::Ident(id) => id.ident.to_string(),
                         _ => "arg".into(),
                     };
+                    let ty = self.lower_type(&pat_type.ty);
+                    let is_ref_mut = matches!(&ty, Type::Ref { mutable: true, .. });
                     let mutable = match &*pat_type.pat {
                         syn::Pat::Ident(id) => id.mutability.is_some(),
                         _ => false,
-                    };
-                    let ty = self.lower_type(&pat_type.ty);
+                    } || is_ref_mut;
                     params.push(Param {
                         name: param_name,
                         ty,
@@ -452,6 +468,32 @@ impl Frontend {
                             }
                             Type::Named("Vec".into())
                         }
+                        "RefCell" | "Cell" | "Mutex" | "RwLock" => {
+                            self.reject(
+                                DiagnosticCode::InteriorMutabilityRejected,
+                                format!(
+                                    "Interior mutability type '{}' is rejected in v0.1",
+                                    segment.ident
+                                ),
+                                &segment.ident,
+                                Some(
+                                    "Use exclusive mutable references (&mut T) or value mutations",
+                                ),
+                            );
+                            Type::Unit
+                        }
+                        "Rc" | "Arc" => {
+                            self.reject(
+                                DiagnosticCode::SharedReferenceRejected,
+                                format!(
+                                    "Shared reference-counted type '{}' is rejected in v0.1",
+                                    segment.ident
+                                ),
+                                &segment.ident,
+                                Some("Use single-owner value hierarchies or inout passing"),
+                            );
+                            Type::Unit
+                        }
                         name => Type::Named(name.into()),
                     }
                 } else {
@@ -559,6 +601,44 @@ impl Frontend {
                                 let target = self.lower_expr(&assign.left);
                                 let value = self.lower_expr(&assign.right);
                                 stmts.push(Stmt::Assign { target, value });
+                            }
+                            syn::Expr::Binary(bin) => {
+                                let maybe_int_op = match bin.op {
+                                    syn::BinOp::AddAssign(_) => Some(IntegerOp::Add),
+                                    syn::BinOp::SubAssign(_) => Some(IntegerOp::Sub),
+                                    syn::BinOp::MulAssign(_) => Some(IntegerOp::Mul),
+                                    syn::BinOp::DivAssign(_) => Some(IntegerOp::Div),
+                                    syn::BinOp::RemAssign(_) => Some(IntegerOp::Rem),
+                                    syn::BinOp::BitXorAssign(_) => Some(IntegerOp::BitXor),
+                                    syn::BinOp::BitAndAssign(_) => Some(IntegerOp::BitAnd),
+                                    syn::BinOp::BitOrAssign(_) => Some(IntegerOp::BitOr),
+                                    syn::BinOp::ShlAssign(_) => Some(IntegerOp::Shl),
+                                    syn::BinOp::ShrAssign(_) => Some(IntegerOp::Shr),
+                                    _ => None,
+                                };
+                                if let Some(op) = maybe_int_op {
+                                    let target = self.lower_expr(&bin.left);
+                                    let value = self.lower_expr(&bin.right);
+                                    let res_ty = target.ty.clone();
+                                    let binary_val = Expr::new(
+                                        ExprKind::Binary {
+                                            op: BinaryOp::Arithmetic {
+                                                op,
+                                                mode: IntegerMode::Checked,
+                                            },
+                                            left: Box::new(target.clone()),
+                                            right: Box::new(value),
+                                        },
+                                        res_ty,
+                                    );
+                                    stmts.push(Stmt::Assign {
+                                        target,
+                                        value: binary_val,
+                                    });
+                                } else {
+                                    let ir_expr = self.lower_expr(expr);
+                                    stmts.push(Stmt::Expr(ir_expr));
+                                }
                             }
                             _ => {
                                 let ir_expr = self.lower_expr(expr);
@@ -790,6 +870,26 @@ impl Frontend {
                 }
             }
             syn::Expr::Call(call) => {
+                let mut mut_borrowed_vars = std::collections::HashSet::new();
+                for arg in &call.args {
+                    if let syn::Expr::Reference(r) = arg {
+                        if r.mutability.is_some() {
+                            if let syn::Expr::Path(p) = &*r.expr {
+                                if let Some(ident) = p.path.get_ident() {
+                                    let name = ident.to_string();
+                                    if !mut_borrowed_vars.insert(name.clone()) {
+                                        self.reject(
+                                            DiagnosticCode::AliasedMutationRejected,
+                                            format!("Simultaneous mutable borrows of '{name}' are rejected"),
+                                            arg,
+                                            Some("Ensure exclusive access when passing &mut parameters"),
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
                 let func_name = match &*call.func {
                     syn::Expr::Path(p) => p
                         .path
@@ -955,7 +1055,24 @@ impl Frontend {
                     },
                 )
             }
-            syn::Expr::Reference(r) => self.lower_expr(&r.expr),
+            syn::Expr::Reference(r) => {
+                let inner = self.lower_expr(&r.expr);
+                if r.mutability.is_some() {
+                    let ty = Type::Ref {
+                        inner: Box::new(inner.ty.clone()),
+                        mutable: true,
+                    };
+                    Expr::new(
+                        ExprKind::Borrow {
+                            expr: Box::new(inner),
+                            mutable: true,
+                        },
+                        ty,
+                    )
+                } else {
+                    inner
+                }
+            }
             syn::Expr::Index(idx) => {
                 let expr = Box::new(self.lower_expr(&idx.expr));
                 match &*idx.index {
@@ -1541,6 +1658,69 @@ mod tests {
         let module = frontend
             .parse_and_lower(src)
             .expect("Should parse and lower data semantics");
+        assert_eq!(module.items.len(), 1);
+    }
+
+    #[test]
+    fn test_custom_drop_rejected_with_e0007() {
+        let src = r#"
+            pub struct Resource;
+            impl Drop for Resource {
+                fn drop(&mut self) {}
+            }
+        "#;
+        let mut frontend = Frontend::new("drop.rs");
+        let errs = frontend
+            .parse_and_lower(src)
+            .expect_err("Should reject custom Drop");
+        assert!(errs
+            .iter()
+            .any(|d| d.code == DiagnosticCode::CustomDropRejected));
+    }
+
+    #[test]
+    fn test_interior_mutability_rejected_with_e0012() {
+        let src = r#"
+            pub fn use_cell(c: RefCell<i32>) {}
+        "#;
+        let mut frontend = Frontend::new("cell.rs");
+        let errs = frontend
+            .parse_and_lower(src)
+            .expect_err("Should reject interior mutability");
+        assert!(errs
+            .iter()
+            .any(|d| d.code == DiagnosticCode::InteriorMutabilityRejected));
+    }
+
+    #[test]
+    fn test_aliased_mutation_rejected_with_e0006() {
+        let src = r#"
+            pub fn mutate_two(a: &mut i32, b: &mut i32) {}
+            pub fn test_alias() {
+                let mut x = 10;
+                mutate_two(&mut x, &mut x);
+            }
+        "#;
+        let mut frontend = Frontend::new("alias.rs");
+        let errs = frontend
+            .parse_and_lower(src)
+            .expect_err("Should reject aliased mutation");
+        assert!(errs
+            .iter()
+            .any(|d| d.code == DiagnosticCode::AliasedMutationRejected));
+    }
+
+    #[test]
+    fn test_inout_parameter_and_borrow_lowering() {
+        let src = r#"
+            pub fn add_amount(val: &mut i64, delta: i64) {
+                *val += delta;
+            }
+        "#;
+        let mut frontend = Frontend::new("inout.rs");
+        let module = frontend
+            .parse_and_lower(src)
+            .expect("Should parse and lower inout function");
         assert_eq!(module.items.len(), 1);
     }
 }

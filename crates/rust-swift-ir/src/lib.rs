@@ -260,6 +260,10 @@ pub enum ExprKind {
         start: Option<Box<Expr>>,
         end: Option<Box<Expr>>,
     },
+    Borrow {
+        expr: Box<Expr>,
+        mutable: bool,
+    },
     Return(Option<Box<Expr>>),
     Break(Option<Box<Expr>>),
     Continue,

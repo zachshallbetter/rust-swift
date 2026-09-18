@@ -1,0 +1,41 @@
+# Formal Ownership and Region Classification Specification
+# rust-swift compiler v0.1
+
+contract_id: "rust-swift.contracts.ownership_regions.v0_1"
+schema_version: "1.0.0"
+title: "Ownership, Region Classification, and Inout Exclusivity"
+status: "active"
+
+description: >
+  Formalizes the translation of Rust affine ownership semantics, exclusive mutable
+  borrows, and parameter passing modes into Swift value semantics and inout exclusivity,
+  enforcing memory safety without reference counting overhead.
+
+passing_modes:
+  - rust_mode: "T"
+    swift_target: "T"
+    classification: "Value move / copy"
+    semantics: "Immutable parameter binding in Swift callee body."
+
+  - rust_mode: "&T"
+    swift_target: "T"
+    classification: "Read-only borrow"
+    semantics: "Immutable parameter binding in Swift callee body without copy allocation."
+
+  - rust_mode: "&mut T"
+    swift_target: "inout T"
+    classification: "Exclusive mutable borrow"
+    semantics: "Exclusive read-write access conforming to Swift Law of Exclusivity; callers pass &argument."
+
+rejections:
+  - code: "E0007_CUSTOM_DROP_REJECTED"
+    reason: "Custom Drop trait implementations are rejected in v0.1."
+    remedy: "Rely on deterministic lexical scope reclamation and value semantics."
+
+  - code: "E0012_INTERIOR_MUTABILITY_REJECTED"
+    reason: "Interior mutability types (RefCell, Cell, Mutex, RwLock) are rejected in v0.1."
+    remedy: "Use exclusive mutable borrows (&mut T) or value mutations."
+
+  - code: "E0013_SHARED_REFERENCE_REJECTED"
+    reason: "Shared reference-counted pointers (Rc, Arc) are rejected in v0.1."
+    remedy: "Use single-owner value hierarchies or inout passing."
