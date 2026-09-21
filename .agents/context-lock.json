@@ -6,9 +6,9 @@
   "selectedPaths": [],
   "sourceSelection": {
     "includedCount": 112,
-    "includedBytes": 727135,
+    "includedBytes": 729170,
     "excludedCounts": {
-      "excluded-directory": 18725,
+      "excluded-directory": 19449,
       "excluded-path": 1,
       "extension": 1320,
       "symlink": 1
@@ -20,14 +20,14 @@
     "repositories": [
       {
         "path": ".",
-        "commit": "ccd179249a970f6dadafed09e537363588acf614",
-        "branch": "feature/ownership-regions",
+        "commit": "8e28d72132e8fa1cef67d982936b87f386dda5ab",
+        "branch": "main",
         "dirty": true,
         "remote": "https://github.com/zachshallbetter/rust-swift.git"
       }
     ]
   },
-  "aggregateSourceDigest": "c6c3925711727de1506eaab2b2a7b610cee49dc5a58d1aef7fa83fcaadb12713",
+  "aggregateSourceDigest": "5a0b19a5ee51e81ef5d59bd5ddc90c3c491a3d95e9ec6c8d12f61f4d5f17b7e7",
   "sources": [
     {
       "path": ".agents/rules/ci.md",
@@ -181,8 +181,8 @@
     },
     {
       "path": "crates/rust-swift-cli/src/main.rs",
-      "bytes": 11247,
-      "sha256": "36714751498631b8134c01e869776988e4dd56338d2d0ef8698fcd1ef03b668c"
+      "bytes": 13282,
+      "sha256": "724ad529b1f87e9add832375162e2ef5113aff8eca85345100fb3dc6cecb7366"
     },
     {
       "path": "crates/rust-swift-codegen/Cargo.toml",

@@ -156,7 +156,11 @@ fn diff_test_command(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>
     println!("Running Rust -> Swift Differential Qualification Suite");
     println!("============================================================");
 
+    const EXPECTED_NEGATIVE_FIXTURES: usize = 9;
+    const EXPECTED_TOTAL_REPORTS: usize = 7 + EXPECTED_NEGATIVE_FIXTURES;
+
     let mut reports = Vec::new();
+    let mut execution_failed = false;
 
     // 1. Finite State Machine
     println!("\n[1/8] Running Finite State Machine differential test...");
@@ -169,7 +173,8 @@ fn diff_test_command(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>
             reports.push(report);
         }
         Err(e) => {
-            eprintln!("  Error in FSM differential test: {}", e);
+            execution_failed = true;
+            eprintln!("  FAILED execution in FSM differential test: {}", e);
         }
     }
 
@@ -184,7 +189,8 @@ fn diff_test_command(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>
             reports.push(report);
         }
         Err(e) => {
-            eprintln!("  Error in Arithmetic differential test: {}", e);
+            execution_failed = true;
+            eprintln!("  FAILED execution in Arithmetic differential test: {}", e);
         }
     }
 
@@ -199,7 +205,8 @@ fn diff_test_command(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>
             reports.push(report);
         }
         Err(e) => {
-            eprintln!("  Error in Contract differential test: {}", e);
+            execution_failed = true;
+            eprintln!("  FAILED execution in Contract differential test: {}", e);
         }
     }
 
@@ -214,7 +221,8 @@ fn diff_test_command(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>
             reports.push(report);
         }
         Err(e) => {
-            eprintln!("  Error in Type System differential test: {}", e);
+            execution_failed = true;
+            eprintln!("  FAILED execution in Type System differential test: {}", e);
         }
     }
 
@@ -229,7 +237,11 @@ fn diff_test_command(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>
             reports.push(report);
         }
         Err(e) => {
-            eprintln!("  Error in Event Dispatch differential test: {}", e);
+            execution_failed = true;
+            eprintln!(
+                "  FAILED execution in Event Dispatch differential test: {}",
+                e
+            );
         }
     }
 
@@ -244,7 +256,11 @@ fn diff_test_command(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>
             reports.push(report);
         }
         Err(e) => {
-            eprintln!("  Error in Data Semantics differential test: {}", e);
+            execution_failed = true;
+            eprintln!(
+                "  FAILED execution in Data Semantics differential test: {}",
+                e
+            );
         }
     }
 
@@ -259,7 +275,8 @@ fn diff_test_command(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>
             reports.push(report);
         }
         Err(e) => {
-            eprintln!("  Error in Ownership differential test: {}", e);
+            execution_failed = true;
+            eprintln!("  FAILED execution in Ownership differential test: {}", e);
         }
     }
 
@@ -267,6 +284,14 @@ fn diff_test_command(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>
     println!("\n[8/8] Running Negative Rejection policy test...");
     match runner.test_negative_rejections() {
         Ok(neg_reports) => {
+            if neg_reports.len() != EXPECTED_NEGATIVE_FIXTURES {
+                execution_failed = true;
+                eprintln!(
+                    "  Negative rejections executed {} fixtures, expected {}",
+                    neg_reports.len(),
+                    EXPECTED_NEGATIVE_FIXTURES
+                );
+            }
             for r in neg_reports {
                 println!(
                     "  Fixture '{}': {} (Cases passed: {}/{})",
@@ -276,7 +301,8 @@ fn diff_test_command(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>
             }
         }
         Err(e) => {
-            eprintln!("  Error in Negative Rejection test: {}", e);
+            execution_failed = true;
+            eprintln!("  FAILED execution in Negative Rejection test: {}", e);
         }
     }
 
@@ -296,9 +322,10 @@ fn diff_test_command(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>
                 "swift": report.swift_version,
                 "cases_tested": report.cases_tested,
                 "cases_passed": report.cases_passed,
+                "cases_failed": report.cases_failed,
                 "status": report.status,
                 "timestamp": report.timestamp,
-                "disposition": if report.cases_failed == 0 { "observed" } else { "contradicted" }
+                "disposition": if report.cases_failed == 0 && report.cases_tested > 0 { "observed" } else { "contradicted" }
             });
             let _ = writeln!(file, "{}", record);
         }
@@ -309,11 +336,39 @@ fn diff_test_command(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>
     }
 
     println!("\n============================================================");
-    let all_passed = reports.iter().all(|r| r.cases_failed == 0);
+
+    let total_assertions: usize = reports.iter().map(|r| r.cases_tested).sum();
+    let total_passed: usize = reports.iter().map(|r| r.cases_passed).sum();
+    let total_failed: usize = reports.iter().map(|r| r.cases_failed).sum();
+
+    let all_passed = !execution_failed
+        && reports.len() == EXPECTED_TOTAL_REPORTS
+        && total_assertions > 0
+        && total_failed == 0
+        && total_passed == total_assertions
+        && reports.iter().all(|r| {
+            (r.status == "PASSED" || r.status == "REJECTED_AS_EXPECTED")
+                && r.cases_tested > 0
+                && r.cases_failed == 0
+                && r.cases_passed == r.cases_tested
+        });
+
     if all_passed {
-        println!("All differential qualification checks PASSED!");
+        println!(
+            "All differential qualification checks PASSED! ({} reports, {} assertions executed, 0 failed)",
+            reports.len(),
+            total_assertions
+        );
     } else {
-        println!("Differential qualification FAILED on some cases.");
+        eprintln!(
+            "Differential qualification FAILED! (execution_failed={}, reports={}/{}, passed={}/{}, failed={})",
+            execution_failed,
+            reports.len(),
+            EXPECTED_TOTAL_REPORTS,
+            total_passed,
+            total_assertions,
+            total_failed
+        );
         std::process::exit(1);
     }
 
