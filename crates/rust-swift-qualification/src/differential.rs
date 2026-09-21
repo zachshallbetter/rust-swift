@@ -9,6 +9,17 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+/// Explicit terminal qualification outcome for strict fail-closed reporting.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum QualificationOutcome {
+    Passed,
+    Failed,
+    InfrastructureError,
+    NotExecuted,
+    Inconclusive,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QualificationReport {
     pub fixture_name: String,
@@ -1853,7 +1864,7 @@ struct OwnershipRunner {
                 "FAILED".into()
             },
             timestamp: "2026-10-13T20:00:00Z".into(),
-            details: vec!["Verified E0007_CUSTOM_DROP_REJECTED emitted".into()],
+            details: vec!["Verified E0014_CUSTOM_DROP_REJECTED emitted".into()],
         });
 
         // 8. Interior mutability rejection
@@ -1894,8 +1905,8 @@ struct OwnershipRunner {
         reports.push(QualificationReport {
             fixture_name: "rejected_aliased_mutation".into(),
             source_hash: Self::compute_sha256(alias_src),
-            rustc_version: rustc_ver,
-            swift_version: swift_ver,
+            rustc_version: rustc_ver.clone(),
+            swift_version: swift_ver.clone(),
             cases_tested: 1,
             cases_passed: if p9 { 1 } else { 0 },
             cases_failed: if p9 { 0 } else { 1 },
@@ -1905,7 +1916,33 @@ struct OwnershipRunner {
                 "FAILED".into()
             },
             timestamp: "2026-10-13T20:00:00Z".into(),
-            details: vec!["Verified E0006_ALIASED_MUTATION_REJECTED emitted".into()],
+            details: vec!["Verified E0010_ALIASED_MUTATION_REJECTED emitted".into()],
+        });
+
+        // 10. 128-bit integer rejection (forbidding silent narrowing to 64-bit)
+        let int128_src = "pub fn test128(x: i128) -> i128 { x }";
+        let mut f10 = Frontend::new("int128.rs");
+        let res10 = f10.parse_and_lower(int128_src);
+        let p10 = res10.is_err()
+            && res10
+                .unwrap_err()
+                .iter()
+                .any(|d| d.code == DiagnosticCode::Int128UnsupportedRejected);
+        reports.push(QualificationReport {
+            fixture_name: "rejected_int128".into(),
+            source_hash: Self::compute_sha256(int128_src),
+            rustc_version: rustc_ver,
+            swift_version: swift_ver,
+            cases_tested: 1,
+            cases_passed: if p10 { 1 } else { 0 },
+            cases_failed: if p10 { 0 } else { 1 },
+            status: if p10 {
+                "REJECTED_AS_EXPECTED".into()
+            } else {
+                "FAILED".into()
+            },
+            timestamp: "2026-10-13T20:00:00Z".into(),
+            details: vec!["Verified E0015_INT128_UNSUPPORTED_REJECTED emitted".into()],
         });
 
         Ok(reports)
@@ -1947,7 +1984,7 @@ mod tests {
         let reports = runner
             .test_negative_rejections()
             .expect("Negative rejections should pass");
-        assert_eq!(reports.len(), 9);
+        assert_eq!(reports.len(), 10);
         for r in reports {
             assert_eq!(r.status, "REJECTED_AS_EXPECTED");
         }

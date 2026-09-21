@@ -60,20 +60,12 @@ impl SwiftGenerator {
         for item in &module.items {
             match item {
                 Item::Function(func) => {
-                    let inouts = func
-                        .params
-                        .iter()
-                        .map(|p| p.mutable || matches!(&p.ty, Type::Ref { mutable: true, .. }))
-                        .collect();
+                    let inouts = func.params.iter().map(|p| p.is_exclusive_ref()).collect();
                     self.fn_inouts.insert(func.name.clone(), inouts);
                 }
                 Item::Impl(imp) => {
                     for method in &imp.methods {
-                        let inouts = method
-                            .params
-                            .iter()
-                            .map(|p| p.mutable || matches!(&p.ty, Type::Ref { mutable: true, .. }))
-                            .collect();
+                        let inouts = method.params.iter().map(|p| p.is_exclusive_ref()).collect();
                         self.fn_inouts.insert(method.name.clone(), inouts);
                     }
                 }
@@ -121,13 +113,17 @@ impl SwiftGenerator {
             Type::I16 => "Int16".into(),
             Type::I32 => "Int32".into(),
             Type::I64 => "Int64".into(),
-            Type::I128 => "Int64".into(), // Fallback for 64-bit platforms
+            Type::I128 => {
+                panic!("Type::I128 must be rejected by frontend; silent narrowing to 64-bit is forbidden")
+            }
             Type::Isize => "Int".into(),
             Type::U8 => "UInt8".into(),
             Type::U16 => "UInt16".into(),
             Type::U32 => "UInt32".into(),
             Type::U64 => "UInt64".into(),
-            Type::U128 => "UInt64".into(),
+            Type::U128 => {
+                panic!("Type::U128 must be rejected by frontend; silent narrowing to 64-bit is forbidden")
+            }
             Type::Usize => "UInt".into(),
             Type::Bool => "Bool".into(),
             Type::Unit => "Void".into(),
@@ -324,11 +320,14 @@ impl SwiftGenerator {
             .params
             .iter()
             .map(|p| {
-                let ty_str = self.map_type(&p.ty);
-                if p.mutable && !ty_str.starts_with("inout ") {
-                    format!("_ {}: inout {}", p.name, ty_str)
+                if p.is_exclusive_ref() {
+                    let inner_ty = match &p.ty {
+                        Type::Ref { inner, .. } => self.map_type(inner),
+                        other => self.map_type(other),
+                    };
+                    format!("_ {}: inout {}", p.name, inner_ty)
                 } else {
-                    format!("_ {}: {}", p.name, ty_str)
+                    format!("_ {}: {}", p.name, self.map_type(&p.ty))
                 }
             })
             .collect::<Vec<_>>()
@@ -351,6 +350,11 @@ impl SwiftGenerator {
         ));
 
         self.indent_level += 1;
+        for p in &method.params {
+            if p.is_mutable_binding() {
+                out.push_str(&format!("{}var {} = {}\n", self.indent(), p.name, p.name));
+            }
+        }
         out.push_str(&self.generate_function_body(&method.body, method.return_type != Type::Unit));
         self.indent_level -= 1;
 
@@ -373,11 +377,14 @@ impl SwiftGenerator {
             .params
             .iter()
             .map(|p| {
-                let ty_str = self.map_type(&p.ty);
-                if p.mutable && !ty_str.starts_with("inout ") {
-                    format!("_ {}: inout {}", p.name, ty_str)
+                if p.is_exclusive_ref() {
+                    let inner_ty = match &p.ty {
+                        Type::Ref { inner, .. } => self.map_type(inner),
+                        other => self.map_type(other),
+                    };
+                    format!("_ {}: inout {}", p.name, inner_ty)
                 } else {
-                    format!("_ {}: {}", p.name, ty_str)
+                    format!("_ {}: {}", p.name, self.map_type(&p.ty))
                 }
             })
             .collect::<Vec<_>>()
@@ -399,6 +406,11 @@ impl SwiftGenerator {
         ));
 
         self.indent_level += 1;
+        for p in &func.params {
+            if p.is_mutable_binding() {
+                out.push_str(&format!("{}var {} = {}\n", self.indent(), p.name, p.name));
+            }
+        }
         out.push_str(&self.generate_function_body(&func.body, func.return_type != Type::Unit));
         self.indent_level -= 1;
 
@@ -1469,5 +1481,33 @@ mod tests {
         let (code, _) = gen.generate_module(&module);
         assert!(code.contains("public func add_amount(_ val: inout Int64, _ delta: Int64)"));
         assert!(code.contains("helper(&val)"));
+    }
+
+    #[test]
+    fn test_codegen_owned_mutable_parameter_binding() {
+        let mut module = Module::new("OwnedMut");
+        module.items.push(Item::Function(Function {
+            name: "increment".into(),
+            params: vec![Param {
+                name: "val".into(),
+                ty: Type::I32,
+                mutable: true,
+            }],
+            return_type: Type::I32,
+            body: Expr::new(ExprKind::Variable("val".into()), Type::I32),
+            is_public: true,
+            span: SourceSpan {
+                file: "mut_bind.rs".into(),
+                start_line: 1,
+                end_line: 4,
+            },
+        }));
+
+        let mut gen = SwiftGenerator::new();
+        let (code, _) = gen.generate_module(&module);
+        // Owned parameter must NOT have 'inout' in signature:
+        assert!(code.contains("public func increment(_ val: Int32) -> Int32"));
+        // Owned mutable binding must introduce a local mutable copy:
+        assert!(code.contains("var val = val"));
     }
 }
