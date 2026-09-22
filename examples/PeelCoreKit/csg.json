@@ -1,0 +1,1088 @@
+{
+  "schema_version": "rr-csg-0.1",
+  "provenance": {
+    "kind": "compiler",
+    "compiler": "rust-swift-compiler",
+    "backend": "swift",
+    "extractor": "rust-swift-frontend",
+    "source_hash": "sha256:87f058b441eea1fb8f10c5384d596e8d4cee16d5a042f75788513225796b50ab"
+  },
+  "nodes": [
+    {
+      "id": "crate::peel_core",
+      "name": "peel_core",
+      "kind": "crate",
+      "span": {
+        "file": "peel_core.rs",
+        "start_line": 1,
+        "end_line": 1
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::peel_core::Support",
+      "name": "Support",
+      "kind": "enum",
+      "span": {
+        "file": "examples/peel_core.rs",
+        "start_line": 4,
+        "end_line": 10
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::peel_core::Support::Supported",
+      "name": "Supported",
+      "kind": "field",
+      "span": {
+        "file": "examples/peel_core.rs",
+        "start_line": 4,
+        "end_line": 10
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::peel_core::Support::Conditional",
+      "name": "Conditional",
+      "kind": "field",
+      "span": {
+        "file": "examples/peel_core.rs",
+        "start_line": 4,
+        "end_line": 10
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::peel_core::Support::Unsupported",
+      "name": "Unsupported",
+      "kind": "field",
+      "span": {
+        "file": "examples/peel_core.rs",
+        "start_line": 4,
+        "end_line": 10
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::peel_core::Support::Experimental",
+      "name": "Experimental",
+      "kind": "field",
+      "span": {
+        "file": "examples/peel_core.rs",
+        "start_line": 4,
+        "end_line": 10
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::peel_core::Format",
+      "name": "Format",
+      "kind": "enum",
+      "span": {
+        "file": "examples/peel_core.rs",
+        "start_line": 12,
+        "end_line": 30
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::peel_core::Format::Zip",
+      "name": "Zip",
+      "kind": "field",
+      "span": {
+        "file": "examples/peel_core.rs",
+        "start_line": 12,
+        "end_line": 30
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::peel_core::Format::Tar",
+      "name": "Tar",
+      "kind": "field",
+      "span": {
+        "file": "examples/peel_core.rs",
+        "start_line": 12,
+        "end_line": 30
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::peel_core::Format::TarGz",
+      "name": "TarGz",
+      "kind": "field",
+      "span": {
+        "file": "examples/peel_core.rs",
+        "start_line": 12,
+        "end_line": 30
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::peel_core::Format::TarBz2",
+      "name": "TarBz2",
+      "kind": "field",
+      "span": {
+        "file": "examples/peel_core.rs",
+        "start_line": 12,
+        "end_line": 30
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::peel_core::Format::TarXz",
+      "name": "TarXz",
+      "kind": "field",
+      "span": {
+        "file": "examples/peel_core.rs",
+        "start_line": 12,
+        "end_line": 30
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::peel_core::Format::TarZst",
+      "name": "TarZst",
+      "kind": "field",
+      "span": {
+        "file": "examples/peel_core.rs",
+        "start_line": 12,
+        "end_line": 30
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::peel_core::Format::GzipSingle",
+      "name": "GzipSingle",
+      "kind": "field",
+      "span": {
+        "file": "examples/peel_core.rs",
+        "start_line": 12,
+        "end_line": 30
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::peel_core::Format::Bzip2Single",
+      "name": "Bzip2Single",
+      "kind": "field",
+      "span": {
+        "file": "examples/peel_core.rs",
+        "start_line": 12,
+        "end_line": 30
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::peel_core::Format::XzSingle",
+      "name": "XzSingle",
+      "kind": "field",
+      "span": {
+        "file": "examples/peel_core.rs",
+        "start_line": 12,
+        "end_line": 30
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::peel_core::Format::ZstdSingle",
+      "name": "ZstdSingle",
+      "kind": "field",
+      "span": {
+        "file": "examples/peel_core.rs",
+        "start_line": 12,
+        "end_line": 30
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::peel_core::Format::Rar",
+      "name": "Rar",
+      "kind": "field",
+      "span": {
+        "file": "examples/peel_core.rs",
+        "start_line": 12,
+        "end_line": 30
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::peel_core::Format::SevenZ",
+      "name": "SevenZ",
+      "kind": "field",
+      "span": {
+        "file": "examples/peel_core.rs",
+        "start_line": 12,
+        "end_line": 30
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::peel_core::Format::Dmg",
+      "name": "Dmg",
+      "kind": "field",
+      "span": {
+        "file": "examples/peel_core.rs",
+        "start_line": 12,
+        "end_line": 30
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::peel_core::Format::AppBundle",
+      "name": "AppBundle",
+      "kind": "field",
+      "span": {
+        "file": "examples/peel_core.rs",
+        "start_line": 12,
+        "end_line": 30
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::peel_core::Format::Pdf",
+      "name": "Pdf",
+      "kind": "field",
+      "span": {
+        "file": "examples/peel_core.rs",
+        "start_line": 12,
+        "end_line": 30
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::peel_core::Format::Exe",
+      "name": "Exe",
+      "kind": "field",
+      "span": {
+        "file": "examples/peel_core.rs",
+        "start_line": 12,
+        "end_line": 30
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::peel_core::ZipKind",
+      "name": "ZipKind",
+      "kind": "enum",
+      "span": {
+        "file": "examples/peel_core.rs",
+        "start_line": 32,
+        "end_line": 43
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::peel_core::ZipKind::Generic",
+      "name": "Generic",
+      "kind": "field",
+      "span": {
+        "file": "examples/peel_core.rs",
+        "start_line": 32,
+        "end_line": 43
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::peel_core::ZipKind::Epub",
+      "name": "Epub",
+      "kind": "field",
+      "span": {
+        "file": "examples/peel_core.rs",
+        "start_line": 32,
+        "end_line": 43
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::peel_core::ZipKind::Jar",
+      "name": "Jar",
+      "kind": "field",
+      "span": {
+        "file": "examples/peel_core.rs",
+        "start_line": 32,
+        "end_line": 43
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::peel_core::ZipKind::Apk",
+      "name": "Apk",
+      "kind": "field",
+      "span": {
+        "file": "examples/peel_core.rs",
+        "start_line": 32,
+        "end_line": 43
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::peel_core::ZipKind::Usdz",
+      "name": "Usdz",
+      "kind": "field",
+      "span": {
+        "file": "examples/peel_core.rs",
+        "start_line": 32,
+        "end_line": 43
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::peel_core::ZipKind::ThreeMf",
+      "name": "ThreeMf",
+      "kind": "field",
+      "span": {
+        "file": "examples/peel_core.rs",
+        "start_line": 32,
+        "end_line": 43
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::peel_core::ZipKind::OfficeOpenXml",
+      "name": "OfficeOpenXml",
+      "kind": "field",
+      "span": {
+        "file": "examples/peel_core.rs",
+        "start_line": 32,
+        "end_line": 43
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::peel_core::ZipKind::OpenDocument",
+      "name": "OpenDocument",
+      "kind": "field",
+      "span": {
+        "file": "examples/peel_core.rs",
+        "start_line": 32,
+        "end_line": 43
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::peel_core::ZipKind::ComicCbz",
+      "name": "ComicCbz",
+      "kind": "field",
+      "span": {
+        "file": "examples/peel_core.rs",
+        "start_line": 32,
+        "end_line": 43
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::peel_core::Collision",
+      "name": "Collision",
+      "kind": "enum",
+      "span": {
+        "file": "examples/peel_core.rs",
+        "start_line": 45,
+        "end_line": 51
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::peel_core::Collision::Error",
+      "name": "Error",
+      "kind": "field",
+      "span": {
+        "file": "examples/peel_core.rs",
+        "start_line": 45,
+        "end_line": 51
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::peel_core::Collision::Overwrite",
+      "name": "Overwrite",
+      "kind": "field",
+      "span": {
+        "file": "examples/peel_core.rs",
+        "start_line": 45,
+        "end_line": 51
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::peel_core::Collision::Rename",
+      "name": "Rename",
+      "kind": "field",
+      "span": {
+        "file": "examples/peel_core.rs",
+        "start_line": 45,
+        "end_line": 51
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::peel_core::Collision::Skip",
+      "name": "Skip",
+      "kind": "field",
+      "span": {
+        "file": "examples/peel_core.rs",
+        "start_line": 45,
+        "end_line": 51
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::peel_core::EnclosingDirectory",
+      "name": "EnclosingDirectory",
+      "kind": "enum",
+      "span": {
+        "file": "examples/peel_core.rs",
+        "start_line": 53,
+        "end_line": 58
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::peel_core::EnclosingDirectory::WhenNeeded",
+      "name": "WhenNeeded",
+      "kind": "field",
+      "span": {
+        "file": "examples/peel_core.rs",
+        "start_line": 53,
+        "end_line": 58
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::peel_core::EnclosingDirectory::Always",
+      "name": "Always",
+      "kind": "field",
+      "span": {
+        "file": "examples/peel_core.rs",
+        "start_line": 53,
+        "end_line": 58
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::peel_core::EnclosingDirectory::Never",
+      "name": "Never",
+      "kind": "field",
+      "span": {
+        "file": "examples/peel_core.rs",
+        "start_line": 53,
+        "end_line": 58
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::peel_core::FormatCapabilities",
+      "name": "FormatCapabilities",
+      "kind": "struct",
+      "span": {
+        "file": "examples/peel_core.rs",
+        "start_line": 60,
+        "end_line": 71
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::peel_core::FormatCapabilities::format",
+      "name": "format",
+      "kind": "field",
+      "span": {
+        "file": "examples/peel_core.rs",
+        "start_line": 60,
+        "end_line": 71
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::peel_core::FormatCapabilities::family",
+      "name": "family",
+      "kind": "field",
+      "span": {
+        "file": "examples/peel_core.rs",
+        "start_line": 60,
+        "end_line": 71
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::peel_core::FormatCapabilities::probe",
+      "name": "probe",
+      "kind": "field",
+      "span": {
+        "file": "examples/peel_core.rs",
+        "start_line": 60,
+        "end_line": 71
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::peel_core::FormatCapabilities::list",
+      "name": "list",
+      "kind": "field",
+      "span": {
+        "file": "examples/peel_core.rs",
+        "start_line": 60,
+        "end_line": 71
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::peel_core::FormatCapabilities::extract_all",
+      "name": "extract_all",
+      "kind": "field",
+      "span": {
+        "file": "examples/peel_core.rs",
+        "start_line": 60,
+        "end_line": 71
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::peel_core::FormatCapabilities::extract_selected",
+      "name": "extract_selected",
+      "kind": "field",
+      "span": {
+        "file": "examples/peel_core.rs",
+        "start_line": 60,
+        "end_line": 71
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::peel_core::FormatCapabilities::create",
+      "name": "create",
+      "kind": "field",
+      "span": {
+        "file": "examples/peel_core.rs",
+        "start_line": 60,
+        "end_line": 71
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::peel_core::FormatCapabilities::password",
+      "name": "password",
+      "kind": "field",
+      "span": {
+        "file": "examples/peel_core.rs",
+        "start_line": 60,
+        "end_line": 71
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::peel_core::FormatCapabilities::multipart",
+      "name": "multipart",
+      "kind": "field",
+      "span": {
+        "file": "examples/peel_core.rs",
+        "start_line": 60,
+        "end_line": 71
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::peel_core::FormatCapabilities::notes",
+      "name": "notes",
+      "kind": "field",
+      "span": {
+        "file": "examples/peel_core.rs",
+        "start_line": 60,
+        "end_line": 71
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::peel_core::archive_tar_like",
+      "name": "archive_tar_like",
+      "kind": "function",
+      "span": {
+        "file": "examples/peel_core.rs",
+        "start_line": 73,
+        "end_line": 86
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::peel_core::stream_single",
+      "name": "stream_single",
+      "kind": "function",
+      "span": {
+        "file": "examples/peel_core.rs",
+        "start_line": 88,
+        "end_line": 101
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::peel_core::zip_package",
+      "name": "zip_package",
+      "kind": "function",
+      "span": {
+        "file": "examples/peel_core.rs",
+        "start_line": 103,
+        "end_line": 116
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::peel_core::capabilities_for",
+      "name": "capabilities_for",
+      "kind": "function",
+      "span": {
+        "file": "examples/peel_core.rs",
+        "start_line": 118,
+        "end_line": 214
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::peel_core::capabilities_for_zip_kind",
+      "name": "capabilities_for_zip_kind",
+      "kind": "function",
+      "span": {
+        "file": "examples/peel_core.rs",
+        "start_line": 216,
+        "end_line": 228
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::peel_core::zip_kind_label",
+      "name": "zip_kind_label",
+      "kind": "function",
+      "span": {
+        "file": "examples/peel_core.rs",
+        "start_line": 230,
+        "end_line": 242
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    },
+    {
+      "id": "crate::peel_core::detect_zip_kind_from_extension",
+      "name": "detect_zip_kind_from_extension",
+      "kind": "function",
+      "span": {
+        "file": "examples/peel_core.rs",
+        "start_line": 244,
+        "end_line": 278
+      },
+      "minimum_access": "public",
+      "size_bytes": null
+    }
+  ],
+  "edges": [
+    {
+      "from": "crate::peel_core",
+      "to": "crate::peel_core::Support",
+      "relationship": "contains_item",
+      "minimum_access": "public"
+    },
+    {
+      "from": "crate::peel_core::Support",
+      "to": "crate::peel_core::Support::Supported",
+      "relationship": "contains_variant",
+      "minimum_access": "public"
+    },
+    {
+      "from": "crate::peel_core::Support",
+      "to": "crate::peel_core::Support::Conditional",
+      "relationship": "contains_variant",
+      "minimum_access": "public"
+    },
+    {
+      "from": "crate::peel_core::Support",
+      "to": "crate::peel_core::Support::Unsupported",
+      "relationship": "contains_variant",
+      "minimum_access": "public"
+    },
+    {
+      "from": "crate::peel_core::Support",
+      "to": "crate::peel_core::Support::Experimental",
+      "relationship": "contains_variant",
+      "minimum_access": "public"
+    },
+    {
+      "from": "crate::peel_core",
+      "to": "crate::peel_core::Format",
+      "relationship": "contains_item",
+      "minimum_access": "public"
+    },
+    {
+      "from": "crate::peel_core::Format",
+      "to": "crate::peel_core::Format::Zip",
+      "relationship": "contains_variant",
+      "minimum_access": "public"
+    },
+    {
+      "from": "crate::peel_core::Format",
+      "to": "crate::peel_core::Format::Tar",
+      "relationship": "contains_variant",
+      "minimum_access": "public"
+    },
+    {
+      "from": "crate::peel_core::Format",
+      "to": "crate::peel_core::Format::TarGz",
+      "relationship": "contains_variant",
+      "minimum_access": "public"
+    },
+    {
+      "from": "crate::peel_core::Format",
+      "to": "crate::peel_core::Format::TarBz2",
+      "relationship": "contains_variant",
+      "minimum_access": "public"
+    },
+    {
+      "from": "crate::peel_core::Format",
+      "to": "crate::peel_core::Format::TarXz",
+      "relationship": "contains_variant",
+      "minimum_access": "public"
+    },
+    {
+      "from": "crate::peel_core::Format",
+      "to": "crate::peel_core::Format::TarZst",
+      "relationship": "contains_variant",
+      "minimum_access": "public"
+    },
+    {
+      "from": "crate::peel_core::Format",
+      "to": "crate::peel_core::Format::GzipSingle",
+      "relationship": "contains_variant",
+      "minimum_access": "public"
+    },
+    {
+      "from": "crate::peel_core::Format",
+      "to": "crate::peel_core::Format::Bzip2Single",
+      "relationship": "contains_variant",
+      "minimum_access": "public"
+    },
+    {
+      "from": "crate::peel_core::Format",
+      "to": "crate::peel_core::Format::XzSingle",
+      "relationship": "contains_variant",
+      "minimum_access": "public"
+    },
+    {
+      "from": "crate::peel_core::Format",
+      "to": "crate::peel_core::Format::ZstdSingle",
+      "relationship": "contains_variant",
+      "minimum_access": "public"
+    },
+    {
+      "from": "crate::peel_core::Format",
+      "to": "crate::peel_core::Format::Rar",
+      "relationship": "contains_variant",
+      "minimum_access": "public"
+    },
+    {
+      "from": "crate::peel_core::Format",
+      "to": "crate::peel_core::Format::SevenZ",
+      "relationship": "contains_variant",
+      "minimum_access": "public"
+    },
+    {
+      "from": "crate::peel_core::Format",
+      "to": "crate::peel_core::Format::Dmg",
+      "relationship": "contains_variant",
+      "minimum_access": "public"
+    },
+    {
+      "from": "crate::peel_core::Format",
+      "to": "crate::peel_core::Format::AppBundle",
+      "relationship": "contains_variant",
+      "minimum_access": "public"
+    },
+    {
+      "from": "crate::peel_core::Format",
+      "to": "crate::peel_core::Format::Pdf",
+      "relationship": "contains_variant",
+      "minimum_access": "public"
+    },
+    {
+      "from": "crate::peel_core::Format",
+      "to": "crate::peel_core::Format::Exe",
+      "relationship": "contains_variant",
+      "minimum_access": "public"
+    },
+    {
+      "from": "crate::peel_core",
+      "to": "crate::peel_core::ZipKind",
+      "relationship": "contains_item",
+      "minimum_access": "public"
+    },
+    {
+      "from": "crate::peel_core::ZipKind",
+      "to": "crate::peel_core::ZipKind::Generic",
+      "relationship": "contains_variant",
+      "minimum_access": "public"
+    },
+    {
+      "from": "crate::peel_core::ZipKind",
+      "to": "crate::peel_core::ZipKind::Epub",
+      "relationship": "contains_variant",
+      "minimum_access": "public"
+    },
+    {
+      "from": "crate::peel_core::ZipKind",
+      "to": "crate::peel_core::ZipKind::Jar",
+      "relationship": "contains_variant",
+      "minimum_access": "public"
+    },
+    {
+      "from": "crate::peel_core::ZipKind",
+      "to": "crate::peel_core::ZipKind::Apk",
+      "relationship": "contains_variant",
+      "minimum_access": "public"
+    },
+    {
+      "from": "crate::peel_core::ZipKind",
+      "to": "crate::peel_core::ZipKind::Usdz",
+      "relationship": "contains_variant",
+      "minimum_access": "public"
+    },
+    {
+      "from": "crate::peel_core::ZipKind",
+      "to": "crate::peel_core::ZipKind::ThreeMf",
+      "relationship": "contains_variant",
+      "minimum_access": "public"
+    },
+    {
+      "from": "crate::peel_core::ZipKind",
+      "to": "crate::peel_core::ZipKind::OfficeOpenXml",
+      "relationship": "contains_variant",
+      "minimum_access": "public"
+    },
+    {
+      "from": "crate::peel_core::ZipKind",
+      "to": "crate::peel_core::ZipKind::OpenDocument",
+      "relationship": "contains_variant",
+      "minimum_access": "public"
+    },
+    {
+      "from": "crate::peel_core::ZipKind",
+      "to": "crate::peel_core::ZipKind::ComicCbz",
+      "relationship": "contains_variant",
+      "minimum_access": "public"
+    },
+    {
+      "from": "crate::peel_core",
+      "to": "crate::peel_core::Collision",
+      "relationship": "contains_item",
+      "minimum_access": "public"
+    },
+    {
+      "from": "crate::peel_core::Collision",
+      "to": "crate::peel_core::Collision::Error",
+      "relationship": "contains_variant",
+      "minimum_access": "public"
+    },
+    {
+      "from": "crate::peel_core::Collision",
+      "to": "crate::peel_core::Collision::Overwrite",
+      "relationship": "contains_variant",
+      "minimum_access": "public"
+    },
+    {
+      "from": "crate::peel_core::Collision",
+      "to": "crate::peel_core::Collision::Rename",
+      "relationship": "contains_variant",
+      "minimum_access": "public"
+    },
+    {
+      "from": "crate::peel_core::Collision",
+      "to": "crate::peel_core::Collision::Skip",
+      "relationship": "contains_variant",
+      "minimum_access": "public"
+    },
+    {
+      "from": "crate::peel_core",
+      "to": "crate::peel_core::EnclosingDirectory",
+      "relationship": "contains_item",
+      "minimum_access": "public"
+    },
+    {
+      "from": "crate::peel_core::EnclosingDirectory",
+      "to": "crate::peel_core::EnclosingDirectory::WhenNeeded",
+      "relationship": "contains_variant",
+      "minimum_access": "public"
+    },
+    {
+      "from": "crate::peel_core::EnclosingDirectory",
+      "to": "crate::peel_core::EnclosingDirectory::Always",
+      "relationship": "contains_variant",
+      "minimum_access": "public"
+    },
+    {
+      "from": "crate::peel_core::EnclosingDirectory",
+      "to": "crate::peel_core::EnclosingDirectory::Never",
+      "relationship": "contains_variant",
+      "minimum_access": "public"
+    },
+    {
+      "from": "crate::peel_core",
+      "to": "crate::peel_core::FormatCapabilities",
+      "relationship": "contains_item",
+      "minimum_access": "public"
+    },
+    {
+      "from": "crate::peel_core::FormatCapabilities",
+      "to": "crate::peel_core::FormatCapabilities::format",
+      "relationship": "contains_field",
+      "minimum_access": "public"
+    },
+    {
+      "from": "crate::peel_core::FormatCapabilities",
+      "to": "crate::peel_core::FormatCapabilities::family",
+      "relationship": "contains_field",
+      "minimum_access": "public"
+    },
+    {
+      "from": "crate::peel_core::FormatCapabilities",
+      "to": "crate::peel_core::FormatCapabilities::probe",
+      "relationship": "contains_field",
+      "minimum_access": "public"
+    },
+    {
+      "from": "crate::peel_core::FormatCapabilities",
+      "to": "crate::peel_core::FormatCapabilities::list",
+      "relationship": "contains_field",
+      "minimum_access": "public"
+    },
+    {
+      "from": "crate::peel_core::FormatCapabilities",
+      "to": "crate::peel_core::FormatCapabilities::extract_all",
+      "relationship": "contains_field",
+      "minimum_access": "public"
+    },
+    {
+      "from": "crate::peel_core::FormatCapabilities",
+      "to": "crate::peel_core::FormatCapabilities::extract_selected",
+      "relationship": "contains_field",
+      "minimum_access": "public"
+    },
+    {
+      "from": "crate::peel_core::FormatCapabilities",
+      "to": "crate::peel_core::FormatCapabilities::create",
+      "relationship": "contains_field",
+      "minimum_access": "public"
+    },
+    {
+      "from": "crate::peel_core::FormatCapabilities",
+      "to": "crate::peel_core::FormatCapabilities::password",
+      "relationship": "contains_field",
+      "minimum_access": "public"
+    },
+    {
+      "from": "crate::peel_core::FormatCapabilities",
+      "to": "crate::peel_core::FormatCapabilities::multipart",
+      "relationship": "contains_field",
+      "minimum_access": "public"
+    },
+    {
+      "from": "crate::peel_core::FormatCapabilities",
+      "to": "crate::peel_core::FormatCapabilities::notes",
+      "relationship": "contains_field",
+      "minimum_access": "public"
+    },
+    {
+      "from": "crate::peel_core",
+      "to": "crate::peel_core::archive_tar_like",
+      "relationship": "contains_item",
+      "minimum_access": "public"
+    },
+    {
+      "from": "crate::peel_core",
+      "to": "crate::peel_core::stream_single",
+      "relationship": "contains_item",
+      "minimum_access": "public"
+    },
+    {
+      "from": "crate::peel_core",
+      "to": "crate::peel_core::zip_package",
+      "relationship": "contains_item",
+      "minimum_access": "public"
+    },
+    {
+      "from": "crate::peel_core",
+      "to": "crate::peel_core::capabilities_for",
+      "relationship": "contains_item",
+      "minimum_access": "public"
+    },
+    {
+      "from": "crate::peel_core",
+      "to": "crate::peel_core::capabilities_for_zip_kind",
+      "relationship": "contains_item",
+      "minimum_access": "public"
+    },
+    {
+      "from": "crate::peel_core",
+      "to": "crate::peel_core::zip_kind_label",
+      "relationship": "contains_item",
+      "minimum_access": "public"
+    },
+    {
+      "from": "crate::peel_core",
+      "to": "crate::peel_core::detect_zip_kind_from_extension",
+      "relationship": "contains_item",
+      "minimum_access": "public"
+    }
+  ]
+}

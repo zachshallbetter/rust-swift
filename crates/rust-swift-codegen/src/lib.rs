@@ -1008,6 +1008,14 @@ public struct RustCompat {
 }
 
 extension String {
+    public static func from(_ s: String) -> String {
+        return s
+    }
+
+    public static func from(_ s: Substring) -> String {
+        return String(s)
+    }
+
     public func byteSlice(_ start: Int, _ end: Int) -> String {
         precondition(start >= 0 && end >= start && end <= self.utf8.count, "String slice index out of bounds")
         let startIdx = self.utf8.index(self.utf8.startIndex, offsetBy: start)
