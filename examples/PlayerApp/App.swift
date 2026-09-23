@@ -1,4 +1,5 @@
 import SwiftUI
+import fsm_example
 
 @main
 struct PlayerApp: App {

@@ -5,12 +5,12 @@
   "validityBasis": "aggregate-source-digest",
   "selectedPaths": [],
   "sourceSelection": {
-    "includedCount": 144,
-    "includedBytes": 1804948,
+    "includedCount": 153,
+    "includedBytes": 2137537,
     "excludedCounts": {
       "excluded-directory": 21273,
       "excluded-path": 1,
-      "extension": 3630,
+      "extension": 4557,
       "symlink": 2
     }
   },
@@ -20,14 +20,14 @@
     "repositories": [
       {
         "path": ".",
-        "commit": "f7f4d66f0d69a80bc654ac138d74412c537fe251",
+        "commit": "f6f79e54c5cce973e183d75fbc0fb186eea56d35",
         "branch": "main",
         "dirty": true,
         "remote": "https://github.com/zachshallbetter/rust-swift.git"
       }
     ]
   },
-  "aggregateSourceDigest": "19c9b5d61bda942da0d8b160659ecf061dd9eef1e51873a828a71d528f701ed5",
+  "aggregateSourceDigest": "e341bcae1afba7118e71df70bec6fc03d1912785daba9d05f2a8c90b2ca03c6d",
   "sources": [
     {
       "path": ".agents/rules/ci.md",
@@ -395,9 +395,24 @@
       "sha256": "21e0cfabda387a8540a02edd159825f873e49bb30a644f895e42187adbf524a0"
     },
     {
+      "path": "examples/GeneratedFSM/.build/out/Intermediates.noindex/XCBuildData/fc196692d6b27474dbbab2395accf379.xcbuilddata/build-request.json",
+      "bytes": 6165,
+      "sha256": "dabdef9c0a218315a3cdd0b601029869ea0932b2089f4e7af79ae08392fb42b2"
+    },
+    {
+      "path": "examples/GeneratedFSM/.build/out/Intermediates.noindex/XCBuildData/fc196692d6b27474dbbab2395accf379.xcbuilddata/manifest.json",
+      "bytes": 276382,
+      "sha256": "30c39c0dac18f72934228a1c51766d0d6ee815c9314fb091ff632b70d4a50c48"
+    },
+    {
+      "path": "examples/GeneratedFSM/.build/out/Intermediates.noindex/XCBuildData/fc196692d6b27474dbbab2395accf379.xcbuilddata/target-graph.txt",
+      "bytes": 790,
+      "sha256": "d14e10ac4ce3f9fb86bf0dce7fca4cdc775162fa3011633564731f2c742b8f26"
+    },
+    {
       "path": "examples/GeneratedFSM/.build/out/Intermediates.noindex/XCBuildData/prior-build-descriptions.txt",
-      "bytes": 33,
-      "sha256": "a2a8025a76abdcd7d2e981715e552f4418d825a88e6f650b1bbb50da52c750be"
+      "bytes": 66,
+      "sha256": "29e8b670478aede65dbfe64511537bbf7e83419e60b69ecffa110349bd3e6294"
     },
     {
       "path": "examples/GeneratedFSM/.build/out/Intermediates.noindex/fsm_example.build/Debug/fsm_example-t.build/Objects-normal/arm64/fsm_example-OutputFileMap.json",
@@ -425,7 +440,32 @@
       "sha256": "deb34a50c6dd08a80341a6229940a0cc38dbc93f989afd9897d76ebe392625b3"
     },
     {
+      "path": "examples/GeneratedFSM/.build/out/Intermediates.noindex/fsm_example.build/Debug/fsm_exampleTests-p.build/Objects-normal/arm64/fsm_exampleTests-OutputFileMap.json",
+      "bytes": 4707,
+      "sha256": "b55dd9ca43a09ef230bf0e6c42b394e00a706de57f65a39eb04479ac71663b63"
+    },
+    {
+      "path": "examples/GeneratedFSM/.build/out/Intermediates.noindex/fsm_example.build/Debug/fsm_exampleTests-p.build/Objects-normal/arm64/fsm_exampleTests-dependencies-1.json",
+      "bytes": 43008,
+      "sha256": "31b6b3ee6e18cc730210503dd1f30ae3331b469d6ba01470f0300529d364479a"
+    },
+    {
+      "path": "examples/GeneratedFSM/.build/out/Intermediates.noindex/fsm_example.build/Debug/fsm_exampleTests-p.build/Objects-normal/arm64/fsm_exampleTests.abi.json",
+      "bytes": 149,
+      "sha256": "4277ac6b49f8511196028a5ac20f5b1b1dfa754c24615d34068089f0b1739728"
+    },
+    {
+      "path": "examples/GeneratedFSM/.build/out/Intermediates.noindex/fsm_example.build/Debug/fsm_exampleTests-p.build/Objects-normal/arm64/fsm_exampleTests_const_extract_protocols.json",
+      "bytes": 386,
+      "sha256": "deb34a50c6dd08a80341a6229940a0cc38dbc93f989afd9897d76ebe392625b3"
+    },
+    {
       "path": "examples/GeneratedFSM/.build/out/Products/Debug/fsm_example.swiftmodule/arm64-apple-macos.abi.json",
+      "bytes": 149,
+      "sha256": "4277ac6b49f8511196028a5ac20f5b1b1dfa754c24615d34068089f0b1739728"
+    },
+    {
+      "path": "examples/GeneratedFSM/.build/out/Products/Debug/fsm_exampleTests.swiftmodule/arm64-apple-macos.abi.json",
       "bytes": 149,
       "sha256": "4277ac6b49f8511196028a5ac20f5b1b1dfa754c24615d34068089f0b1739728"
     },
@@ -566,8 +606,8 @@
     },
     {
       "path": "examples/PeelCoreKit/.build/out/Intermediates.noindex/XCBuildData/prior-build-descriptions.txt",
-      "bytes": 99,
-      "sha256": "03d082257489886affcb91cc1b4ca721f321df1380375923172acbe162c253dc"
+      "bytes": 132,
+      "sha256": "7ac47ecef068e738482e8afb02c19011186334a0ad8430f530a24f0617e44ade"
     },
     {
       "path": "examples/PeelCoreKit/.build/out/Products/Debug/PeelCoreKit.swiftmodule/arm64-apple-macos.abi.json",
@@ -603,6 +643,11 @@
       "path": "examples/PeelInspectorApp/README.md",
       "bytes": 1168,
       "sha256": "f59644487eca3968f231ad10de9c2ac4119fafba4bc8501f51dad687d34d40c3"
+    },
+    {
+      "path": "examples/PlayerApp/README.md",
+      "bytes": 787,
+      "sha256": "36fa07f7b5f4c2fb2dd1893c73be002229580634e13201788ecbe9510db03445"
     },
     {
       "path": "examples/fsm_example.rs",
