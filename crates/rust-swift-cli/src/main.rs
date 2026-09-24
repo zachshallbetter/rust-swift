@@ -157,13 +157,13 @@ fn diff_test_command(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>
     println!("============================================================");
 
     const EXPECTED_NEGATIVE_FIXTURES: usize = 10;
-    const EXPECTED_TOTAL_REPORTS: usize = 7 + EXPECTED_NEGATIVE_FIXTURES;
+    const EXPECTED_TOTAL_REPORTS: usize = 8 + EXPECTED_NEGATIVE_FIXTURES;
 
     let mut reports = Vec::new();
     let mut execution_failed = false;
 
     // 1. Finite State Machine
-    println!("\n[1/8] Running Finite State Machine differential test...");
+    println!("\n[1/9] Running Finite State Machine differential test...");
     match runner.test_fsm(output_dir) {
         Ok(report) => {
             println!(
@@ -179,7 +179,7 @@ fn diff_test_command(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>
     }
 
     // 2. Wrapping Arithmetic
-    println!("\n[2/8] Running Wrapping Arithmetic differential test...");
+    println!("\n[2/9] Running Wrapping Arithmetic differential test...");
     match runner.test_wrapping_arithmetic(output_dir) {
         Ok(report) => {
             println!(
@@ -195,7 +195,7 @@ fn diff_test_command(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>
     }
 
     // 3. Contract System & Invariant Traps
-    println!("\n[3/8] Running Contract & Invariant Trap differential test...");
+    println!("\n[3/9] Running Contract & Invariant Trap differential test...");
     match runner.test_contracts(output_dir) {
         Ok(report) => {
             println!(
@@ -211,7 +211,7 @@ fn diff_test_command(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>
     }
 
     // 4. Type System & Enums
-    println!("\n[4/8] Running Type System (Methods, Payload Enums, Tuples) differential test...");
+    println!("\n[4/9] Running Type System (Methods, Payload Enums, Tuples) differential test...");
     match runner.test_types(output_dir) {
         Ok(report) => {
             println!(
@@ -227,7 +227,7 @@ fn diff_test_command(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>
     }
 
     // 5. Event Dispatch & Trace Model
-    println!("\n[5/8] Running Event Dispatch & Trace Model (50-Step History) differential test...");
+    println!("\n[5/9] Running Event Dispatch & Trace Model (50-Step History) differential test...");
     match runner.test_event_trace(output_dir) {
         Ok(report) => {
             println!(
@@ -246,7 +246,7 @@ fn diff_test_command(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>
     }
 
     // 6. Data Semantics (Option, Result, UTF-8 Strings)
-    println!("\n[6/8] Running Data Semantics (Option, Result, UTF-8 Strings) differential test...");
+    println!("\n[6/9] Running Data Semantics (Option, Result, UTF-8 Strings) differential test...");
     match runner.test_data_semantics(output_dir) {
         Ok(report) => {
             println!(
@@ -265,7 +265,7 @@ fn diff_test_command(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>
     }
 
     // 7. Ownership & Region Classification (&mut and inout exclusivity)
-    println!("\n[7/8] Running Ownership & Region Classification differential test...");
+    println!("\n[7/9] Running Ownership & Region Classification differential test...");
     match runner.test_ownership_regions(output_dir) {
         Ok(report) => {
             println!(
@@ -280,8 +280,24 @@ fn diff_test_command(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>
         }
     }
 
-    // 8. Negative rejections
-    println!("\n[8/8] Running Negative Rejection policy test...");
+    // 8. Iteration & Dynamic Collections (For-Loops, Vec Lifecycle)
+    println!("\n[8/9] Running Iteration & Dynamic Collections differential test...");
+    match runner.test_iteration_collections(output_dir) {
+        Ok(report) => {
+            println!(
+                "  Status: {} ({} of {} cases passed)",
+                report.status, report.cases_passed, report.cases_tested
+            );
+            reports.push(report);
+        }
+        Err(e) => {
+            execution_failed = true;
+            eprintln!("  FAILED execution in Iteration differential test: {}", e);
+        }
+    }
+
+    // 9. Negative rejections
+    println!("\n[9/9] Running Negative Rejection policy test...");
     match runner.test_negative_rejections() {
         Ok(neg_reports) => {
             if neg_reports.len() != EXPECTED_NEGATIVE_FIXTURES {

@@ -432,11 +432,7 @@ impl SwiftGenerator {
                     if returns_value {
                         out.push_str(&self.generate_return_expr(final_e));
                     } else {
-                        out.push_str(&format!(
-                            "{}{}\n",
-                            self.indent(),
-                            self.generate_expr(final_e)
-                        ));
+                        out.push_str(&self.generate_stmt(&Stmt::Expr(*final_e.clone())));
                     }
                 }
                 out
@@ -522,6 +518,42 @@ impl SwiftGenerator {
                 } else {
                     format!("{}fatalError(\"panic\")\n", self.indent())
                 }
+            }
+            Stmt::Expr(Expr {
+                kind: ExprKind::For { pattern, iter, body },
+                ..
+            }) => {
+                let pat_str = self.generate_for_pattern(pattern);
+                let iter_str = self.generate_expr(iter);
+                let mut out = format!("{}for {} in {} {{\n", self.indent(), pat_str, iter_str);
+                self.indent_level += 1;
+                out.push_str(&self.generate_function_body(body, false));
+                self.indent_level -= 1;
+                out.push_str(&format!("{}}}\n", self.indent()));
+                out
+            }
+            Stmt::Expr(Expr {
+                kind: ExprKind::While { cond, body },
+                ..
+            }) => {
+                let cond_str = self.generate_expr(cond);
+                let mut out = format!("{}while {} {{\n", self.indent(), cond_str);
+                self.indent_level += 1;
+                out.push_str(&self.generate_function_body(body, false));
+                self.indent_level -= 1;
+                out.push_str(&format!("{}}}\n", self.indent()));
+                out
+            }
+            Stmt::Expr(Expr {
+                kind: ExprKind::Loop { body },
+                ..
+            }) => {
+                let mut out = format!("{}while true {{\n", self.indent());
+                self.indent_level += 1;
+                out.push_str(&self.generate_function_body(body, false));
+                self.indent_level -= 1;
+                out.push_str(&format!("{}}}\n", self.indent()));
+                out
             }
             Stmt::Expr(expr) => {
                 format!("{}{}\n", self.indent(), self.generate_expr(expr))
@@ -661,6 +693,22 @@ impl SwiftGenerator {
         out
     }
 
+    fn generate_for_pattern(&self, pat: &Pattern) -> String {
+        match pat {
+            Pattern::Wildcard => "_".into(),
+            Pattern::Variable(v) => v.clone(),
+            Pattern::Tuple(elems) => {
+                let inner = elems
+                    .iter()
+                    .map(|p| self.generate_for_pattern(p))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                format!("({})", inner)
+            }
+            _ => self.generate_pattern(pat),
+        }
+    }
+
     fn generate_pattern(&self, pat: &Pattern) -> String {
         match pat {
             Pattern::Wildcard => "_".into(),
@@ -788,6 +836,9 @@ impl SwiftGenerator {
                 }
             }
             ExprKind::Call { func, args } => {
+                if func == "Vec.new" && args.is_empty() {
+                    return "[]".into();
+                }
                 let swift_func = match func.as_str() {
                     "Some" => ".some",
                     "Ok" => ".success",
@@ -822,6 +873,8 @@ impl SwiftGenerator {
                 let r_str = self.generate_expr(receiver);
                 let swift_method = match method.as_str() {
                     "push" => "append",
+                    "pop" => "popLast",
+                    "clear" => "removeAll",
                     "len" => "len",
                     "is_empty" => "is_empty",
                     "is_some" => "is_some",
@@ -1036,6 +1089,18 @@ extension String {
 }
 
 extension Array {
+    public mutating func push(_ element: Element) {
+        self.append(element)
+    }
+
+    public mutating func pop() -> Element? {
+        return self.popLast()
+    }
+
+    public mutating func clear() {
+        self.removeAll()
+    }
+
     public func len() -> Int {
         return self.count
     }
@@ -1517,5 +1582,101 @@ mod tests {
         assert!(code.contains("public func increment(_ val: Int32) -> Int32"));
         // Owned mutable binding must introduce a local mutable copy:
         assert!(code.contains("var val = val"));
+    }
+
+    #[test]
+    fn test_codegen_for_loops_and_vec() {
+        let mut module = Module::new("LoopModule");
+        module.items.push(Item::Function(Function {
+            name: "sum_list".into(),
+            params: vec![Param {
+                name: "items".into(),
+                ty: Type::Array {
+                    element: Box::new(Type::I32),
+                    size: None,
+                },
+                mutable: false,
+            }],
+            return_type: Type::I32,
+            body: Expr::new(
+                ExprKind::Block {
+                    stmts: vec![
+                        Stmt::Let {
+                            name: "total".into(),
+                            mutable: true,
+                            ty: Some(Type::I32),
+                            init: Some(Expr::new(
+                                ExprKind::Literal(Literal::Int {
+                                    value: 0,
+                                    ty: Type::I32,
+                                }),
+                                Type::I32,
+                            )),
+                        },
+                        Stmt::Expr(Expr::new(
+                            ExprKind::For {
+                                pattern: Pattern::Variable("x".into()),
+                                iter: Box::new(Expr::new(
+                                    ExprKind::Variable("items".into()),
+                                    Type::Array {
+                                        element: Box::new(Type::I32),
+                                        size: None,
+                                    },
+                                )),
+                                body: Box::new(Expr::new(
+                                    ExprKind::Block {
+                                        stmts: vec![Stmt::Assign {
+                                            target: Expr::new(
+                                                ExprKind::Variable("total".into()),
+                                                Type::I32,
+                                            ),
+                                            value: Expr::new(
+                                                ExprKind::Binary {
+                                                    op: BinaryOp::Arithmetic {
+                                                        op: IntegerOp::Add,
+                                                        mode: IntegerMode::Wrapping,
+                                                    },
+                                                    left: Box::new(Expr::new(
+                                                        ExprKind::Variable("total".into()),
+                                                        Type::I32,
+                                                    )),
+                                                    right: Box::new(Expr::new(
+                                                        ExprKind::Variable("x".into()),
+                                                        Type::I32,
+                                                    )),
+                                                },
+                                                Type::I32,
+                                            ),
+                                        }],
+                                        expr: None,
+                                    },
+                                    Type::Unit,
+                                )),
+                            },
+                            Type::Unit,
+                        )),
+                    ],
+                    expr: Some(Box::new(Expr::new(
+                        ExprKind::Variable("total".into()),
+                        Type::I32,
+                    ))),
+                },
+                Type::I32,
+            ),
+            is_public: true,
+            span: SourceSpan {
+                file: "loop.rs".into(),
+                start_line: 1,
+                end_line: 10,
+            },
+        }));
+
+        let mut gen = SwiftGenerator::new();
+        let (code, _) = gen.generate_module(&module);
+        assert!(code.contains("public func sum_list(_ items: [Int32]) -> Int32"));
+        assert!(code.contains("var total: Int32 = 0"));
+        assert!(code.contains("for x in items {"));
+        assert!(code.contains("total = (total &+ x)"));
+        assert!(code.contains("return total"));
     }
 }

@@ -581,8 +581,28 @@ impl Frontend {
             let is_last = idx == block.stmts.len() - 1;
             match stmt {
                 syn::Stmt::Local(local) => {
-                    let (name, mutable) = match &local.pat {
-                        syn::Pat::Ident(id) => (id.ident.to_string(), id.mutability.is_some()),
+                    let (name, mutable, ty) = match &local.pat {
+                        syn::Pat::Ident(id) => (
+                            id.ident.to_string(),
+                            id.mutability.is_some(),
+                            None,
+                        ),
+                        syn::Pat::Type(pt) => {
+                            let (n, m) = match &*pt.pat {
+                                syn::Pat::Ident(id) => (id.ident.to_string(), id.mutability.is_some()),
+                                other => {
+                                    self.reject(
+                                        DiagnosticCode::UnsupportedTypeRejected,
+                                        "Complex pattern in let binding not supported",
+                                        other,
+                                        None,
+                                    );
+                                    ("val".into(), false)
+                                }
+                            };
+                            let lowered_ty = self.lower_type(&pt.ty);
+                            (n, m, Some(lowered_ty))
+                        }
                         other => {
                             self.reject(
                                 DiagnosticCode::UnsupportedTypeRejected,
@@ -590,10 +610,9 @@ impl Frontend {
                                 other,
                                 None,
                             );
-                            ("val".into(), false)
+                            ("val".into(), false, None)
                         }
                     };
-                    let ty = None;
                     let init = local.init.as_ref().map(|init| self.lower_expr(&init.expr));
                     stmts.push(Stmt::Let {
                         name,
@@ -1002,6 +1021,19 @@ impl Frontend {
                 let cond = Box::new(self.lower_expr(&w.cond));
                 let body = Box::new(self.lower_block(&w.body));
                 Expr::new(ExprKind::While { cond, body }, Type::Unit)
+            }
+            syn::Expr::ForLoop(f) => {
+                let pattern = self.lower_pattern(&f.pat);
+                let iter = Box::new(self.lower_expr(&f.expr));
+                let body = Box::new(self.lower_block(&f.body));
+                Expr::new(
+                    ExprKind::For {
+                        pattern,
+                        iter,
+                        body,
+                    },
+                    Type::Unit,
+                )
             }
             syn::Expr::Return(r) => {
                 let val = r.expr.as_ref().map(|e| Box::new(self.lower_expr(e)));
@@ -1737,5 +1769,32 @@ mod tests {
             .parse_and_lower(src)
             .expect("Should parse and lower inout function");
         assert_eq!(module.items.len(), 1);
+    }
+
+    #[test]
+    fn test_for_loop_and_vec_lowering() {
+        let src = r#"
+            pub fn sum_elements(items: Vec<i32>) -> i32 {
+                let mut total = 0;
+                for x in items {
+                    total += x;
+                }
+                total
+            }
+        "#;
+        let mut frontend = Frontend::new("loops.rs");
+        let module = frontend
+            .parse_and_lower(src)
+            .expect("Should parse and lower for loop");
+        assert_eq!(module.items.len(), 1);
+        if let IrItem::Function(func) = &module.items[0] {
+            if let ExprKind::Block { stmts, .. } = &func.body.kind {
+                assert!(stmts.iter().any(|s| matches!(s, Stmt::Expr(Expr { kind: ExprKind::For { .. }, .. }))));
+            } else {
+                panic!("Expected function body to be a block");
+            }
+        } else {
+            panic!("Expected Item::Function");
+        }
     }
 }

@@ -1,0 +1,48 @@
+# Formal Iteration and Dynamic Collection Semantics
+# rust-swift compiler v0.1
+
+contract_id: "rust-swift.contracts.iteration_collections.v0_1"
+schema_version: "1.0.0"
+title: "Iteration, Dynamic Collections, and Array Slices"
+status: "active"
+
+description: >
+  Formalizes the translation of Rust for-loops, vector allocation (Vec<T>),
+  dynamic element mutation (push, pop, clear), length inspection, and array indexing
+  into native Swift arrays with copy-on-write value semantics.
+
+constructs:
+  - rust: "for pat in iter { body }"
+    swift: "for pat in iter { body }"
+    classification: "Deterministic range / sequence iteration"
+    semantics: "Translates directly to Swift for-in statement with pattern binding."
+
+  - rust: "Vec::new() / vec![]"
+    swift: "[]"
+    classification: "Dynamic array allocation"
+    semantics: "Swift Array initialization with inferred or explicit element type."
+
+  - rust: "vec.push(item)"
+    swift: "vec.append(item)"
+    classification: "Dynamic array append"
+    semantics: "Swift Array append method mutating value in-place."
+
+  - rust: "vec.pop()"
+    swift: "vec.popLast()"
+    classification: "Dynamic array pop"
+    semantics: "Swift popLast returning Optional<Element>."
+
+  - rust: "vec.len()"
+    swift: "vec.len()"
+    classification: "Array element count"
+    semantics: "Swift Array len() shim returning Int count."
+
+  - rust: "vec.is_empty()"
+    swift: "vec.is_empty()"
+    classification: "Array emptiness predicate"
+    semantics: "Swift Array is_empty() shim returning Bool."
+
+  - rust: "vec[idx]"
+    swift: "vec[idx]"
+    classification: "Subscript indexing"
+    semantics: "Direct Swift array indexing with runtime bounds check."

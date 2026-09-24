@@ -249,6 +249,11 @@ pub enum ExprKind {
         cond: Box<Expr>,
         body: Box<Expr>,
     },
+    For {
+        pattern: Pattern,
+        iter: Box<Expr>,
+        body: Box<Expr>,
+    },
     Tuple(Vec<Expr>),
     Array(Vec<Expr>),
     Index {
