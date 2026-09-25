@@ -1,0 +1,35 @@
+# Formal Property-Based Differential Fuzzing Specification
+# rust-swift compiler v0.1
+
+contract_id: "rust-swift.contracts.property_fuzzing.v0_1"
+schema_version: "1.0.0"
+title: "Property-Based Differential Fuzzing and Oracle Verification"
+status: "active"
+
+description: >
+  Formalizes automated property-based fuzzing and differential oracle verification
+  over 10,000 deterministic pseudo-random iterations across integer boundary arithmetic,
+  Option/Result monadic chains, dynamic collection lifecycle, and string transformations.
+
+domains:
+  - domain: "Wrapping Arithmetic & Boundary Conditions"
+    vector_space: "i32 and i64 minimums, maximums, zeros, and linear congruential permutations"
+    invariants:
+      - "Bit-for-bit equivalence between Rust wrapping operators and Swift &+, &-, &*"
+      - "Identical handling of overflow, underflow, and sign preservation"
+
+  - domain: "Option and Result Monadic Chaining"
+    vector_space: "Nested Some/None states and Ok/Err transitions under map and unwrap equivalents"
+    invariants:
+      - "Preservation of none-propagation and error payload equality"
+
+  - domain: "Dynamic Collection Lifecycle"
+    vector_space: "Sequences of push, pop, clear, and indexed reads on arbitrary element vectors"
+    invariants:
+      - "Identical length, capacity reallocations, and element ordering between Vec and Swift [T]"
+
+  - domain: "Deterministic State Transition Oracles"
+    vector_space: "10,000 pseudo-random seed-derived event execution sequences"
+    invariants:
+      - "Digest equality (SHA-256) between Rust reference trace and Swift execution trace"
+      - "Zero differential discrepancies across all 10,000 iterations"

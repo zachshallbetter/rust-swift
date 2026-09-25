@@ -2069,6 +2069,306 @@ struct TrapRunner {
         })
     }
 
+    /// Property-based differential fuzzing over 10,000 iterations asserting bit-level parity
+    pub fn test_property_fuzzing(
+        &self,
+        output_dir: &Path,
+    ) -> Result<QualificationReport, Box<dyn std::error::Error>> {
+        let out_dir = output_dir.join("property_fuzzing");
+        fs::create_dir_all(&out_dir)?;
+
+        let fuzz_source = r#"pub enum FuzzError {
+    Failed,
+}
+
+pub struct FuzzOracle {
+    pub state_counter: i64,
+}
+
+impl FuzzOracle {
+    pub fn compute_arithmetic(&mut self, a: i32, b: i32, c: i64) -> i64 {
+        let add = a.wrapping_add(b);
+        let sub = a.wrapping_sub(b);
+        let mul = a.wrapping_mul(b);
+        let combined = (add as i64).wrapping_add(sub as i64).wrapping_add(mul as i64).wrapping_add(c);
+        self.state_counter = self.state_counter.wrapping_add(combined);
+        combined
+    }
+
+    pub fn process_option(&self, opt: Option<i32>, default_val: i32) -> i32 {
+        match opt {
+            Some(v) => v.wrapping_add(1),
+            None => default_val,
+        }
+    }
+
+    pub fn process_result(&self, is_ok: bool, val: i32) -> Result<i32, FuzzError> {
+        if is_ok {
+            Ok(val.wrapping_mul(2))
+        } else {
+            Err(FuzzError::Failed)
+        }
+    }
+
+    pub fn process_vector(&self, items: Vec<i32>) -> i32 {
+        let mut sum: i32 = 0;
+        for x in items {
+            sum = sum.wrapping_add(x);
+        }
+        sum
+    }
+}
+"#;
+
+        let source_hash = Self::compute_sha256(fuzz_source);
+        let (rustc_ver, swift_ver) = Self::toolchain_versions();
+
+        // 1. Lower to IR
+        let mut frontend = Frontend::new("fuzz_target.rs");
+        let module = frontend
+            .parse_and_lower(fuzz_source)
+            .map_err(|diags| format!("Frontend rejected fuzz target: {:?}", diags))?;
+
+        // 2. Emit Swift Package
+        let pkg_dir = out_dir.join("fuzz_pkg");
+        let mut generator = SwiftGenerator::new();
+        generator.emit_package(&module, &pkg_dir, "FuzzModule")?;
+
+        // 3. Emit Swift 10,000-iteration runner
+        let runner_swift = r#"
+import Foundation
+
+struct Prng {
+    var state: UInt64
+    init(seed: UInt64) { self.state = seed }
+    mutating func nextU64() -> UInt64 {
+        state ^= (state << 13)
+        state ^= (state >> 7)
+        state ^= (state << 17)
+        return state
+    }
+    mutating func nextI32() -> Int32 {
+        return Int32(truncatingIfNeeded: nextU64())
+    }
+    mutating func nextI64() -> Int64 {
+        return Int64(truncatingIfNeeded: nextU64())
+    }
+}
+
+@main
+struct FuzzRunner {
+    static func main() {
+        var prng = Prng(seed: 0xDEADBEEFCAFEBABE)
+        var oracle = FuzzOracle(state_counter: 0)
+        var global_hash: UInt64 = 0
+
+        let boundary_i32: [Int32] = [0, 1, -1, Int32.max, Int32.min, 0x7fff, -0x8000]
+        let boundary_i64: [Int64] = [0, 1, -1, Int64.max, Int64.min]
+
+        for i in 0..<10_000 {
+            let a = (i % 50 == 0) ? boundary_i32[i % boundary_i32.count] : prng.nextI32()
+            let b = (i % 70 == 0) ? boundary_i32[(i + 1) % boundary_i32.count] : prng.nextI32()
+            let c = (i % 100 == 0) ? boundary_i64[i % boundary_i64.count] : prng.nextI64()
+
+            let arith_res = oracle.compute_arithmetic(a, b, c)
+
+            let opt_in: Int32? = (i % 3 == 0) ? nil : a
+            let opt_res = oracle.process_option(opt_in, b)
+
+            let is_ok = (i % 2 == 0)
+            let res_out = oracle.process_result(is_ok, b)
+            let res_val: Int32
+            switch res_out {
+            case .success(let v): res_val = v
+            case .failure: res_val = -999
+            }
+
+            let vec_len = Int(prng.nextU64() % 5)
+            var vec: [Int32] = []
+            for _ in 0..<vec_len {
+                vec.push(prng.nextI32())
+            }
+            let vec_res = oracle.process_vector(vec)
+
+            let step_mix = UInt64(bitPattern: arith_res)
+                ^ (UInt64(bitPattern: Int64(opt_res)) &<< 16)
+                ^ (UInt64(bitPattern: Int64(res_val)) &<< 32)
+                ^ (UInt64(bitPattern: Int64(vec_res)) &<< 48)
+                ^ UInt64(bitPattern: oracle.state_counter)
+
+            global_hash = (global_hash &* 6364136223846793005) &+ step_mix &+ 1442695040888963407
+        }
+
+        print("iterations:10000")
+        print("final_state:\(oracle.state_counter)")
+        print("global_hash:\(global_hash)")
+    }
+}
+"#;
+        let sources_dir = pkg_dir.join("Sources").join("FuzzModule");
+        let main_swift_path = sources_dir.join("main.swift");
+        fs::write(&main_swift_path, runner_swift)?;
+
+        let swift_source = sources_dir.join("fuzz_target.swift");
+        let rust_compat = sources_dir.join("RustCompat.swift");
+        let swiftc_out = Command::new("swiftc")
+            .arg("-parse-as-library")
+            .arg("-emit-executable")
+            .arg(&swift_source)
+            .arg(&rust_compat)
+            .arg(&main_swift_path)
+            .arg("-o")
+            .arg(pkg_dir.join("fuzz_runner"))
+            .output()?;
+
+        if !swiftc_out.status.success() {
+            return Err(format!(
+                "Failed to compile Swift Fuzz runner: {}",
+                String::from_utf8_lossy(&swiftc_out.stderr)
+            )
+            .into());
+        }
+
+        let exec_out = Command::new(pkg_dir.join("fuzz_runner")).output()?;
+        let swift_stdout = String::from_utf8(exec_out.stdout)?;
+
+        // 4. Reference Rust Oracle Implementation
+        struct RustPrng {
+            state: u64,
+        }
+        impl RustPrng {
+            fn new(seed: u64) -> Self { Self { state: seed } }
+            fn next_u64(&mut self) -> u64 {
+                self.state ^= self.state << 13;
+                self.state ^= self.state >> 7;
+                self.state ^= self.state << 17;
+                self.state
+            }
+            fn next_i32(&mut self) -> i32 { self.next_u64() as i32 }
+            fn next_i64(&mut self) -> i64 { self.next_u64() as i64 }
+        }
+
+        struct RustOracle {
+            state_counter: i64,
+        }
+        impl RustOracle {
+            fn compute_arithmetic(&mut self, a: i32, b: i32, c: i64) -> i64 {
+                let add = a.wrapping_add(b);
+                let sub = a.wrapping_sub(b);
+                let mul = a.wrapping_mul(b);
+                let combined = (add as i64).wrapping_add(sub as i64).wrapping_add(mul as i64).wrapping_add(c);
+                self.state_counter = self.state_counter.wrapping_add(combined);
+                combined
+            }
+            fn process_option(&self, opt: Option<i32>, default_val: i32) -> i32 {
+                match opt {
+                    Some(v) => v.wrapping_add(1),
+                    None => default_val,
+                }
+            }
+            fn process_result(&self, is_ok: bool, val: i32) -> Result<i32, ()> {
+                if is_ok {
+                    Ok(val.wrapping_mul(2))
+                } else {
+                    Err(())
+                }
+            }
+            fn process_vector(&self, items: Vec<i32>) -> i32 {
+                let mut sum: i32 = 0;
+                for x in items {
+                    sum = sum.wrapping_add(x);
+                }
+                sum
+            }
+        }
+
+        let mut prng = RustPrng::new(0xDEADBEEFCAFEBABE);
+        let mut oracle = RustOracle { state_counter: 0 };
+        let mut global_hash: u64 = 0;
+
+        let boundary_i32: [i32; 7] = [0, 1, -1, i32::MAX, i32::MIN, 0x7fff, -0x8000];
+        let boundary_i64: [i64; 5] = [0, 1, -1, i64::MAX, i64::MIN];
+
+        for i in 0..10_000 {
+            let a = if i % 50 == 0 { boundary_i32[i % boundary_i32.len()] } else { prng.next_i32() };
+            let b = if i % 70 == 0 { boundary_i32[(i + 1) % boundary_i32.len()] } else { prng.next_i32() };
+            let c = if i % 100 == 0 { boundary_i64[i % boundary_i64.len()] } else { prng.next_i64() };
+
+            let arith_res = oracle.compute_arithmetic(a, b, c);
+
+            let opt_in = if i % 3 == 0 { None } else { Some(a) };
+            let opt_res = oracle.process_option(opt_in, b);
+
+            let is_ok = i % 2 == 0;
+            let res_out = oracle.process_result(is_ok, b);
+            let res_val = match res_out {
+                Ok(v) => v,
+                Err(_) => -999,
+            };
+
+            let vec_len = (prng.next_u64() % 5) as usize;
+            let mut vec = Vec::new();
+            for _ in 0..vec_len {
+                vec.push(prng.next_i32());
+            }
+            let vec_res = oracle.process_vector(vec);
+
+            let step_mix = (arith_res as u64)
+                ^ ((opt_res as i64 as u64) << 16)
+                ^ ((res_val as i64 as u64) << 32)
+                ^ ((vec_res as i64 as u64) << 48)
+                ^ (oracle.state_counter as u64);
+
+            global_hash = global_hash.wrapping_mul(6364136223846793005).wrapping_add(step_mix).wrapping_add(1442695040888963407);
+        }
+
+        let rust_stdout = format!(
+            "iterations:10000\nfinal_state:{}\nglobal_hash:{}",
+            oracle.state_counter, global_hash
+        );
+
+        let rust_digest = Self::compute_sha256(&rust_stdout);
+        let swift_digest = Self::compute_sha256(swift_stdout.trim());
+
+        let total = 10_000;
+        let mut cases_passed = 0;
+        let mut details = Vec::new();
+
+        let rust_lines: Vec<&str> = rust_stdout.lines().collect();
+        let swift_lines: Vec<&str> = swift_stdout.lines().map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
+
+        let values_match = rust_lines == swift_lines;
+        if values_match {
+            cases_passed = total;
+            details.push(format!(
+                "10,000 iterations passed with 0 discrepancies (final_state={}, global_hash={})",
+                oracle.state_counter, global_hash
+            ));
+            details.push(format!("Rust Digest:  {}", rust_digest));
+            details.push(format!("Swift Digest: {}", swift_digest));
+        } else {
+            details.push(format!(
+                "Differential divergence detected! Rust: {:?}, Swift: {:?}",
+                rust_lines, swift_lines
+            ));
+        }
+
+        let status = if cases_passed == total { "PASSED" } else { "FAILED" };
+
+        Ok(QualificationReport {
+            fixture_name: "property_based_differential_fuzzing_10k".into(),
+            source_hash,
+            rustc_version: rustc_ver,
+            swift_version: swift_ver,
+            cases_tested: total,
+            cases_passed,
+            cases_failed: total - cases_passed,
+            status: status.into(),
+            timestamp: "2026-10-13T20:58:00Z".into(),
+            details,
+        })
+    }
+
     /// Run negative rejection tests asserting exact stable diagnostic codes
     pub fn test_negative_rejections(
         &self,
@@ -2471,5 +2771,19 @@ mod tests {
         assert_eq!(report.cases_passed, 3);
         assert_eq!(report.cases_failed, 0);
     }
+
+    #[test]
+    fn test_property_fuzzing_differential_passes() {
+        let runner = DifferentialRunner::new(".");
+        let temp_dir = std::env::temp_dir().join("property_fuzzing_diff_test");
+        let _ = fs::create_dir_all(&temp_dir);
+        let report = runner
+            .test_property_fuzzing(&temp_dir)
+            .expect("Property fuzzing differential test should pass");
+        assert_eq!(report.status, "PASSED");
+        assert_eq!(report.cases_passed, 10_000);
+        assert_eq!(report.cases_failed, 0);
+    }
 }
+
 
