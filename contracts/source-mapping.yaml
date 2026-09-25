@@ -1,0 +1,28 @@
+# Formal Source Mapping and Traceability Specification
+# rust-swift compiler v0.1
+
+contract_id: "rust-swift.contracts.source_mapping.v0_1"
+schema_version: "1.0.0"
+title: "Source Mapping and Bidirectional Traceability"
+status: "active"
+
+description: >
+  Formalizes bidirectional source mapping between original Rust source spans
+  and generated Swift files using #sourceLocation directives and Compiler Semantic
+  Graph (CSG) node references, enabling native IDE stepping and diagnostics.
+
+features:
+  - directive: "#sourceLocation(file: String, line: Int)"
+    swift_target: "Swift compiler line directive"
+    classification: "Debugger / diagnostic redirection"
+    semantics: "Directs lldb and Xcode debuggers to the exact originating Rust source line."
+
+  - directive: "#sourceLocation()"
+    swift_target: "Swift compiler line directive reset"
+    classification: "Diagnostic scope termination"
+    semantics: "Restores standard Swift file line numbering for generated compatibility shims."
+
+  - artifact: "csg.json"
+    schema: "Compiler Semantic Graph (Reflective Rust)"
+    classification: "Semantic provenance exchange"
+    semantics: "Preserves full AST and IR node spans, edges, and provenance hashes for formal qualification."
