@@ -1789,6 +1789,7 @@ struct LoopRunner {
         let swift_results = String::from_utf8(exec_out.stdout)?;
 
         // 5. Compute expected results using Rust reference
+        #[allow(clippy::vec_init_then_push)]
         fn rust_build_list() -> Vec<i32> {
             let mut v = Vec::new();
             v.push(10);
@@ -1807,10 +1808,7 @@ struct LoopRunner {
 
         fn rust_stack_pop_first(items: Vec<i32>) -> i32 {
             let mut v = items;
-            match v.pop() {
-                Some(val) => val,
-                None => 0,
-            }
+            v.pop().unwrap_or_default()
         }
 
         fn rust_filter_evens_and_double(items: Vec<i32>) -> Vec<i32> {
@@ -1949,12 +1947,16 @@ impl Worker {
         let mut details = Vec::new();
 
         // Check 1: Directive presence in generated Swift code
-        let has_struct_loc = swift_source.contains("#sourceLocation(file: \"source_mapping_test.rs\", line: 1)");
-        let has_method_loc = swift_source.contains("#sourceLocation(file: \"source_mapping_test.rs\", line: 6)");
+        let has_struct_loc =
+            swift_source.contains("#sourceLocation(file: \"source_mapping_test.rs\", line: 1)");
+        let has_method_loc =
+            swift_source.contains("#sourceLocation(file: \"source_mapping_test.rs\", line: 6)");
         let has_reset_loc = swift_source.ends_with("#sourceLocation()\n");
         if has_struct_loc && has_method_loc && has_reset_loc && manifest.source_locations_enabled {
             cases_passed += 1;
-            details.push("Step #1: PASS (#sourceLocation directives and manifest flag present)".into());
+            details.push(
+                "Step #1: PASS (#sourceLocation directives and manifest flag present)".into(),
+            );
         } else {
             details.push(format!(
                 "Step #1: FAIL (struct_loc={}, method_loc={}, reset_loc={}, manifest={})",
@@ -2003,7 +2005,9 @@ struct MappedRunner {
         let stdout = String::from_utf8_lossy(&exec_out.stdout);
         if stdout.contains("res:25") && stdout.contains("valid:true") {
             cases_passed += 1;
-            details.push("Step #2: PASS (Valid execution with source locations matches semantics)".into());
+            details.push(
+                "Step #2: PASS (Valid execution with source locations matches semantics)".into(),
+            );
         } else {
             details.push(format!("Step #2: FAIL (Unexpected stdout: {})", stdout));
         }
@@ -2050,10 +2054,17 @@ struct TrapRunner {
             cases_passed += 1;
             details.push("Step #3: PASS (Precondition failure correctly reports source_mapping_test.rs:11 in stack trace)".into());
         } else {
-            details.push(format!("Step #3: FAIL (Expected source_mapping_test.rs:11 in stderr, got: {})", stderr));
+            details.push(format!(
+                "Step #3: FAIL (Expected source_mapping_test.rs:11 in stderr, got: {})",
+                stderr
+            ));
         }
 
-        let status = if cases_passed == total { "PASSED" } else { "FAILED" };
+        let status = if cases_passed == total {
+            "PASSED"
+        } else {
+            "FAILED"
+        };
 
         Ok(QualificationReport {
             fixture_name: "source_mapping_and_traceability".into(),
@@ -2237,15 +2248,21 @@ struct FuzzRunner {
             state: u64,
         }
         impl RustPrng {
-            fn new(seed: u64) -> Self { Self { state: seed } }
+            fn new(seed: u64) -> Self {
+                Self { state: seed }
+            }
             fn next_u64(&mut self) -> u64 {
                 self.state ^= self.state << 13;
                 self.state ^= self.state >> 7;
                 self.state ^= self.state << 17;
                 self.state
             }
-            fn next_i32(&mut self) -> i32 { self.next_u64() as i32 }
-            fn next_i64(&mut self) -> i64 { self.next_u64() as i64 }
+            fn next_i32(&mut self) -> i32 {
+                self.next_u64() as i32
+            }
+            fn next_i64(&mut self) -> i64 {
+                self.next_u64() as i64
+            }
         }
 
         struct RustOracle {
@@ -2256,7 +2273,10 @@ struct FuzzRunner {
                 let add = a.wrapping_add(b);
                 let sub = a.wrapping_sub(b);
                 let mul = a.wrapping_mul(b);
-                let combined = (add as i64).wrapping_add(sub as i64).wrapping_add(mul as i64).wrapping_add(c);
+                let combined = (add as i64)
+                    .wrapping_add(sub as i64)
+                    .wrapping_add(mul as i64)
+                    .wrapping_add(c);
                 self.state_counter = self.state_counter.wrapping_add(combined);
                 combined
             }
@@ -2290,9 +2310,21 @@ struct FuzzRunner {
         let boundary_i64: [i64; 5] = [0, 1, -1, i64::MAX, i64::MIN];
 
         for i in 0..10_000 {
-            let a = if i % 50 == 0 { boundary_i32[i % boundary_i32.len()] } else { prng.next_i32() };
-            let b = if i % 70 == 0 { boundary_i32[(i + 1) % boundary_i32.len()] } else { prng.next_i32() };
-            let c = if i % 100 == 0 { boundary_i64[i % boundary_i64.len()] } else { prng.next_i64() };
+            let a = if i % 50 == 0 {
+                boundary_i32[i % boundary_i32.len()]
+            } else {
+                prng.next_i32()
+            };
+            let b = if i % 70 == 0 {
+                boundary_i32[(i + 1) % boundary_i32.len()]
+            } else {
+                prng.next_i32()
+            };
+            let c = if i % 100 == 0 {
+                boundary_i64[i % boundary_i64.len()]
+            } else {
+                prng.next_i64()
+            };
 
             let arith_res = oracle.compute_arithmetic(a, b, c);
 
@@ -2301,10 +2333,7 @@ struct FuzzRunner {
 
             let is_ok = i % 2 == 0;
             let res_out = oracle.process_result(is_ok, b);
-            let res_val = match res_out {
-                Ok(v) => v,
-                Err(_) => -999,
-            };
+            let res_val = res_out.unwrap_or(-999);
 
             let vec_len = (prng.next_u64() % 5) as usize;
             let mut vec = Vec::new();
@@ -2319,7 +2348,10 @@ struct FuzzRunner {
                 ^ ((vec_res as i64 as u64) << 48)
                 ^ (oracle.state_counter as u64);
 
-            global_hash = global_hash.wrapping_mul(6364136223846793005).wrapping_add(step_mix).wrapping_add(1442695040888963407);
+            global_hash = global_hash
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(step_mix)
+                .wrapping_add(1442695040888963407);
         }
 
         let rust_stdout = format!(
@@ -2335,7 +2367,11 @@ struct FuzzRunner {
         let mut details = Vec::new();
 
         let rust_lines: Vec<&str> = rust_stdout.lines().collect();
-        let swift_lines: Vec<&str> = swift_stdout.lines().map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
+        let swift_lines: Vec<&str> = swift_stdout
+            .lines()
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .collect();
 
         let values_match = rust_lines == swift_lines;
         if values_match {
@@ -2353,7 +2389,11 @@ struct FuzzRunner {
             ));
         }
 
-        let status = if cases_passed == total { "PASSED" } else { "FAILED" };
+        let status = if cases_passed == total {
+            "PASSED"
+        } else {
+            "FAILED"
+        };
 
         Ok(QualificationReport {
             fixture_name: "property_based_differential_fuzzing_10k".into(),
@@ -2785,5 +2825,3 @@ mod tests {
         assert_eq!(report.cases_failed, 0);
     }
 }
-
-

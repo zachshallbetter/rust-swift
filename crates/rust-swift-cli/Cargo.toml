@@ -1,9 +1,11 @@
 [package]
 name = "rust-swift-cli"
+description = "Command-line interface for the rust-swift compiler"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
+repository.workspace = true
 
 [[bin]]
 name = "rust-swift"

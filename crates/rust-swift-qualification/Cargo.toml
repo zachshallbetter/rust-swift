@@ -1,9 +1,11 @@
 [package]
 name = "rust-swift-qualification"
+description = "Differential qualification test harness and oracle verification for rust-swift"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
+repository.workspace = true
 
 [dependencies]
 rust-swift-ir = { path = "../rust-swift-ir" }

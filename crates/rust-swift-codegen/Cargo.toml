@@ -1,9 +1,11 @@
 [package]
 name = "rust-swift-codegen"
+description = "Deterministic Swift code generator and standalone Swift package emitter for rust-swift"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
+repository.workspace = true
 
 [dependencies]
 rust-swift-ir = { path = "../rust-swift-ir" }

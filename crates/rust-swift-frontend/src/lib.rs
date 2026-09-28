@@ -582,14 +582,14 @@ impl Frontend {
             match stmt {
                 syn::Stmt::Local(local) => {
                     let (name, mutable, ty) = match &local.pat {
-                        syn::Pat::Ident(id) => (
-                            id.ident.to_string(),
-                            id.mutability.is_some(),
-                            None,
-                        ),
+                        syn::Pat::Ident(id) => {
+                            (id.ident.to_string(), id.mutability.is_some(), None)
+                        }
                         syn::Pat::Type(pt) => {
                             let (n, m) = match &*pt.pat {
-                                syn::Pat::Ident(id) => (id.ident.to_string(), id.mutability.is_some()),
+                                syn::Pat::Ident(id) => {
+                                    (id.ident.to_string(), id.mutability.is_some())
+                                }
                                 other => {
                                     self.reject(
                                         DiagnosticCode::UnsupportedTypeRejected,
@@ -1789,7 +1789,13 @@ mod tests {
         assert_eq!(module.items.len(), 1);
         if let IrItem::Function(func) = &module.items[0] {
             if let ExprKind::Block { stmts, .. } = &func.body.kind {
-                assert!(stmts.iter().any(|s| matches!(s, Stmt::Expr(Expr { kind: ExprKind::For { .. }, .. }))));
+                assert!(stmts.iter().any(|s| matches!(
+                    s,
+                    Stmt::Expr(Expr {
+                        kind: ExprKind::For { .. },
+                        ..
+                    })
+                )));
             } else {
                 panic!("Expected function body to be a block");
             }

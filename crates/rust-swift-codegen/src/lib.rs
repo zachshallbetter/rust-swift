@@ -353,7 +353,8 @@ impl SwiftGenerator {
         });
 
         let mut out = String::new();
-        if self.emit_source_locations && method.span.start_line > 0 && !method.span.file.is_empty() {
+        if self.emit_source_locations && method.span.start_line > 0 && !method.span.file.is_empty()
+        {
             let escaped = method.span.file.replace('\\', "\\\\").replace('"', "\\\"");
             out.push_str(&format!(
                 "{}#sourceLocation(file: \"{}\", line: {})\n",
@@ -582,7 +583,12 @@ impl SwiftGenerator {
                 }
             }
             Stmt::Expr(Expr {
-                kind: ExprKind::For { pattern, iter, body },
+                kind:
+                    ExprKind::For {
+                        pattern,
+                        iter,
+                        body,
+                    },
                 ..
             }) => {
                 let pat_str = self.generate_for_pattern(pattern);
@@ -1788,4 +1794,3 @@ mod tests {
         assert!(code_mapped.ends_with("#sourceLocation()\n"));
     }
 }
-

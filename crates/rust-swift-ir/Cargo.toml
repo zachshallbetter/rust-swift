@@ -1,9 +1,11 @@
 [package]
 name = "rust-swift-ir"
+description = "Target-neutral semantic intermediate representation and Compiler Semantic Graph bridge for rust-swift"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
+repository.workspace = true
 
 [dependencies]
 serde = { workspace = true }

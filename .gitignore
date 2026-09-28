@@ -1,20 +1,80 @@
-
 # formal-project-bootstrap: secrets stay out; AGENTS.md and the .agents/ tree stay in
 .env
 .env.local
+.env.*
+!.env.example
 .agents/llms.txt
 .agents/llms-full.txt
-__pycache__/
 !.agents/
 !**/.agents/
 !AGENTS.md
+
+# Rust build artifacts
 target/
+**/*.rs.bk
+*.pdb
+
+# Swift / SwiftPM build artifacts
 .build/
 **/.build/
-.DS_Store
-**/.DS_Store
+.swiftpm/
+**/.swiftpm/
+Packages/
+Package.resolved
+
+# Xcode & Apple toolchain artifacts
+*.xcodeproj/
+*.xcworkspace/
+xcuserdata/
+**/xcuserdata/
+DerivedData/
+*.dSYM/
+**/*.dSYM/
 *.app/
 **/*.app/
+
+# Native binaries from examples
 examples/PlayerApp/PlayerApp
 examples/PeelInspectorApp/PeelInspectorApp
+**/runner
 
+# Generated test & qualification outputs
+generated-swift/
+target/qualification/
+*.log
+
+# Operating System files
+.DS_Store
+**/.DS_Store
+._*
+**/._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+
+# Editor & IDE configurations
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+*.bak
+*.orig
+.nova/
+.zed/
+
+# Python cache artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Credentials & Certificates
+*.pem
+*.key
+*.p12
+*.cer
+*.secret
+*.p8
+credentials.json
+auth.json
