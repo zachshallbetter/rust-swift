@@ -449,6 +449,35 @@ pub struct ImplBlock {
     pub span: SourceSpan,
 }
 
+/// Trait method signature and optional default body.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TraitMethod {
+    pub name: String,
+    pub receiver: Option<ReceiverKind>,
+    pub params: Vec<Param>,
+    pub return_type: Type,
+    pub default_body: Option<Expr>,
+    pub span: SourceSpan,
+}
+
+/// Trait definition.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TraitDef {
+    pub name: String,
+    pub methods: Vec<TraitMethod>,
+    pub is_public: bool,
+    pub span: SourceSpan,
+}
+
+/// Trait implementation for a target struct or enum type.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TraitImpl {
+    pub trait_name: String,
+    pub target_type: String,
+    pub methods: Vec<Method>,
+    pub span: SourceSpan,
+}
+
 /// Item in a module.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -457,6 +486,8 @@ pub enum Item {
     Struct(StructDef),
     Enum(EnumDef),
     Impl(ImplBlock),
+    Trait(TraitDef),
+    TraitImpl(TraitImpl),
 }
 
 /// Top-level compilation unit module.
@@ -624,6 +655,85 @@ impl Module {
                             from: root_id.clone(),
                             to: method_id,
                             relationship: "contains_item".into(),
+                            minimum_access: AccessLevel::Public,
+                        });
+                    }
+                }
+                Item::Trait(trt) => {
+                    let trait_id = format!("{}::{}", root_id, trt.name);
+                    nodes.push(CsgNode {
+                        id: trait_id.clone(),
+                        name: trt.name.clone(),
+                        kind: CsgNodeKind::Trait,
+                        span: trt.span.clone().into(),
+                        minimum_access: if trt.is_public {
+                            AccessLevel::Public
+                        } else {
+                            AccessLevel::Owner
+                        },
+                        size_bytes: None,
+                    });
+                    edges.push(CsgEdge {
+                        from: root_id.clone(),
+                        to: trait_id.clone(),
+                        relationship: "contains_item".into(),
+                        minimum_access: AccessLevel::Public,
+                    });
+                    for method in &trt.methods {
+                        let method_id = format!("{}::{}", trait_id, method.name);
+                        nodes.push(CsgNode {
+                            id: method_id.clone(),
+                            name: method.name.clone(),
+                            kind: CsgNodeKind::Function,
+                            span: method.span.clone().into(),
+                            minimum_access: AccessLevel::Public,
+                            size_bytes: None,
+                        });
+                        edges.push(CsgEdge {
+                            from: trait_id.clone(),
+                            to: method_id,
+                            relationship: "declares".into(),
+                            minimum_access: AccessLevel::Public,
+                        });
+                    }
+                }
+                Item::TraitImpl(timpl) => {
+                    let impl_id = format!(
+                        "{}::impl_{}_for_{}",
+                        root_id, timpl.trait_name, timpl.target_type
+                    );
+                    nodes.push(CsgNode {
+                        id: impl_id.clone(),
+                        name: format!("impl {} for {}", timpl.trait_name, timpl.target_type),
+                        kind: CsgNodeKind::Impl,
+                        span: timpl.span.clone().into(),
+                        minimum_access: AccessLevel::Public,
+                        size_bytes: None,
+                    });
+                    edges.push(CsgEdge {
+                        from: root_id.clone(),
+                        to: impl_id.clone(),
+                        relationship: "contains_item".into(),
+                        minimum_access: AccessLevel::Public,
+                    });
+                    for method in &timpl.methods {
+                        let method_id = format!("{}::{}", impl_id, method.name);
+                        nodes.push(CsgNode {
+                            id: method_id.clone(),
+                            name: method.name.clone(),
+                            kind: CsgNodeKind::Function,
+                            span: method.span.clone().into(),
+                            minimum_access: if method.is_public {
+                                AccessLevel::Public
+                            } else {
+                                AccessLevel::Owner
+                            },
+                            size_bytes: None,
+                        });
+                        edges.push(CsgEdge {
+                            from: impl_id.clone(),
+                            to: method_id,
+                            relationship: "defines".into(),
                             minimum_access: AccessLevel::Public,
                         });
                     }

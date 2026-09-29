@@ -2080,6 +2080,191 @@ struct TrapRunner {
         })
     }
 
+    /// Differential qualification testing for Rust traits and Swift protocols & extensions
+    pub fn test_protocols_and_traits(
+        &self,
+        output_dir: &Path,
+    ) -> Result<QualificationReport, Box<dyn std::error::Error>> {
+        let out_dir = output_dir.join("protocols_and_traits");
+        fs::create_dir_all(&out_dir)?;
+
+        let source = r#"pub trait Describable {
+    fn describe(&self) -> String;
+    fn default_tag(&self) -> i32 {
+        42
+    }
+}
+
+pub trait Tunable {
+    fn adjust_gain(&mut self, delta: i32);
+}
+
+pub struct AudioChannel {
+    pub name: String,
+    pub gain: i32,
+}
+
+impl Describable for AudioChannel {
+    fn describe(&self) -> String {
+        self.name.clone()
+    }
+}
+
+impl Tunable for AudioChannel {
+    fn adjust_gain(&mut self, delta: i32) {
+        self.gain = self.gain + delta;
+    }
+}
+"#;
+
+        let source_hash = Self::compute_sha256(source);
+        let (rustc_ver, swift_ver) = Self::toolchain_versions();
+
+        // 1. Lower to IR
+        let mut frontend = Frontend::new("traits_test.rs");
+        let module = frontend
+            .parse_and_lower(source)
+            .map_err(|diags| format!("Frontend rejected traits fixture: {:?}", diags))?;
+
+        // 2. Emit Swift Package
+        let pkg_dir = out_dir.join("traits_pkg");
+        let mut generator = SwiftGenerator::new();
+        generator.emit_package(&module, &pkg_dir, "TraitsModule")?;
+
+        let sources_dir = pkg_dir.join("Sources").join("TraitsModule");
+        let swift_source = fs::read_to_string(sources_dir.join("traits_test.swift"))?;
+
+        let mut cases_passed = 0;
+        let total = 4;
+        let mut details = Vec::new();
+
+        // Case 1: Protocol & extension structure verification
+        let has_protocol_desc = swift_source.contains("public protocol Describable {");
+        let has_protocol_tune = swift_source.contains("public protocol Tunable {");
+        let has_ext_desc = swift_source.contains("public extension Describable {");
+        let has_impl_desc = swift_source.contains("extension AudioChannel: Describable {");
+        let has_impl_tune = swift_source.contains("extension AudioChannel: Tunable {");
+
+        if has_protocol_desc && has_protocol_tune && has_ext_desc && has_impl_desc && has_impl_tune
+        {
+            cases_passed += 1;
+            details.push(
+                "Case #1: PASS (Swift protocol, extension, and conformance generated)".into(),
+            );
+        } else {
+            details.push(
+                "Case #1: FAIL (Missing protocol/extension definitions in Swift code)".into(),
+            );
+        }
+
+        // 3. Compile and execute Rust test runner
+        let rust_runner_src = format!(
+            r#"{source}
+
+fn main() {{
+    let mut ch = AudioChannel {{ name: "Master".to_string(), gain: 10 }};
+    println!("desc:{{}}", ch.describe());
+    println!("tag:{{}}", ch.default_tag());
+    ch.adjust_gain(5);
+    println!("gain:{{}}", ch.gain);
+}}
+"#
+        );
+        let rust_file = out_dir.join("runner.rs");
+        fs::write(&rust_file, &rust_runner_src)?;
+        let rust_bin = out_dir.join("rust_runner");
+        let rustc_status = Command::new("rustc")
+            .arg(&rust_file)
+            .arg("-o")
+            .arg(&rust_bin)
+            .status()?;
+        if !rustc_status.success() {
+            return Err("Failed to compile Rust trait runner".into());
+        }
+
+        let rust_output = Command::new(&rust_bin).output()?;
+        let rust_stdout = String::from_utf8(rust_output.stdout)?;
+
+        // 4. Compile and execute Swift test runner
+        let swift_runner_src = r#"
+import Foundation
+
+@main
+struct TraitRunner {
+    static func main() {
+        var ch = AudioChannel(name: "Master", gain: 10)
+        print("desc:\(ch.describe())")
+        print("tag:\(ch.default_tag())")
+        ch.adjust_gain(5)
+        print("gain:\(ch.gain)")
+    }
+}
+"#;
+        let swift_runner_file = sources_dir.join("main.swift");
+        fs::write(&swift_runner_file, swift_runner_src)?;
+
+        let swift_bin = out_dir.join("swift_runner");
+        let swiftc_status = Command::new("swiftc")
+            .arg("-parse-as-library")
+            .arg(sources_dir.join("traits_test.swift"))
+            .arg(&swift_runner_file)
+            .arg("-o")
+            .arg(&swift_bin)
+            .status()?;
+        if !swiftc_status.success() {
+            return Err("Failed to compile Swift trait runner".into());
+        }
+
+        let swift_output = Command::new(&swift_bin).output()?;
+        let swift_stdout = String::from_utf8(swift_output.stdout)?;
+
+        // Case 2: Output parity for required method
+        if rust_stdout.contains("desc:Master") && swift_stdout.contains("desc:Master") {
+            cases_passed += 1;
+            details.push("Case #2: PASS (Required trait method describe() output parity)".into());
+        } else {
+            details.push("Case #2: FAIL (describe() output mismatch)".into());
+        }
+
+        // Case 3: Output parity for default implementation
+        if rust_stdout.contains("tag:42") && swift_stdout.contains("tag:42") {
+            cases_passed += 1;
+            details.push(
+                "Case #3: PASS (Default trait method default_tag() extension output parity)".into(),
+            );
+        } else {
+            details.push("Case #3: FAIL (default_tag() output mismatch)".into());
+        }
+
+        // Case 4: Output parity for mutating trait method
+        if rust_stdout.contains("gain:15") && swift_stdout.contains("gain:15") {
+            cases_passed += 1;
+            details
+                .push("Case #4: PASS (Mutating trait method adjust_gain() output parity)".into());
+        } else {
+            details.push("Case #4: FAIL (adjust_gain() output mismatch)".into());
+        }
+
+        let status = if cases_passed == total {
+            "PASSED"
+        } else {
+            "FAILED"
+        };
+
+        Ok(QualificationReport {
+            fixture_name: "protocols_and_traits".into(),
+            source_hash,
+            rustc_version: rustc_ver,
+            swift_version: swift_ver,
+            cases_tested: total,
+            cases_passed,
+            cases_failed: total - cases_passed,
+            status: status.into(),
+            timestamp: "2026-10-14T13:20:00Z".into(),
+            details,
+        })
+    }
+
     /// Property-based differential fuzzing over 10,000 iterations asserting bit-level parity
     pub fn test_property_fuzzing(
         &self,
@@ -2495,8 +2680,8 @@ struct FuzzRunner {
         });
 
         // 4. Complex trait rejection
-        let trait_src = "pub struct Foo; impl Bar for Foo {}";
-        let mut f4 = Frontend::new("trait_impl.rs");
+        let trait_src = "pub trait ComplexTrait { type Output; }";
+        let mut f4 = Frontend::new("complex_trait.rs");
         let res4 = f4.parse_and_lower(trait_src);
         let p4 = res4.is_err()
             && res4
@@ -2809,6 +2994,19 @@ mod tests {
             .expect("Source mapping differential test should pass");
         assert_eq!(report.status, "PASSED");
         assert_eq!(report.cases_passed, 3);
+        assert_eq!(report.cases_failed, 0);
+    }
+
+    #[test]
+    fn test_protocols_and_traits_differential_passes() {
+        let runner = DifferentialRunner::new(".");
+        let temp_dir = std::env::temp_dir().join("protocols_and_traits_diff_test");
+        let _ = fs::create_dir_all(&temp_dir);
+        let report = runner
+            .test_protocols_and_traits(&temp_dir)
+            .expect("Protocols and traits differential test should pass");
+        assert_eq!(report.status, "PASSED");
+        assert_eq!(report.cases_passed, 4);
         assert_eq!(report.cases_failed, 0);
     }
 

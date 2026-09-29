@@ -9,7 +9,8 @@ use diagnostic::{Diagnostic, DiagnosticCode};
 use rust_swift_ir::{
     BinaryOp, CmpOp, EnumDef, EnumVariant, Expr, ExprKind, FieldDef, Function, ImplBlock,
     IntegerMode, IntegerOp, Item as IrItem, Literal, LogicalOp, MatchArm, Method, Module, Param,
-    Pattern, ReceiverKind, SourceSpan, Stmt, StructDef, Type, UnaryOp, VariantPayload,
+    Pattern, ReceiverKind, SourceSpan, Stmt, StructDef, TraitDef, TraitImpl, TraitMethod, Type,
+    UnaryOp, VariantPayload,
 };
 use syn::spanned::Spanned;
 
@@ -103,15 +104,7 @@ impl Frontend {
                 );
                 None
             }
-            syn::Item::Trait(t) => {
-                self.reject(
-                    DiagnosticCode::ComplexTraitRejected,
-                    "Trait declarations are rejected in v0.1",
-                    t,
-                    Some("Use concrete functions and structs"),
-                );
-                None
-            }
+            syn::Item::Trait(t) => self.lower_trait(t).map(IrItem::Trait),
             syn::Item::Impl(imp) => {
                 if let Some((_, trait_path, _)) = &imp.trait_ {
                     let trait_name = trait_path
@@ -126,15 +119,19 @@ impl Frontend {
                             imp,
                             Some("Rely on deterministic value semantics and lexical scoping"),
                         );
-                    } else {
+                        None
+                    } else if !imp.generics.params.is_empty() {
                         self.reject(
                             DiagnosticCode::ComplexTraitRejected,
-                            "Trait implementations are rejected in v0.1",
+                            "Generic trait implementations are rejected in v0.2",
                             imp,
-                            Some("Use standalone pure functions or inherent methods"),
+                            Some("Use monomorphic trait implementations"),
                         );
+                        None
+                    } else {
+                        self.lower_trait_impl(imp, trait_name)
+                            .map(IrItem::TraitImpl)
                     }
-                    None
                 } else {
                     let target_type = match &*imp.self_ty {
                         syn::Type::Path(p) => p
@@ -317,6 +314,140 @@ impl Frontend {
             body,
             is_public,
             span: self.make_span(method),
+        })
+    }
+
+    fn lower_trait(&mut self, item_trait: &syn::ItemTrait) -> Option<TraitDef> {
+        if !item_trait.generics.params.is_empty() {
+            self.reject(
+                DiagnosticCode::ComplexTraitRejected,
+                "Generic traits with type parameters are rejected in v0.2",
+                item_trait,
+                Some("Use monomorphic traits"),
+            );
+            return None;
+        }
+
+        let name = item_trait.ident.to_string();
+        let is_public = matches!(item_trait.vis, syn::Visibility::Public(_));
+        let mut methods = Vec::new();
+
+        for item in &item_trait.items {
+            match item {
+                syn::TraitItem::Fn(trait_fn) => {
+                    if let Some(m) = self.lower_trait_method(trait_fn) {
+                        methods.push(m);
+                    }
+                }
+                syn::TraitItem::Type(_) => {
+                    self.reject(
+                        DiagnosticCode::ComplexTraitRejected,
+                        "Associated types in traits are rejected in v0.2",
+                        item,
+                        Some("Use explicit return types in trait methods"),
+                    );
+                    return None;
+                }
+                other => {
+                    self.reject(
+                        DiagnosticCode::ComplexTraitRejected,
+                        "Unsupported item in trait definition",
+                        other,
+                        None,
+                    );
+                    return None;
+                }
+            }
+        }
+
+        Some(TraitDef {
+            name,
+            methods,
+            is_public,
+            span: self.make_span(item_trait),
+        })
+    }
+
+    fn lower_trait_method(&mut self, method: &syn::TraitItemFn) -> Option<TraitMethod> {
+        let name = method.sig.ident.to_string();
+
+        let mut receiver = None;
+        let mut params = Vec::new();
+
+        for input in &method.sig.inputs {
+            match input {
+                syn::FnArg::Receiver(r) => {
+                    if r.reference.is_some() {
+                        if r.mutability.is_some() {
+                            receiver = Some(ReceiverKind::MutRef);
+                        } else {
+                            receiver = Some(ReceiverKind::Ref);
+                        }
+                    } else {
+                        receiver = Some(ReceiverKind::Value);
+                    }
+                }
+                syn::FnArg::Typed(pat_type) => {
+                    let param_name = match &*pat_type.pat {
+                        syn::Pat::Ident(id) => id.ident.to_string(),
+                        _ => "arg".into(),
+                    };
+                    let is_mutable_binding = match &*pat_type.pat {
+                        syn::Pat::Ident(id) => id.mutability.is_some(),
+                        _ => false,
+                    };
+                    let ty = self.lower_type(&pat_type.ty);
+                    params.push(Param {
+                        name: param_name,
+                        ty,
+                        mutable: is_mutable_binding,
+                    });
+                }
+            }
+        }
+
+        let return_type = match &method.sig.output {
+            syn::ReturnType::Default => Type::Unit,
+            syn::ReturnType::Type(_, ty) => self.lower_type(ty),
+        };
+
+        let default_body = method.default.as_ref().map(|b| self.lower_block(b));
+
+        Some(TraitMethod {
+            name,
+            receiver,
+            params,
+            return_type,
+            default_body,
+            span: self.make_span(method),
+        })
+    }
+
+    fn lower_trait_impl(&mut self, imp: &syn::ItemImpl, trait_name: String) -> Option<TraitImpl> {
+        let target_type = match &*imp.self_ty {
+            syn::Type::Path(p) => p
+                .path
+                .segments
+                .last()
+                .map(|s| s.ident.to_string())
+                .unwrap_or_else(|| "Target".into()),
+            _ => "Target".into(),
+        };
+
+        let mut methods = Vec::new();
+        for item in &imp.items {
+            if let syn::ImplItem::Fn(method) = item {
+                if let Some(m) = self.lower_method(method) {
+                    methods.push(m);
+                }
+            }
+        }
+
+        Some(TraitImpl {
+            trait_name,
+            target_type,
+            methods,
+            span: self.make_span(imp),
         })
     }
 
@@ -1645,18 +1776,62 @@ mod tests {
     }
 
     #[test]
-    fn test_trait_impl_rejected_with_e0006() {
+    fn test_complex_trait_rejected_with_e0006() {
         let src = r#"
-            pub struct Foo;
-            impl Bar for Foo {}
+            pub trait ComplexTrait {
+                type Item;
+            }
         "#;
-        let mut frontend = Frontend::new("trait_impl.rs");
+        let mut frontend = Frontend::new("complex_trait.rs");
         let errs = frontend
             .parse_and_lower(src)
-            .expect_err("Should reject trait impl");
+            .expect_err("Should reject complex trait with associated types");
         assert!(errs
             .iter()
             .any(|d| d.code == DiagnosticCode::ComplexTraitRejected));
+    }
+
+    #[test]
+    fn test_trait_and_trait_impl_lowering() {
+        let src = r#"
+            pub trait Greeter {
+                fn greet(&self) -> String;
+                fn tag(&self) -> i32 {
+                    42
+                }
+            }
+
+            pub struct Person {
+                pub name: String,
+            }
+
+            impl Greeter for Person {
+                fn greet(&self) -> String {
+                    self.name
+                }
+            }
+        "#;
+        let mut frontend = Frontend::new("greeter.rs");
+        let module = frontend
+            .parse_and_lower(src)
+            .expect("Should parse and lower valid trait and trait impl");
+        assert_eq!(module.items.len(), 3);
+        match &module.items[0] {
+            IrItem::Trait(trt) => {
+                assert_eq!(trt.name, "Greeter");
+                assert_eq!(trt.methods.len(), 2);
+                assert!(trt.methods[1].default_body.is_some());
+            }
+            _ => panic!("Expected IrItem::Trait"),
+        }
+        match &module.items[2] {
+            IrItem::TraitImpl(timpl) => {
+                assert_eq!(timpl.trait_name, "Greeter");
+                assert_eq!(timpl.target_type, "Person");
+                assert_eq!(timpl.methods.len(), 1);
+            }
+            _ => panic!("Expected IrItem::TraitImpl"),
+        }
     }
 
     #[test]
