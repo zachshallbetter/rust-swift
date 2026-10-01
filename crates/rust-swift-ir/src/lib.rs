@@ -11,7 +11,7 @@ use reflective_rust_protocol::AccessLevel;
 use serde::{Deserialize, Serialize};
 
 /// Source code location span.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct SourceSpan {
     pub file: String,
     pub start_line: u32,
@@ -367,6 +367,8 @@ pub struct StructDef {
     pub name: String,
     pub fields: Vec<FieldDef>,
     pub is_public: bool,
+    #[serde(default)]
+    pub is_codable: bool,
     pub span: SourceSpan,
 }
 
@@ -391,6 +393,8 @@ pub struct EnumDef {
     pub name: String,
     pub variants: Vec<EnumVariant>,
     pub is_public: bool,
+    #[serde(default)]
+    pub is_codable: bool,
     pub span: SourceSpan,
 }
 
