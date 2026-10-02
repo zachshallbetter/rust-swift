@@ -55,6 +55,10 @@ enum Commands {
         /// Force synthesis of Swift Codable conformance across all structs and enums
         #[arg(long)]
         codable: bool,
+
+        /// Enable SwiftUI @Observable macro synthesis for state models
+        #[arg(long)]
+        observable: bool,
     },
     /// Run differential qualification test suite across Rust reference and Swift outputs
     DiffTest {
@@ -79,6 +83,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             source_locations,
             spm,
             codable,
+            observable,
         } => {
             compile_command(CompileOptions {
                 input: &input,
@@ -89,6 +94,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 source_locations,
                 spm,
                 codable,
+                observable,
             })?;
         }
         Commands::DiffTest { output_dir } => {
@@ -111,6 +117,7 @@ struct CompileOptions<'a> {
     source_locations: bool,
     spm: bool,
     codable: bool,
+    observable: bool,
 }
 
 fn compile_command(opts: CompileOptions<'_>) -> Result<(), Box<dyn std::error::Error>> {
@@ -122,6 +129,7 @@ fn compile_command(opts: CompileOptions<'_>) -> Result<(), Box<dyn std::error::E
     let source_locations = opts.source_locations;
     let spm = opts.spm;
     let codable = opts.codable;
+    let observable = opts.observable;
 
     if !input.exists() {
         eprintln!("Error: Input file does not exist: {}", input.display());
@@ -139,8 +147,9 @@ fn compile_command(opts: CompileOptions<'_>) -> Result<(), Box<dyn std::error::E
         .unwrap_or("Module");
     let pkg_name = package_name.unwrap_or(file_stem);
 
-    let mut frontend =
-        Frontend::new(input.to_string_lossy().to_string()).with_default_codable(codable);
+    let mut frontend = Frontend::new(input.to_string_lossy().to_string())
+        .with_default_codable(codable)
+        .with_default_observable(observable);
     let module = match frontend.parse_and_lower(&source) {
         Ok(m) => m,
         Err(diags) => {
@@ -152,7 +161,9 @@ fn compile_command(opts: CompileOptions<'_>) -> Result<(), Box<dyn std::error::E
         }
     };
 
-    let mut generator = SwiftGenerator::new().with_source_locations(source_locations);
+    let mut generator = SwiftGenerator::new()
+        .with_source_locations(source_locations)
+        .with_observable(observable);
     let manifest = if spm {
         generator.emit_package(&module, output_dir, pkg_name)?
     } else {
@@ -206,7 +217,7 @@ fn diff_test_command(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>
     println!("============================================================");
 
     const EXPECTED_NEGATIVE_FIXTURES: usize = 10;
-    const EXPECTED_TOTAL_REPORTS: usize = 13 + EXPECTED_NEGATIVE_FIXTURES;
+    const EXPECTED_TOTAL_REPORTS: usize = 14 + EXPECTED_NEGATIVE_FIXTURES;
 
     let mut reports = Vec::new();
     let mut execution_failed = false;
@@ -428,7 +439,7 @@ fn diff_test_command(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>
     }
 
     // 13. Swift Codable Synthesis and Serde JSON Interoperability
-    println!("\n[13/14] Running Swift Codable Synthesis and Serde JSON Interoperability qualification...");
+    println!("\n[13/15] Running Swift Codable Synthesis and Serde JSON Interoperability qualification...");
     match runner.test_codable_json_serialization(output_dir) {
         Ok(report) => {
             println!(
@@ -443,8 +454,27 @@ fn diff_test_command(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>
         }
     }
 
-    // 14. Negative rejections
-    println!("\n[14/14] Running Negative Rejection policy test...");
+    // 14. Modern SwiftUI @Observable Support and Runtime State Observation
+    println!("\n[14/15] Running Modern SwiftUI @Observable Support and Runtime State Observation qualification...");
+    match runner.test_observable_model(output_dir) {
+        Ok(report) => {
+            println!(
+                "  Status: {} ({} of {} cases passed)",
+                report.status, report.cases_passed, report.cases_tested
+            );
+            reports.push(report);
+        }
+        Err(e) => {
+            execution_failed = true;
+            eprintln!(
+                "  FAILED execution in Modern SwiftUI @Observable qualification: {}",
+                e
+            );
+        }
+    }
+
+    // 15. Negative rejections
+    println!("\n[15/15] Running Negative Rejection policy test...");
     match runner.test_negative_rejections() {
         Ok(neg_reports) => {
             if neg_reports.len() != EXPECTED_NEGATIVE_FIXTURES {

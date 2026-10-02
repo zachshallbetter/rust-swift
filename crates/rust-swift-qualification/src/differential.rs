@@ -2943,6 +2943,185 @@ struct CodableRunner {{
         })
     }
 
+    /// Modern SwiftUI @Observable Support and Runtime State Observation qualification
+    pub fn test_observable_model(
+        &self,
+        output_dir: &Path,
+    ) -> Result<QualificationReport, Box<dyn std::error::Error>> {
+        let (rustc_ver, swift_ver) = Self::toolchain_versions();
+        let obs_dir = output_dir.join("observable_qualification");
+        let _ = fs::remove_dir_all(&obs_dir);
+        fs::create_dir_all(&obs_dir)?;
+
+        let source = r#"#[observable]
+pub struct CounterViewModel {
+    pub id: i64,
+    pub title: String,
+    pub count: i64,
+}
+
+impl CounterViewModel {
+    pub fn increment(&mut self) {
+        self.count = self.count + 1;
+    }
+
+    pub fn set_title(&mut self, new_title: String) {
+        self.title = new_title;
+    }
+
+    pub fn reset(&mut self) {
+        self.count = 0;
+    }
+}
+"#;
+        let source_hash = Self::compute_sha256(source);
+
+        let mut frontend = Frontend::new("CounterViewModel.rs");
+        let module = frontend
+            .parse_and_lower(source)
+            .map_err(|diags| format!("Frontend parsing failed with {} diagnostics", diags.len()))?;
+
+        let mut gen = SwiftGenerator::new();
+        let (swift_code, _) = gen.generate_module(&module);
+        let swift_src_path = obs_dir.join("CounterViewModel.swift");
+        fs::write(&swift_src_path, &swift_code)?;
+
+        let runner_src = r#"import Foundation
+import Observation
+
+final class Flag: @unchecked Sendable {
+    var value = false
+}
+
+@main
+struct ObservableRunner {
+    static func main() {
+        let vm = CounterViewModel(id: 42, title: "Initial", count: 10)
+
+        // 1. Initial State
+        print("initial_id:\(vm.id)")
+        print("initial_title:\(vm.title)")
+        print("initial_count:\(vm.count)")
+
+        // 2. Count Observation Tracking
+        let countObserved = Flag()
+        withObservationTracking {
+            _ = vm.count
+        } onChange: {
+            countObserved.value = true
+        }
+        vm.increment()
+        print("after_inc_count:\(vm.count)")
+        print("count_observed:\(countObserved.value)")
+
+        // 3. Title Observation Tracking
+        let titleObserved = Flag()
+        withObservationTracking {
+            _ = vm.title
+        } onChange: {
+            titleObserved.value = true
+        }
+        vm.set_title("Updated")
+        print("after_set_title:\(vm.title)")
+        print("title_observed:\(titleObserved.value)")
+
+        // 4. Reset
+        vm.reset()
+        print("after_reset_count:\(vm.count)")
+    }
+}
+"#;
+        let runner_path = obs_dir.join("main.swift");
+        fs::write(&runner_path, runner_src)?;
+
+        let total = 4;
+        let mut cases_passed = 0;
+        let mut details = Vec::new();
+
+        // Case 1: Swift @Observable class compilation
+        let swift_bin = obs_dir.join("observable_runner");
+        let swiftc_status = Command::new("swiftc")
+            .arg("-parse-as-library")
+            .arg(&swift_src_path)
+            .arg(&runner_path)
+            .arg("-o")
+            .arg(&swift_bin)
+            .status()?;
+
+        if swiftc_status.success() {
+            cases_passed += 1;
+            details.push("Case #1: PASS (Swift @Observable model and Observation runner compiled successfully)".into());
+        } else {
+            details.push("Case #1: FAIL (Failed to compile Swift @Observable model)".into());
+            return Ok(QualificationReport {
+                fixture_name: "observable_model".into(),
+                source_hash,
+                rustc_version: rustc_ver,
+                swift_version: swift_ver,
+                cases_tested: total,
+                cases_passed,
+                cases_failed: total - cases_passed,
+                status: "FAILED".into(),
+                timestamp: "2026-10-14T14:00:00Z".into(),
+                details,
+            });
+        }
+
+        // Execute runner
+        let exec_out = Command::new(&swift_bin).output()?;
+        let stdout = String::from_utf8(exec_out.stdout)?;
+
+        // Case 2: Identifiable and initial property values
+        if stdout.contains("initial_id:42")
+            && stdout.contains("initial_title:Initial")
+            && stdout.contains("initial_count:10")
+        {
+            cases_passed += 1;
+            details.push("Case #2: PASS (Initial model property values verified)".into());
+        } else {
+            details.push("Case #2: FAIL (Initial model property values incorrect)".into());
+        }
+
+        // Case 3: Count mutation triggered withObservationTracking onChange
+        if stdout.contains("after_inc_count:11") && stdout.contains("count_observed:true") {
+            cases_passed += 1;
+            details.push("Case #3: PASS (State mutation automatically triggered withObservationTracking onChange)".into());
+        } else {
+            details.push("Case #3: FAIL (Observation tracking failed on count mutation)".into());
+        }
+
+        // Case 4: Title mutation triggered withObservationTracking onChange and reset returned to 0
+        if stdout.contains("after_set_title:Updated")
+            && stdout.contains("title_observed:true")
+            && stdout.contains("after_reset_count:0")
+        {
+            cases_passed += 1;
+            details.push(
+                "Case #4: PASS (Title observation triggered and reset transition succeeded)".into(),
+            );
+        } else {
+            details.push("Case #4: FAIL (Title observation or reset failed)".into());
+        }
+
+        let all_passed = cases_passed == total;
+        Ok(QualificationReport {
+            fixture_name: "observable_model".into(),
+            source_hash,
+            rustc_version: rustc_ver,
+            swift_version: swift_ver,
+            cases_tested: total,
+            cases_passed,
+            cases_failed: total - cases_passed,
+            status: if all_passed {
+                "PASSED".into()
+            } else {
+                "FAILED".into()
+            },
+            timestamp: "2026-10-14T14:00:00Z".into(),
+            details,
+        })
+    }
+
     /// Run negative rejection tests asserting exact stable diagnostic codes
     pub fn test_negative_rejections(
         &self,
@@ -3393,6 +3572,19 @@ mod tests {
         let report = runner
             .test_codable_json_serialization(&temp_dir)
             .expect("Codable JSON serialization differential test should pass");
+        assert_eq!(report.status, "PASSED");
+        assert_eq!(report.cases_passed, 4);
+        assert_eq!(report.cases_failed, 0);
+    }
+
+    #[test]
+    fn test_observable_model_differential_passes() {
+        let runner = DifferentialRunner::new(".");
+        let temp_dir = std::env::temp_dir().join("observable_diff_test");
+        let _ = fs::create_dir_all(&temp_dir);
+        let report = runner
+            .test_observable_model(&temp_dir)
+            .expect("Observable model differential test should pass");
         assert_eq!(report.status, "PASSED");
         assert_eq!(report.cases_passed, 4);
         assert_eq!(report.cases_failed, 0);
