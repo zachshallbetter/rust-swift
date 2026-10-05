@@ -4,6 +4,7 @@ use clap::{Parser, Subcommand};
 use rust_swift_codegen::SwiftGenerator;
 use rust_swift_frontend::Frontend;
 use rust_swift_qualification::differential::DifferentialRunner;
+use rust_swift_qualification::mutation::MutationRunner;
 use sha2::{Digest, Sha256};
 use std::fs::{self, OpenOptions};
 use std::io::Write;
@@ -68,6 +69,16 @@ enum Commands {
     },
     /// Inspect environment and toolchain reproducibility manifest
     Manifest,
+    /// Run aggressive evaluation suites, failure injection mutations, and gate capability proofs
+    Eval {
+        /// Output directory for evaluation artifacts
+        #[arg(short, long, default_value = "target/evals")]
+        output_dir: PathBuf,
+
+        /// Run defect injection and mutation testing
+        #[arg(long, default_value_t = true)]
+        mutations: bool,
+    },
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -102,6 +113,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         Commands::Manifest => {
             print_manifest()?;
+        }
+        Commands::Eval {
+            output_dir,
+            mutations,
+        } => {
+            eval_command(&output_dir, mutations)?;
         }
     }
 
@@ -595,6 +612,47 @@ fn print_manifest() -> Result<(), Box<dyn std::error::Error>> {
     println!("  Swift Toolchain:  {}", swift_ver);
     println!("  Target Baseline:  macOS v13+ / Swift 5.9+");
     println!("  Admitted Subset:  v0.1 Pure functions, integers, simple structs, fieldless enums");
+
+    Ok(())
+}
+
+fn eval_command(output_dir: &Path, mutations: bool) -> Result<(), Box<dyn std::error::Error>> {
+    fs::create_dir_all(output_dir)?;
+    println!("============================================================");
+    println!("Running rust-swift Aggressive Evals & Gate Capability Suite");
+    println!("============================================================");
+
+    if mutations {
+        let runner = MutationRunner::new(".");
+        println!("\nExecuting Failure Injection & Mutation Testing Matrix...");
+        let report = runner.run_all_mutations(output_dir)?;
+        println!(
+            "  Mutations Tested: {} | Detected by Gates: {} | Escaped: {}",
+            report.mutations_tested, report.mutations_detected, report.mutations_escaped
+        );
+        for rec in &report.records {
+            let status_badge = if rec.gate_failed_as_expected {
+                "DETECTED"
+            } else {
+                "ESCAPED"
+            };
+            println!(
+                "  [{}] {}: {} (Target Gate: {})",
+                status_badge, rec.mutation_id, rec.description, rec.target_gate
+            );
+        }
+
+        if report.mutations_escaped > 0 {
+            eprintln!(
+                "\nERROR: {} mutation(s) escaped detection! Gates lack failure capability.",
+                report.mutations_escaped
+            );
+            std::process::exit(1);
+        }
+
+        println!("\nSuccess: All simulated defects were deterministically detected by qualification gates.");
+        println!("Appended failure receipts to records/negative-results.jsonl");
+    }
 
     Ok(())
 }
