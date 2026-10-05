@@ -34,6 +34,9 @@ jobs:
       - name: Run Failure Injection & Mutation Qualification Suite
         run: cargo run -p rust-swift-cli -- eval
 
+      - name: Run Differential Performance Benchmarking Suite
+        run: cargo run -p rust-swift-cli -- bench
+
       - name: Validate Formal Bootstrap
         run: python3 scripts/validate-bootstrap.py
 

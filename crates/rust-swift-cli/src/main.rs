@@ -3,6 +3,7 @@
 use clap::{Parser, Subcommand};
 use rust_swift_codegen::SwiftGenerator;
 use rust_swift_frontend::Frontend;
+use rust_swift_qualification::benchmark::BenchmarkRunner;
 use rust_swift_qualification::differential::DifferentialRunner;
 use rust_swift_qualification::mutation::MutationRunner;
 use sha2::{Digest, Sha256};
@@ -79,6 +80,12 @@ enum Commands {
         #[arg(long, default_value_t = true)]
         mutations: bool,
     },
+    /// Run differential performance benchmarking suite across compiler throughput and runtime parity
+    Bench {
+        /// Output directory for benchmark executables and test artifacts
+        #[arg(short, long, default_value = "target/benchmarks")]
+        output_dir: PathBuf,
+    },
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -119,6 +126,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             mutations,
         } => {
             eval_command(&output_dir, mutations)?;
+        }
+        Commands::Bench { output_dir } => {
+            bench_command(&output_dir)?;
         }
     }
 
@@ -653,6 +663,61 @@ fn eval_command(output_dir: &Path, mutations: bool) -> Result<(), Box<dyn std::e
         println!("\nSuccess: All simulated defects were deterministically detected by qualification gates.");
         println!("Appended failure receipts to records/negative-results.jsonl");
     }
+
+    Ok(())
+}
+
+fn bench_command(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    fs::create_dir_all(output_dir)?;
+    println!("============================================================");
+    println!("Running rust-swift Differential Performance Benchmarks");
+    println!("============================================================");
+
+    let runner = BenchmarkRunner::new(".");
+    let report = runner.run_all_benchmarks(output_dir)?;
+
+    println!("\nCompiler Throughput:");
+    for tp in &report.compiler_throughput {
+        println!(
+            "  [{}] Lines: {} | Bytes: {} | Elapsed: {:.2}ms | Throughput: {:.0} lines/s ({:.1} KB/s)",
+            tp.status,
+            tp.lines_processed,
+            tp.bytes_processed,
+            tp.elapsed_micros as f64 / 1000.0,
+            tp.throughput_lines_per_sec,
+            tp.throughput_kb_per_sec
+        );
+    }
+
+    println!("\nRuntime Parity & Performance Differential (rustc -O vs swiftc -O):");
+    for p in &report.runtime_parity {
+        let parity_status = if p.outputs_match { "MATCH" } else { "MISMATCH" };
+        println!(
+            "  [{}] Workload: {} ({} iters)",
+            parity_status, p.workload, p.iterations
+        );
+        println!(
+            "       Rust: {:.2}ms | Swift: {:.2}ms | Ratio (Swift/Rust): {:.2}x | Parity Checksum: {}",
+            p.rust_elapsed_micros as f64 / 1000.0,
+            p.swift_elapsed_micros as f64 / 1000.0,
+            p.ratio_swift_to_rust,
+            p.rust_result_digest
+        );
+    }
+
+    if report.benchmarks_passed != report.benchmarks_run {
+        eprintln!(
+            "\nERROR: {}/{} benchmarks passed. Parity or execution defect detected!",
+            report.benchmarks_passed, report.benchmarks_run
+        );
+        std::process::exit(1);
+    }
+
+    println!(
+        "\nSuccess: All {} benchmarks completed and matched with full runtime parity.",
+        report.benchmarks_run
+    );
+    println!("Appended benchmark telemetry to records/benchmarks.jsonl");
 
     Ok(())
 }
