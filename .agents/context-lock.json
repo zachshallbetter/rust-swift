@@ -5,13 +5,13 @@
   "validityBasis": "aggregate-source-digest",
   "selectedPaths": [],
   "sourceSelection": {
-    "includedCount": 156,
-    "includedBytes": 2219559,
+    "includedCount": 161,
+    "includedBytes": 2340324,
     "excludedCounts": {
-      "excluded-directory": 30618,
+      "excluded-directory": 41295,
       "excluded-path": 1,
-      "extension": 4561,
-      "symlink": 2
+      "extension": 4563,
+      "symlink": 3
     }
   },
   "repositoryState": {
@@ -20,14 +20,14 @@
     "repositories": [
       {
         "path": ".",
-        "commit": "083fb069869856f2cbe526a508a0a8ec7acee257",
-        "branch": "feature/protocols-and-traits",
-        "dirty": true,
+        "commit": "588574b997a547765bd2c7193378430912c29303",
+        "branch": "main",
+        "dirty": false,
         "remote": "https://github.com/zachshallbetter/rust-swift.git"
       }
     ]
   },
-  "aggregateSourceDigest": "7a7b4670fb9ac5eb9d2171a200be3bc1047f4d0f908a87debe7792a6d26fab81",
+  "aggregateSourceDigest": "7ff760940c03fd8c053d6103a8a4fc4ec798a656610f718646e752ead30d78fe",
   "sources": [
     {
       "path": ".agents/rules/ci.md",
@@ -86,8 +86,8 @@
     },
     {
       "path": ".github/workflows/ci.yml",
-      "bytes": 813,
-      "sha256": "85c14a5a0e3e2059de1c5e8368a7fcc8bd327bd4dc5382ef6509edd757cb0173"
+      "bytes": 1294,
+      "sha256": "23cda23bc87b6283f3f274e563a52177c3e8b99eda99bc3f8f3503ee7911c295"
     },
     {
       "path": "AGENTS.md",
@@ -196,8 +196,8 @@
     },
     {
       "path": "crates/rust-swift-cli/src/main.rs",
-      "bytes": 16159,
-      "sha256": "ff1c74cfb7d1df48e6fa3284ef9cc407f38d03dadf596fe5568222c93743967b"
+      "bytes": 26466,
+      "sha256": "652a10846040e9a1387ef83080c3f2b9ef557b68fa4b936cb1d333c8769468c0"
     },
     {
       "path": "crates/rust-swift-codegen/Cargo.toml",
@@ -206,8 +206,8 @@
     },
     {
       "path": "crates/rust-swift-codegen/src/lib.rs",
-      "bytes": 75555,
-      "sha256": "bcbb48748bf94bd486af156220c304081c5adaf24caf1a605c49926597539516"
+      "bytes": 86122,
+      "sha256": "3390e604d67ff58d82027de10842981675c0db97a067d26946588d59e77ec669"
     },
     {
       "path": "crates/rust-swift-frontend/Cargo.toml",
@@ -221,8 +221,8 @@
     },
     {
       "path": "crates/rust-swift-frontend/src/lib.rs",
-      "bytes": 76412,
-      "sha256": "b5d5a3cd69bd269c7fae10542ee3e22be9c274000f7c688ea90e45800c744c2b"
+      "bytes": 79410,
+      "sha256": "73a60cf7dedf9b315a729be55ab7ea5ca9827b42d7d64d0d49d92c2e04ce5fac"
     },
     {
       "path": "crates/rust-swift-ir/Cargo.toml",
@@ -231,8 +231,8 @@
     },
     {
       "path": "crates/rust-swift-ir/src/lib.rs",
-      "bytes": 23899,
-      "sha256": "33fafc3b854d77374c4cea0b26d222ffdab78c7c7920aeb7623bae1dd8ce0e6b"
+      "bytes": 24055,
+      "sha256": "4d0a72fcff2d7b66edd86fe1c2c37fdbdb7d26cbde00179f40891614363f727f"
     },
     {
       "path": "crates/rust-swift-qualification/Cargo.toml",
@@ -240,14 +240,29 @@
       "sha256": "5f75780289d875b5ac035badc15d78bd37773153efad1fd575a87b614664c199"
     },
     {
+      "path": "crates/rust-swift-qualification/src/benchmark.rs",
+      "bytes": 24324,
+      "sha256": "c0af3c620d7170b0d37c3b3a933901d416270d07e4e8108d0442dd8732a52e89"
+    },
+    {
       "path": "crates/rust-swift-qualification/src/differential.rs",
-      "bytes": 103457,
-      "sha256": "a0aa46d80e68b7f32e3f50cf6026819dcd26e0d2fdbfb4f62d5db0b640d03773"
+      "bytes": 123548,
+      "sha256": "8596f6932792a051be4fa9b3df47e3551c9b672143f2731a0dd3aac8695ab0c5"
+    },
+    {
+      "path": "crates/rust-swift-qualification/src/evals.rs",
+      "bytes": 22039,
+      "sha256": "f0aed394a6dcd456dd649b09852c0fd52971abcae9140fc16c4d4f79f2da0045"
     },
     {
       "path": "crates/rust-swift-qualification/src/lib.rs",
-      "bytes": 110,
-      "sha256": "18a6706fbb2bbb59c84ec742b3f0bcb1c42123b960bc521f1fdce70134ec5b71"
+      "bytes": 162,
+      "sha256": "525d0334a3950720f21d9395322412ff94fe9e1893d24d1beff3f33005cdc35c"
+    },
+    {
+      "path": "crates/rust-swift-qualification/src/mutation.rs",
+      "bytes": 18504,
+      "sha256": "e4d32b44081ec66eb2b09c7ab95bc50ffb85763757d17c4995550b23351badd5"
     },
     {
       "path": "docs/01-product-definition.md",
@@ -743,6 +758,16 @@
       "path": "scripts/acp.py",
       "bytes": 25463,
       "sha256": "6fca8c5738deb7864a77838d95214cf388a6b80dcfac97fe9446eb0aa83176dd"
+    },
+    {
+      "path": "scripts/apple-notarize.sh",
+      "bytes": 5138,
+      "sha256": "cb6bc69ffa083d4e1cc41195368fcdcfc59405cd66957f14f5745855d43938db"
+    },
+    {
+      "path": "scripts/asc-token.py",
+      "bytes": 6108,
+      "sha256": "b3dacefa1964f089bb14119c6d139ef2617014c76e9d4f9cb21dcee9a08dab5a"
     },
     {
       "path": "scripts/check-protocol-integrity.py",
