@@ -1334,7 +1334,23 @@ impl SwiftGenerator {
                     "false".into()
                 }
             }
-            Literal::String(s) => format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\"")),
+            Literal::String(s) => {
+                let mut escaped = String::with_capacity(s.len() + 2);
+                escaped.push('"');
+                for c in s.chars() {
+                    match c {
+                        '\\' => escaped.push_str("\\\\"),
+                        '"' => escaped.push_str("\\\""),
+                        '\n' => escaped.push_str("\\n"),
+                        '\r' => escaped.push_str("\\r"),
+                        '\t' => escaped.push_str("\\t"),
+                        '\0' => escaped.push_str("\\0"),
+                        other => escaped.push(other),
+                    }
+                }
+                escaped.push('"');
+                escaped
+            }
             Literal::Unit => "()".into(),
         }
     }
