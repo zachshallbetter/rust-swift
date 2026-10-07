@@ -270,6 +270,18 @@ $$\text{Documented} \neq \text{Implemented} \neq \text{Tested} \neq \text{Empiri
 
 ---
 
+## Lineage, Credits & Ecosystem
+
+The `rust-swift` compiler was conceived and architected by **[Zach Shallbetter](https://github.com/zachshallbetter)** as part of the **[Reflective Rust](https://github.com/zachshallbetter/reflective-rust)** high-assurance systems ecosystem.
+
+### Foundational Technologies & Acknowledgments:
+- **[Reflective Rust](https://github.com/zachshallbetter/reflective-rust)**: Compiler Semantic Graph (`reflective-rust-csg`) specifications, semantic interaction contracts (`reflective-rust-protocol`), and epistemic verification methodologies.
+- **`syn` & `quote`**: Rust AST parsing and token manipulation foundations.
+- **The Swift Project & Apple Developer Tools**: Native Swift value type semantics, Swift Observation framework, Swift Package Manager, and the App Store Connect APIs.
+- **Formal Project Bootstrap**: Epistemic integrity governance, Four-Tier Claim Taxonomy, and "Gates That Cannot Fail" qualification architecture.
+
+---
+
 ## License
 
 This project is licensed under either of:
