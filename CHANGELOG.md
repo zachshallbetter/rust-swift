@@ -8,6 +8,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Protocols & Traits (`WI-TRAIT-001`)**:
+  - Rust trait definitions (`pub trait Foo { ... }`) lowering into native Swift `public protocol Foo { ... }`.
+  - Default trait method implementations lowered to protocol extension defaults.
+  - Conformance implementation blocks (`impl Foo for Bar { ... }`) lowered to `extension Bar: Foo { ... }`.
+  - Differential qualification suite verifying protocol dynamic dispatch and method overrides between `rustc` and `swiftc`.
+- **Swift Package Manager Manifest Emission (`WI-SPM-001`)**:
+  - Generation of buildable Swift 5.9+ `Package.swift` manifests via `SwiftGenerator::emit_package` and CLI `--spm`.
+  - Clean-room package layout generation including library products, sources directory, and XCTest suite test targets.
+  - Verified with clean-room `swift build` and `swift test` qualification runs.
+- **Codable JSON Serialization (`WI-CODABLE-001`)**:
+  - Lowering of `#[derive(Codable)]` on structs and payload enums into Swift `: Codable` protocol conformance.
+  - JSON serialization differential qualification suite validating bi-directional parity between `serde_json` and Swift `JSONEncoder`/`JSONDecoder`.
+- **SwiftUI `@Observable` Architecture (`WI-OBSERVABLE-001`)**:
+  - Lowering of `#[observable]` annotations to Swift `@Observable public final class`.
+  - Observation tracking differential suite verifying that state property mutations trigger `withObservationTracking` onChange handlers.
+- **App Store Connect & Notarization Pipeline (`WI-NOTARIZE-001`)**:
+  - Automated ES256 JWT authentication token generator (`scripts/asc-token.py`) for App Store Connect API.
+  - Production packaging, code signing, sandboxing entitlements, and notarization script (`scripts/apple-notarize.sh`).
+- **Failure Injection & Mutation Testing Framework (`WI-EVAL-MUT-001`)**:
+  - `MutationRunner` covering 6 synthetic defect mutation classes (`MUT-001` through `MUT-006`) enforcing the "Gates That Cannot Fail" doctrine:
+    * `MUT-001-ARITH-INVERSION` (Wrapping arithmetic operator inversion)
+    * `MUT-002-FSM-TRANSITION` (FSM state machine transition defect)
+    * `MUT-003-CONTRACT-TRAP` (Contract precondition invariant violation)
+    * `MUT-004-CODABLE-DRIFT` (Codable schema drift / payload corruption)
+    * `MUT-005-OBSERVABLE-SUPPRESSION` (SwiftUI observable state mutation suppression)
+    * `MUT-006-BOUNDARY-OFF-BY-ONE` (Loop iteration boundary defect)
+  - Permanent retention of failure receipts in `records/negative-results.jsonl`.
+  - CLI `eval --mutations` subcommand and CI qualification step.
+- **Differential Performance Benchmarking Suite (`WI-PERF-BENCH-001`)**:
+  - `BenchmarkRunner` measuring compiler throughput (lines/sec, KB/sec) and runtime parity between `rustc -O` and `swiftc -O` across:
+    * `BENCH-001-ARITH-LOOP` (100,000 wrapping arithmetic operations)
+    * `BENCH-002-VEC-TRANSFORM` (25,000 item vector allocation, modulo filter, sum reduction)
+    * `BENCH-003-FSM-CYCLES` (50,000 FSM cycles / 300,000 transitions)
+  - Output validation asserting bit-for-bit checksum parity.
+  - Telemetry records written to `records/benchmarks.jsonl`.
+  - CLI `bench` subcommand and CI qualification step.
+- **Aggressive Adversarial Evals & Assertion Telemetry (`WI-EVAL-ADV-001`)**:
+  - Multi-domain stress testing: 32-level deep recursive expression nesting, extreme Unicode (emoji sequences, ZWJ clusters, multi-script UTF-8), and integer boundary overflow transitions.
+  - No-Op Protection enforcing minimum executed assertion thresholds (24 executed, threshold $\ge 20$) to prevent false greens in CI.
+  - Structured qualification records appended to `records/evidence.jsonl`.
+  - CLI `eval --adversarial` subcommand.
 - **Event Dispatch & Trace Model (`WI-EVENT-001`)**:
   - Support for `Type::Array` and dynamic vectors `Vec<T>`, slices `[T]`, and fixed-size arrays `[T; N]`.
   - Admitted array literals `[e1, e2]` and the `vec![...]` macro in expression positions.
@@ -33,6 +74,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `panic!(msg)` lowered to Swift `fatalError(msg)`.
   - Formal contract execution specification in `contracts/contract-execution.yaml`.
   - Differential qualification suite verifying positive assertions and identical process trap behavior on invariant failure across `rustc` and `swiftc` binaries.
+
+### Fixed
+- **String Literal Control Character Escaping in Swift Codegen**:
+  - Properly escapes raw newlines (`\n`), carriage returns (`\r`), tabs (`\t`), null bytes (`\0`), backslashes (`\\`), and double quotes (`\"`) when emitting Swift string literals.
 
 ## [0.1.0] - 2026-10-13
 
