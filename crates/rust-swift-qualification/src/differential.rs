@@ -2730,6 +2730,110 @@ impl ComputeEngine {
         })
     }
 
+    /// SPM BuildToolPlugin automated compilation qualification
+    pub fn test_spm_build_tool_plugin(
+        &self,
+    ) -> Result<QualificationReport, Box<dyn std::error::Error>> {
+        let (rustc_ver, swift_ver) = Self::toolchain_versions();
+        let total = 3;
+        let mut cases_passed = 0;
+        let mut details = Vec::new();
+
+        let plugin_swift = self
+            .workspace_dir
+            .join("Plugins/RustSwiftPlugin/plugin.swift");
+        let package_swift = self.workspace_dir.join("Package.swift");
+        let demo_app = self.workspace_dir.join("examples/PluginDemoApp");
+
+        // Case 1: Plugin declaration and manifest
+        if plugin_swift.exists() && package_swift.exists() {
+            let pkg_content = fs::read_to_string(&package_swift)?;
+            if pkg_content.contains("RustSwiftPlugin") && pkg_content.contains(".buildTool()") {
+                cases_passed += 1;
+                details.push(
+                    "Case #1: PASS (RustSwiftPlugin declared as buildTool plugin in Package.swift)"
+                        .into(),
+                );
+            } else {
+                details.push(
+                    "Case #1: FAIL (Package.swift does not declare buildTool plugin properly)"
+                        .into(),
+                );
+            }
+        } else {
+            details.push(
+                "Case #1: FAIL (Plugins/RustSwiftPlugin/plugin.swift or Package.swift missing)"
+                    .into(),
+            );
+        }
+
+        // Case 2: Demo app with .rs files
+        let rs_file = demo_app.join("Sources/PluginDemoApp/models.rs");
+        if demo_app.exists() && rs_file.exists() {
+            cases_passed += 1;
+            details.push(
+                "Case #2: PASS (PluginDemoApp consumer fixture present with Rust sources)".into(),
+            );
+        } else {
+            details.push("Case #2: FAIL (examples/PluginDemoApp or models.rs missing)".into());
+        }
+
+        // Case 3: Execution of SPM build with plugin
+        let bin_path = if self.workspace_dir.join("target/debug/rust-swift").exists() {
+            self.workspace_dir.join("target/debug/rust-swift")
+        } else if self
+            .workspace_dir
+            .join("target/release/rust-swift")
+            .exists()
+        {
+            self.workspace_dir.join("target/release/rust-swift")
+        } else {
+            PathBuf::from("rust-swift")
+        };
+
+        let run_output = Command::new("swift")
+            .arg("run")
+            .arg("--package-path")
+            .arg(&demo_app)
+            .env("RUST_SWIFT_BIN", &bin_path)
+            .output()?;
+
+        let run_stdout = String::from_utf8_lossy(&run_output.stdout);
+        if run_output.status.success() && run_stdout.contains("PLUGIN_RESULT:Starting->Running") {
+            cases_passed += 1;
+            details.push("Case #3: PASS (swift run builds .rs via plugin and outputs PLUGIN_RESULT:Starting->Running)".into());
+        } else {
+            details.push(format!(
+                "Case #3: FAIL (swift run failed: stdout={}, stderr={})",
+                run_stdout,
+                String::from_utf8_lossy(&run_output.stderr)
+            ));
+        }
+
+        let status = if cases_passed == total {
+            "PASSED"
+        } else {
+            "FAILED"
+        };
+
+        Ok(QualificationReport {
+            fixture_name: "spm_build_tool_plugin".into(),
+            source_hash: Self::compute_sha256(
+                fs::read_to_string(&plugin_swift)
+                    .unwrap_or_default()
+                    .as_str(),
+            ),
+            rustc_version: rustc_ver,
+            swift_version: swift_ver,
+            cases_tested: total,
+            cases_passed,
+            cases_failed: total - cases_passed,
+            status: status.into(),
+            timestamp: "2026-10-14T15:30:00Z".into(),
+            details,
+        })
+    }
+
     /// Swift Codable Synthesis and Serde JSON Interoperability qualification
     pub fn test_codable_json_serialization(
         &self,
@@ -3587,6 +3691,29 @@ mod tests {
             .expect("Observable model differential test should pass");
         assert_eq!(report.status, "PASSED");
         assert_eq!(report.cases_passed, 4);
+        assert_eq!(report.cases_failed, 0);
+    }
+
+    #[test]
+    fn test_spm_build_tool_plugin_differential_passes() {
+        let runner = DifferentialRunner::new(
+            std::env::var("CARGO_MANIFEST_DIR")
+                .map(|p| {
+                    PathBuf::from(p)
+                        .parent()
+                        .unwrap()
+                        .parent()
+                        .unwrap()
+                        .to_path_buf()
+                })
+                .unwrap_or_else(|_| PathBuf::from(".")),
+        );
+        let report = runner
+            .test_spm_build_tool_plugin()
+            .expect("SPM build tool plugin should pass");
+        eprintln!("Details: {:?}", report.details);
+        assert_eq!(report.status, "PASSED");
+        assert_eq!(report.cases_passed, 3);
         assert_eq!(report.cases_failed, 0);
     }
 }
