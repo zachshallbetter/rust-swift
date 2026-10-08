@@ -9,8 +9,9 @@ use diagnostic::{Diagnostic, DiagnosticCode};
 use rust_swift_ir::{
     BinaryOp, CmpOp, EnumDef, EnumVariant, Expr, ExprKind, FieldDef, Function, ImplBlock,
     IntegerMode, IntegerOp, Item as IrItem, Literal, LogicalOp, MatchArm, Method, Module, Param,
-    Pattern, ReceiverKind, SourceSpan, Stmt, StructDef, TraitDef, TraitImpl, TraitMethod, Type,
-    UnaryOp, VariantPayload,
+    Pattern, PropertyBindingKind, ReceiverKind, SourceSpan, Stmt, StructDef, TraitDef, TraitImpl,
+    TraitMethod, Type, UnaryOp, VariantPayload, ViewDef, ViewKind, ViewModifier, ViewNode,
+    ViewProperty,
 };
 use syn::spanned::Spanned;
 
@@ -90,10 +91,61 @@ impl Frontend {
             .unwrap_or("module");
 
         let mut module = Module::new(mod_name);
+        let mut view_structs: std::collections::HashMap<String, (syn::ItemStruct, SourceSpan)> =
+            std::collections::HashMap::new();
+        let mut view_bodies: std::collections::HashMap<String, (syn::Block, SourceSpan)> =
+            std::collections::HashMap::new();
 
         for item in &syn_file.items {
+            if let syn::Item::Struct(s) = item {
+                if Self::has_view_attr(&s.attrs) {
+                    let span = self.make_span(s);
+                    view_structs.insert(s.ident.to_string(), (s.clone(), span));
+                    continue;
+                }
+            }
+            if let syn::Item::Impl(imp) = item {
+                let target_name = match &*imp.self_ty {
+                    syn::Type::Path(p) => p
+                        .path
+                        .segments
+                        .last()
+                        .map(|s| s.ident.to_string())
+                        .unwrap_or_default(),
+                    _ => String::new(),
+                };
+                let mut has_body = false;
+                for impl_item in &imp.items {
+                    if let syn::ImplItem::Fn(m) = impl_item {
+                        if m.sig.ident == "body" {
+                            let span = self.make_span(m);
+                            view_bodies.insert(target_name.clone(), (m.block.clone(), span));
+                            has_body = true;
+                        }
+                    }
+                }
+                if has_body {
+                    continue;
+                }
+            }
+            if let syn::Item::Fn(f) = item {
+                if Self::has_view_attr(&f.attrs) {
+                    if let Some(view_def) = self.lower_view_fn(f) {
+                        module.items.push(IrItem::View(view_def));
+                        continue;
+                    }
+                }
+            }
+
             if let Some(ir_item) = self.lower_item(item) {
                 module.items.push(ir_item);
+            }
+        }
+
+        for (name, (s, span)) in view_structs {
+            let body_block = view_bodies.get(&name).map(|(b, _)| b);
+            if let Some(view_def) = self.lower_view_struct(&s, body_block, span) {
+                module.items.push(IrItem::View(view_def));
             }
         }
 
@@ -500,6 +552,479 @@ impl Frontend {
                 false
             }
         })
+    }
+
+    fn has_view_attr(attrs: &[syn::Attribute]) -> bool {
+        attrs.iter().any(|attr| {
+            if attr.path().is_ident("view") || attr.path().is_ident("swift_view") {
+                return true;
+            }
+            if attr.path().is_ident("derive") {
+                let mut found = false;
+                let _ = attr.parse_nested_meta(|meta| {
+                    if meta.path.is_ident("View") || meta.path.is_ident("SwiftView") {
+                        found = true;
+                    }
+                    Ok(())
+                });
+                found
+            } else {
+                false
+            }
+        })
+    }
+
+    fn lower_view_struct(
+        &mut self,
+        s: &syn::ItemStruct,
+        body_block: Option<&syn::Block>,
+        span: SourceSpan,
+    ) -> Option<ViewDef> {
+        let name = s.ident.to_string();
+        let is_public = matches!(s.vis, syn::Visibility::Public(_));
+        let mut properties = Vec::new();
+
+        if let syn::Fields::Named(named) = &s.fields {
+            for field in &named.named {
+                let prop_name = field.ident.as_ref().map(|i| i.to_string()).unwrap();
+                let ty = self.lower_type(&field.ty);
+                let is_pub = matches!(field.vis, syn::Visibility::Public(_));
+                let kind = if field.attrs.iter().any(|a| a.path().is_ident("binding")) {
+                    PropertyBindingKind::Binding
+                } else if field.attrs.iter().any(|a| a.path().is_ident("state")) {
+                    PropertyBindingKind::State
+                } else if field.attrs.iter().any(|a| a.path().is_ident("observable"))
+                    || matches!(ty, Type::Named(_))
+                {
+                    PropertyBindingKind::Observable
+                } else {
+                    PropertyBindingKind::Plain
+                };
+                properties.push(ViewProperty {
+                    name: prop_name,
+                    ty,
+                    kind,
+                    is_public: is_pub,
+                });
+            }
+        }
+
+        let root = if let Some(blk) = body_block {
+            let syn_expr = syn::Expr::Block(syn::ExprBlock {
+                attrs: Vec::new(),
+                label: None,
+                block: blk.clone(),
+            });
+            self.lower_view_expr(&syn_expr).unwrap_or_else(|| ViewNode {
+                kind: ViewKind::VStack { spacing: None },
+                children: Vec::new(),
+                modifiers: Vec::new(),
+                span: span.clone(),
+            })
+        } else {
+            ViewNode {
+                kind: ViewKind::VStack { spacing: None },
+                children: Vec::new(),
+                modifiers: Vec::new(),
+                span: span.clone(),
+            }
+        };
+
+        Some(ViewDef {
+            name,
+            properties,
+            root,
+            is_public,
+            span,
+        })
+    }
+
+    fn lower_view_fn(&mut self, f: &syn::ItemFn) -> Option<ViewDef> {
+        let name = f.sig.ident.to_string();
+        let is_public = matches!(f.vis, syn::Visibility::Public(_));
+        let span = self.make_span(f);
+        let mut properties = Vec::new();
+
+        for input in &f.sig.inputs {
+            if let syn::FnArg::Typed(pat_type) = input {
+                if let syn::Pat::Ident(pat_ident) = &*pat_type.pat {
+                    let prop_name = pat_ident.ident.to_string();
+                    let ty = self.lower_type(&pat_type.ty);
+                    let kind = if matches!(ty, Type::Ref { mutable: true, .. }) {
+                        PropertyBindingKind::Binding
+                    } else if matches!(ty, Type::Named(_)) {
+                        PropertyBindingKind::Observable
+                    } else {
+                        PropertyBindingKind::Plain
+                    };
+                    properties.push(ViewProperty {
+                        name: prop_name,
+                        ty,
+                        kind,
+                        is_public: true,
+                    });
+                }
+            }
+        }
+
+        let syn_expr = syn::Expr::Block(syn::ExprBlock {
+            attrs: Vec::new(),
+            label: None,
+            block: (*f.block).clone(),
+        });
+
+        let root = self.lower_view_expr(&syn_expr).unwrap_or_else(|| ViewNode {
+            kind: ViewKind::VStack { spacing: None },
+            children: Vec::new(),
+            modifiers: Vec::new(),
+            span: span.clone(),
+        });
+
+        Some(ViewDef {
+            name,
+            properties,
+            root,
+            is_public,
+            span,
+        })
+    }
+
+    fn lower_view_expr(&mut self, expr: &syn::Expr) -> Option<ViewNode> {
+        let span = self.make_span(expr);
+        match expr {
+            syn::Expr::Call(call) => {
+                let func_name = match &*call.func {
+                    syn::Expr::Path(p) => p.path.segments.last().map(|s| s.ident.to_string())?,
+                    _ => return None,
+                };
+                let kind_str = func_name.as_str();
+                match kind_str {
+                    "VStack" | "vstack" => {
+                        let mut spacing = None;
+                        let mut children = Vec::new();
+                        for arg in &call.args {
+                            if let syn::Expr::Lit(syn::ExprLit {
+                                lit: syn::Lit::Int(i),
+                                ..
+                            }) = arg
+                            {
+                                spacing = i.base10_parse::<i32>().ok();
+                            } else {
+                                children.extend(self.lower_view_children(arg));
+                            }
+                        }
+                        Some(ViewNode {
+                            kind: ViewKind::VStack { spacing },
+                            children,
+                            modifiers: Vec::new(),
+                            span,
+                        })
+                    }
+                    "HStack" | "hstack" => {
+                        let mut spacing = None;
+                        let mut children = Vec::new();
+                        for arg in &call.args {
+                            if let syn::Expr::Lit(syn::ExprLit {
+                                lit: syn::Lit::Int(i),
+                                ..
+                            }) = arg
+                            {
+                                spacing = i.base10_parse::<i32>().ok();
+                            } else {
+                                children.extend(self.lower_view_children(arg));
+                            }
+                        }
+                        Some(ViewNode {
+                            kind: ViewKind::HStack { spacing },
+                            children,
+                            modifiers: Vec::new(),
+                            span,
+                        })
+                    }
+                    "ZStack" | "zstack" => {
+                        let mut children = Vec::new();
+                        for arg in &call.args {
+                            children.extend(self.lower_view_children(arg));
+                        }
+                        Some(ViewNode {
+                            kind: ViewKind::ZStack,
+                            children,
+                            modifiers: Vec::new(),
+                            span,
+                        })
+                    }
+                    "Text" | "text" => {
+                        let text_val = call
+                            .args
+                            .first()
+                            .map(|a| self.extract_string_or_ident(a))
+                            .unwrap_or_default();
+                        Some(ViewNode {
+                            kind: ViewKind::Text(text_val),
+                            children: Vec::new(),
+                            modifiers: Vec::new(),
+                            span,
+                        })
+                    }
+                    "Button" | "button" => {
+                        let label = call
+                            .args
+                            .first()
+                            .map(|a| self.extract_string_or_ident(a))
+                            .unwrap_or_default();
+                        let action = call
+                            .args
+                            .iter()
+                            .nth(1)
+                            .map(|a| self.extract_string_or_ident(a))
+                            .unwrap_or_default();
+                        Some(ViewNode {
+                            kind: ViewKind::Button { label, action },
+                            children: Vec::new(),
+                            modifiers: Vec::new(),
+                            span,
+                        })
+                    }
+                    "Toggle" | "toggle" => {
+                        let label = call
+                            .args
+                            .first()
+                            .map(|a| self.extract_string_or_ident(a))
+                            .unwrap_or_default();
+                        let binding = call
+                            .args
+                            .iter()
+                            .nth(1)
+                            .map(|a| self.extract_string_or_ident(a))
+                            .unwrap_or_default();
+                        Some(ViewNode {
+                            kind: ViewKind::Toggle { label, binding },
+                            children: Vec::new(),
+                            modifiers: Vec::new(),
+                            span,
+                        })
+                    }
+                    "List" | "list" => {
+                        let mut children = Vec::new();
+                        for arg in &call.args {
+                            children.extend(self.lower_view_children(arg));
+                        }
+                        Some(ViewNode {
+                            kind: ViewKind::List,
+                            children,
+                            modifiers: Vec::new(),
+                            span,
+                        })
+                    }
+                    "Spacer" | "spacer" => Some(ViewNode {
+                        kind: ViewKind::Spacer,
+                        children: Vec::new(),
+                        modifiers: Vec::new(),
+                        span,
+                    }),
+                    "Divider" | "divider" => Some(ViewNode {
+                        kind: ViewKind::Divider,
+                        children: Vec::new(),
+                        modifiers: Vec::new(),
+                        span,
+                    }),
+                    "ForEach" | "foreach" => {
+                        let items = call
+                            .args
+                            .first()
+                            .map(|a| self.extract_string_or_ident(a))
+                            .unwrap_or_default();
+                        let id = call
+                            .args
+                            .iter()
+                            .nth(1)
+                            .map(|a| self.extract_string_or_ident(a));
+                        let mut children = Vec::new();
+                        if let Some(arg) = call.args.iter().nth(2) {
+                            children.extend(self.lower_view_children(arg));
+                        }
+                        Some(ViewNode {
+                            kind: ViewKind::ForEach { items, id },
+                            children,
+                            modifiers: Vec::new(),
+                            span,
+                        })
+                    }
+                    custom => {
+                        let mut children = Vec::new();
+                        for arg in &call.args {
+                            children.extend(self.lower_view_children(arg));
+                        }
+                        Some(ViewNode {
+                            kind: ViewKind::Custom(custom.to_string()),
+                            children,
+                            modifiers: Vec::new(),
+                            span,
+                        })
+                    }
+                }
+            }
+            syn::Expr::MethodCall(method_call) => {
+                let mut base = self.lower_view_expr(&method_call.receiver)?;
+                let method_name = method_call.method.to_string();
+                match method_name.as_str() {
+                    "padding" => {
+                        let val = method_call.args.first().and_then(|a| {
+                            if let syn::Expr::Lit(syn::ExprLit {
+                                lit: syn::Lit::Int(i),
+                                ..
+                            }) = a
+                            {
+                                i.base10_parse::<i32>().ok()
+                            } else {
+                                None
+                            }
+                        });
+                        base.modifiers.push(ViewModifier::Padding(val));
+                    }
+                    "font" => {
+                        let font_str = method_call
+                            .args
+                            .first()
+                            .map(|a| self.extract_string_or_ident(a))
+                            .unwrap_or_else(|| "body".into());
+                        base.modifiers.push(ViewModifier::Font(font_str));
+                    }
+                    "foreground_color" | "foregroundColor" => {
+                        let color_str = method_call
+                            .args
+                            .first()
+                            .map(|a| self.extract_string_or_ident(a))
+                            .unwrap_or_else(|| "primary".into());
+                        base.modifiers
+                            .push(ViewModifier::ForegroundColor(color_str));
+                    }
+                    "frame" => {
+                        let mut width = None;
+                        let mut height = None;
+                        if let Some(syn::Expr::Lit(syn::ExprLit {
+                            lit: syn::Lit::Int(i),
+                            ..
+                        })) = method_call.args.first()
+                        {
+                            width = i.base10_parse::<i32>().ok();
+                        }
+                        if let Some(syn::Expr::Lit(syn::ExprLit {
+                            lit: syn::Lit::Int(i),
+                            ..
+                        })) = method_call.args.iter().nth(1)
+                        {
+                            height = i.base10_parse::<i32>().ok();
+                        }
+                        base.modifiers.push(ViewModifier::Frame { width, height });
+                    }
+                    "disabled" => {
+                        let cond = method_call
+                            .args
+                            .first()
+                            .map(|a| self.extract_string_or_ident(a))
+                            .unwrap_or_default();
+                        base.modifiers.push(ViewModifier::Disabled(cond));
+                    }
+                    "background" => {
+                        let bg = method_call
+                            .args
+                            .first()
+                            .map(|a| self.extract_string_or_ident(a))
+                            .unwrap_or_default();
+                        base.modifiers.push(ViewModifier::Background(bg));
+                    }
+                    _ => {}
+                }
+                Some(base)
+            }
+            syn::Expr::Path(p) => {
+                let name = p.path.segments.last().map(|s| s.ident.to_string())?;
+                match name.as_str() {
+                    "Spacer" | "spacer" => Some(ViewNode {
+                        kind: ViewKind::Spacer,
+                        children: Vec::new(),
+                        modifiers: Vec::new(),
+                        span,
+                    }),
+                    "Divider" | "divider" => Some(ViewNode {
+                        kind: ViewKind::Divider,
+                        children: Vec::new(),
+                        modifiers: Vec::new(),
+                        span,
+                    }),
+                    _ => None,
+                }
+            }
+            syn::Expr::Block(blk) => {
+                for stmt in blk.block.stmts.iter().rev() {
+                    if let syn::Stmt::Expr(e, _) = stmt {
+                        if let Some(node) = self.lower_view_expr(e) {
+                            return Some(node);
+                        }
+                    }
+                }
+                None
+            }
+            _ => None,
+        }
+    }
+
+    fn lower_view_children(&mut self, expr: &syn::Expr) -> Vec<ViewNode> {
+        match expr {
+            syn::Expr::Array(arr) => arr
+                .elems
+                .iter()
+                .filter_map(|e| self.lower_view_expr(e))
+                .collect(),
+            syn::Expr::Macro(m) => {
+                if let Ok(elems) = m.mac.parse_body_with(
+                    syn::punctuated::Punctuated::<syn::Expr, syn::Token![,]>::parse_terminated,
+                ) {
+                    elems
+                        .iter()
+                        .filter_map(|e| self.lower_view_expr(e))
+                        .collect()
+                } else {
+                    Vec::new()
+                }
+            }
+            other => {
+                if let Some(child) = self.lower_view_expr(other) {
+                    vec![child]
+                } else {
+                    Vec::new()
+                }
+            }
+        }
+    }
+
+    fn extract_string_or_ident(&self, expr: &syn::Expr) -> String {
+        match expr {
+            syn::Expr::Lit(syn::ExprLit {
+                lit: syn::Lit::Str(s),
+                ..
+            }) => s.value(),
+            syn::Expr::Path(p) => p
+                .path
+                .segments
+                .iter()
+                .map(|s| s.ident.to_string())
+                .collect::<Vec<_>>()
+                .join("."),
+            syn::Expr::Field(f) => {
+                let base = self.extract_string_or_ident(&f.base);
+                match &f.member {
+                    syn::Member::Named(id) => format!("{}.{}", base, id),
+                    syn::Member::Unnamed(idx) => format!("{}.{}", base, idx.index),
+                }
+            }
+            syn::Expr::MethodCall(m) => {
+                let base = self.extract_string_or_ident(&m.receiver);
+                format!("{}.{}()", base, m.method)
+            }
+            _ => quote::quote!(#expr).to_string(),
+        }
     }
 
     fn lower_struct(&mut self, item_struct: &syn::ItemStruct) -> Option<StructDef> {
@@ -2073,6 +2598,60 @@ mod tests {
             assert!(e.is_codable);
         } else {
             panic!("Expected enum item");
+        }
+    }
+
+    #[test]
+    fn test_view_component_lowering() {
+        let src = r#"
+            #[observable]
+            pub struct TaskState {
+                pub title: String,
+                pub is_done: bool,
+            }
+
+            #[view]
+            pub struct TaskView {
+                pub state: TaskState,
+            }
+
+            impl TaskView {
+                pub fn body(&self) {
+                    VStack(vec![
+                        Text("Task Details").font("headline").padding(),
+                        HStack(vec![
+                            Text("Done"),
+                            Toggle("Status", "$state.is_done"),
+                            Spacer(),
+                            Button("Delete", "state.delete()"),
+                        ]),
+                    ])
+                }
+            }
+        "#;
+
+        let mut frontend = Frontend::new("ui_test.rs");
+        let module = frontend
+            .parse_and_lower(src)
+            .expect("Should parse and lower TaskState and TaskView");
+
+        assert_eq!(module.items.len(), 2);
+        assert!(
+            matches!(&module.items[0], IrItem::Struct(s) if s.name == "TaskState" && s.is_observable)
+        );
+        if let IrItem::View(v) = &module.items[1] {
+            assert_eq!(v.name, "TaskView");
+            assert_eq!(v.properties.len(), 1);
+            assert_eq!(v.properties[0].name, "state");
+            assert_eq!(v.properties[0].kind, PropertyBindingKind::Observable);
+            assert!(matches!(v.root.kind, ViewKind::VStack { .. }));
+            assert_eq!(v.root.children.len(), 2);
+            assert!(matches!(v.root.children[0].kind, ViewKind::Text(_)));
+            assert_eq!(v.root.children[0].modifiers.len(), 2);
+            assert!(matches!(v.root.children[1].kind, ViewKind::HStack { .. }));
+            assert_eq!(v.root.children[1].children.len(), 4);
+        } else {
+            panic!("Expected Item::View");
         }
     }
 }
