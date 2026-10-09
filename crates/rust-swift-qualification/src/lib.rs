@@ -4,3 +4,4 @@ pub mod benchmark;
 pub mod differential;
 pub mod evals;
 pub mod mutation;
+pub mod proof;

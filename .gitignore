@@ -41,6 +41,8 @@ examples/PeelInspectorApp/PeelInspectorApp
 # Generated test & qualification outputs
 generated-swift/
 target/qualification/
+proof-receipt.json
+*.proof-receipt.json
 *.log
 
 # Operating System files
