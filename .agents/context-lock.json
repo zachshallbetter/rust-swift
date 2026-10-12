@@ -6,9 +6,9 @@
   "selectedPaths": [],
   "sourceSelection": {
     "includedCount": 183,
-    "includedBytes": 3080283,
+    "includedBytes": 3081292,
     "excludedCounts": {
-      "excluded-directory": 45579,
+      "excluded-directory": 45870,
       "excluded-path": 1,
       "extension": 5974,
       "symlink": 4
@@ -20,14 +20,14 @@
     "repositories": [
       {
         "path": ".",
-        "commit": "4bfc3821ec5f95877c7a879f6132bd64959de82f",
+        "commit": "20695c4e41afe685b2149675f33aa7046da1d995",
         "branch": "main",
         "dirty": true,
         "remote": "https://github.com/zachshallbetter/rust-swift.git"
       }
     ]
   },
-  "aggregateSourceDigest": "1000ad92a996adbb1af107029f7d96828eaa8595c460d3df4cbc4ab331ec2a2c",
+  "aggregateSourceDigest": "ef352832ed072609617a2cac0271b8f6fe5015992f813e994799e56b3e283b16",
   "sources": [
     {
       "path": ".agents/rules/ci.md",
@@ -291,8 +291,8 @@
     },
     {
       "path": "docs/04-language-matrix.md",
-      "bytes": 3349,
-      "sha256": "5a6f8a3f2ae8826f2d7afa21ed435218cb5f843d0b38021fc98a879a2056d0b5"
+      "bytes": 3891,
+      "sha256": "168e9079b7363759d23e6444d015f2f295cdd14ccaf30de347243b6c92b22c1d"
     },
     {
       "path": "docs/05-validation.md",
@@ -301,8 +301,8 @@
     },
     {
       "path": "docs/06-implementation-plan.md",
-      "bytes": 2043,
-      "sha256": "61c74de84c62748acd50c4f703172a3ba89b532c207b91ceeef406083c6c081e"
+      "bytes": 2281,
+      "sha256": "f9835fd29d456153e7859097ba5daa379ae48afea2fdffc3c9d226cf075454e7"
     },
     {
       "path": "docs/07-rfc.md",
@@ -766,8 +766,8 @@
     },
     {
       "path": "examples/PluginDemoApp/.build/plugins/cache/RustSwiftPlugin-state.json",
-      "bytes": 10708,
-      "sha256": "4551c9b6dd834c950b4477ab979c242d72de22801e3fc71d6d8d454f0a140a45"
+      "bytes": 10937,
+      "sha256": "f4951787abaed62896dccb66135c4d52bc758c8bf9f423125b4b322948bbb5fa"
     },
     {
       "path": "examples/PluginDemoApp/.build/plugins/cache/RustSwiftPlugin.dSYM/Contents/Resources/Relocations/aarch64/RustSwiftPlugin.yml",
