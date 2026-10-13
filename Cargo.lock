@@ -342,6 +342,7 @@ dependencies = [
 [[package]]
 name = "reflective-rust-csg"
 version = "0.1.0"
+source = "git+https://github.com/zachshallbetter/reflective-rust?branch=main#14c7b347b45fa9c5d257a8f0aed9796dc2c6200a"
 dependencies = [
  "reflective-rust-protocol",
  "serde",
@@ -351,6 +352,7 @@ dependencies = [
 [[package]]
 name = "reflective-rust-protocol"
 version = "0.1.0"
+source = "git+https://github.com/zachshallbetter/reflective-rust?branch=main#14c7b347b45fa9c5d257a8f0aed9796dc2c6200a"
 dependencies = [
  "base64",
  "ed25519-dalek",
