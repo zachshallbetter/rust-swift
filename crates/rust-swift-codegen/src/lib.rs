@@ -104,6 +104,11 @@ impl SwiftGenerator {
             Type::Usize => "UInt".into(),
             Type::Bool => "Bool".into(),
             Type::Unit => "Void".into(),
+            Type::String => "String".into(),
+            Type::Option(inner) => format!("{}?", self.map_type(inner)),
+            Type::Result { ok, err } => {
+                format!("Result<{}, {}>", self.map_type(ok), self.map_type(err))
+            }
             Type::Named(name) => name.clone(),
             Type::Tuple(elems) => {
                 let inner = elems
@@ -140,7 +145,7 @@ impl SwiftGenerator {
 
         if enm.is_fieldless() {
             out.push_str(&format!(
-                "{}enum {}: String, CaseIterable, Equatable, Hashable, Sendable {{\n",
+                "{}enum {}: String, CaseIterable, Equatable, Hashable, Sendable, Error {{\n",
                 vis, enm.name
             ));
             self.indent_level += 1;
@@ -156,7 +161,7 @@ impl SwiftGenerator {
             out.push_str(&format!("{}}}", self.indent()));
         } else {
             out.push_str(&format!(
-                "{}enum {}: Equatable, Hashable, Sendable {{\n",
+                "{}enum {}: Equatable, Hashable, Sendable, Error {{\n",
                 vis, enm.name
             ));
             self.indent_level += 1;
@@ -620,24 +625,40 @@ impl SwiftGenerator {
         match pat {
             Pattern::Wildcard => "_".into(),
             Pattern::Literal(lit) => self.generate_literal(lit),
-            Pattern::Variable(v) => format!("let {}", v),
+            Pattern::Variable(v) => {
+                if v == "None" {
+                    ".none".into()
+                } else {
+                    format!("let {}", v)
+                }
+            }
             Pattern::EnumVariant {
                 enum_name: _,
                 variant,
             } => {
-                format!(".{}", variant)
+                let v = match variant.as_str() {
+                    "None" => "none",
+                    other => other,
+                };
+                format!(".{}", v)
             }
             Pattern::EnumVariantPayload {
                 enum_name: _,
                 variant,
                 patterns,
             } => {
+                let v = match variant.as_str() {
+                    "Some" => "some",
+                    "Ok" => "success",
+                    "Err" => "failure",
+                    other => other,
+                };
                 let inner = patterns
                     .iter()
                     .map(|p| self.generate_pattern(p))
                     .collect::<Vec<_>>()
                     .join(", ");
-                format!(".{}({})", variant, inner)
+                format!(".{}({})", v, inner)
             }
             Pattern::Tuple(elems) => {
                 let inner = elems
@@ -663,7 +684,9 @@ impl SwiftGenerator {
         match &expr.kind {
             ExprKind::Literal(lit) => self.generate_literal(lit),
             ExprKind::Variable(var) => {
-                if var.contains('.') {
+                if var == "None" {
+                    "nil".into()
+                } else if var.contains('.') {
                     let parts: Vec<&str> = var.split('.').collect();
                     if parts.len() == 2 {
                         format!("{}.{}", parts[0], parts[1])
@@ -725,12 +748,18 @@ impl SwiftGenerator {
                 }
             }
             ExprKind::Call { func, args } => {
+                let swift_func = match func.as_str() {
+                    "Some" => ".some",
+                    "Ok" => ".success",
+                    "Err" => ".failure",
+                    other => other,
+                };
                 let args_str = args
                     .iter()
                     .map(|a| self.generate_expr(a))
                     .collect::<Vec<_>>()
                     .join(", ");
-                format!("{}({})", func, args_str)
+                format!("{}({})", swift_func, args_str)
             }
             ExprKind::MethodCall {
                 receiver,
@@ -740,8 +769,13 @@ impl SwiftGenerator {
                 let r_str = self.generate_expr(receiver);
                 let swift_method = match method.as_str() {
                     "push" => "append",
-                    "len" => "count",
-                    "is_empty" => "isEmpty",
+                    "len" => "len",
+                    "is_empty" => "is_empty",
+                    "is_some" => "is_some",
+                    "is_none" => "is_none",
+                    "is_ok" => "is_ok",
+                    "is_err" => "is_err",
+                    "unwrap" => "unwrap",
                     other => other,
                 };
                 let args_str = args
@@ -800,6 +834,23 @@ impl SwiftGenerator {
                     .join(", ");
                 format!("[{}]", inner)
             }
+            ExprKind::Index { expr, index } => {
+                let e_str = self.generate_expr(expr);
+                let idx_str = self.generate_expr(index);
+                format!("{}[Int({})]", e_str, idx_str)
+            }
+            ExprKind::Slice { expr, start, end } => {
+                let e_str = self.generate_expr(expr);
+                let start_str = start
+                    .as_ref()
+                    .map(|s| format!("Int({})", self.generate_expr(s)))
+                    .unwrap_or_else(|| "0".into());
+                let end_str = end
+                    .as_ref()
+                    .map(|e| format!("Int({})", self.generate_expr(e)))
+                    .unwrap_or_else(|| format!("{}.utf8.count", e_str));
+                format!("{}.byteSlice({}, {})", e_str, start_str, end_str)
+            }
             ExprKind::Block {
                 stmts: _,
                 expr: Some(final_e),
@@ -826,6 +877,7 @@ impl SwiftGenerator {
                     "false".into()
                 }
             }
+            Literal::String(s) => format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\"")),
             Literal::Unit => "()".into(),
         }
     }
@@ -891,6 +943,84 @@ public struct RustCompat {
             return b >= 0 ? T.min : T.max
         }
         return res
+    }
+}
+
+extension String {
+    public func byteSlice(_ start: Int, _ end: Int) -> String {
+        precondition(start >= 0 && end >= start && end <= self.utf8.count, "String slice index out of bounds")
+        let startIdx = self.utf8.index(self.utf8.startIndex, offsetBy: start)
+        let endIdx = self.utf8.index(self.utf8.startIndex, offsetBy: end)
+        guard let sub = String(self.utf8[startIdx..<endIdx]) else {
+            fatalError("String slice boundary is not a valid UTF-8 code point")
+        }
+        return sub
+    }
+
+    public func len() -> Int {
+        return self.utf8.count
+    }
+
+    public func is_empty() -> Bool {
+        return self.isEmpty
+    }
+}
+
+extension Array {
+    public func len() -> Int {
+        return self.count
+    }
+
+    public func is_empty() -> Bool {
+        return self.isEmpty
+    }
+}
+
+extension Optional {
+    public func is_some() -> Bool {
+        return self != nil
+    }
+
+    public func is_none() -> Bool {
+        return self == nil
+    }
+
+    public func unwrap() -> Wrapped {
+        guard let value = self else {
+            fatalError("Called unwrap() on a None value")
+        }
+        return value
+    }
+}
+
+extension Result {
+    public var isOk: Bool {
+        switch self {
+        case .success: return true
+        case .failure: return false
+        }
+    }
+
+    public var isErr: Bool {
+        switch self {
+        case .failure: return true
+        case .success: return false
+        }
+    }
+
+    public func is_ok() -> Bool {
+        return self.isOk
+    }
+
+    public func is_err() -> Bool {
+        return self.isErr
+    }
+
+    public func unwrap() -> Success {
+        switch self {
+        case .success(let val): return val
+        case .failure(let err): fatalError("Called unwrap() on an Err value: \(err)")
+        }
     }
 }
 "#;
@@ -1172,10 +1302,72 @@ mod tests {
         assert!(code.contains("public struct Counter"));
         assert!(code.contains("extension Counter"));
         assert!(code.contains("public mutating func increment(_ delta: Int64)"));
-        assert!(code.contains("public enum Action: Equatable, Hashable, Sendable"));
+        assert!(code.contains("public enum Action: Equatable, Hashable, Sendable, Error"));
         assert!(code.contains("case Stop"));
         assert!(code.contains("case Move(Int64, Int64)"));
         assert!(!code.contains("String, CaseIterable"));
         assert!(symbols.iter().any(|s| s.swift_name == "Counter.increment"));
+    }
+
+    #[test]
+    fn test_generate_option_result_string() {
+        let mut module = Module::new("DataSemantics");
+        module.items.push(Item::Function(Function {
+            name: "test_data".into(),
+            params: vec![
+                Param {
+                    name: "opt".into(),
+                    ty: Type::Option(Box::new(Type::I64)),
+                    mutable: false,
+                },
+                Param {
+                    name: "res".into(),
+                    ty: Type::Result {
+                        ok: Box::new(Type::String),
+                        err: Box::new(Type::Named("ErrType".into())),
+                    },
+                    mutable: false,
+                },
+                Param {
+                    name: "s".into(),
+                    ty: Type::String,
+                    mutable: false,
+                },
+            ],
+            return_type: Type::String,
+            body: Expr::new(
+                ExprKind::Slice {
+                    expr: Box::new(Expr::new(ExprKind::Variable("s".into()), Type::String)),
+                    start: Some(Box::new(Expr::new(
+                        ExprKind::Literal(Literal::Int {
+                            value: 0,
+                            ty: Type::I32,
+                        }),
+                        Type::I32,
+                    ))),
+                    end: Some(Box::new(Expr::new(
+                        ExprKind::Literal(Literal::Int {
+                            value: 5,
+                            ty: Type::I32,
+                        }),
+                        Type::I32,
+                    ))),
+                },
+                Type::String,
+            ),
+            is_public: true,
+            span: SourceSpan {
+                file: "data.rs".into(),
+                start_line: 1,
+                end_line: 10,
+            },
+        }));
+
+        let mut gen = SwiftGenerator::new();
+        let (code, _) = gen.generate_module(&module);
+        assert!(code.contains("opt: Int64?"));
+        assert!(code.contains("res: Result<String, ErrType>"));
+        assert!(code.contains("s: String"));
+        assert!(code.contains("s.byteSlice(Int(0), Int(5))"));
     }
 }

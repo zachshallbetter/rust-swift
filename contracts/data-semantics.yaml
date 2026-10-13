@@ -1,0 +1,48 @@
+# Formal Data Semantics Specification
+# rust-swift compiler v0.1
+
+contract_id: "rust-swift.contracts.data_semantics.v0_1"
+schema_version: "1.0.0"
+title: "Foundational Data Semantics — Option, Result, and UTF-8 Strings"
+status: "active"
+
+description: >
+  Defines the lowering, runtime representation, and boundary enforcement
+  for standard Rust data structures into native Swift types, ensuring exact
+  semantic parity across Option unwrapping, Result error propagation,
+  and UTF-8 byte boundary string slicing.
+
+type_mappings:
+  - rust_type: "Option<T>"
+    swift_target: "T?"
+    representation: "Native Swift Optional"
+    invariants:
+      - "Some(v) lowers to .some(v) or v."
+      - "None lowers to nil."
+      - "opt.is_some() evaluates to (opt != nil)."
+      - "opt.is_none() evaluates to (opt == nil)."
+      - "opt.unwrap() evaluates to opt! with precondition trap on nil."
+      - "Pattern matching branches on .some(let v) and .none."
+
+  - rust_type: "Result<T, E>"
+    swift_target: "Result<T, E>"
+    representation: "Native Swift Result enum conforming to Error protocol for E"
+    invariants:
+      - "Ok(v) lowers to .success(v)."
+      - "Err(e) lowers to .failure(e)."
+      - "Error enums automatically conform to Swift Error protocol."
+      - "Pattern matching branches on .success(let v) and .failure(let e)."
+
+  - rust_type: "String / &str"
+    swift_target: "String"
+    representation: "Native Swift String backed by UTF-8 encoding view"
+    invariants:
+      - "s.len() evaluates to s.utf8.count (UTF-8 byte count, not grapheme count)."
+      - "s.is_empty() evaluates to s.isEmpty."
+      - "&s[start..end] evaluates to s.byteSlice(start, end)."
+      - "Out-of-bounds slice or slicing across a multi-byte UTF-8 code point traps immediately."
+
+rejections:
+  - code: "E0011_UNSPECIALIZABLE_GENERIC_REJECTED"
+    reason: "Unspecialized generic functions without concrete type parameters are rejected."
+    remedy: "Use concrete types (e.g., Option<i64>, Result<u32, MathError>)."
