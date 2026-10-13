@@ -92,9 +92,7 @@ impl Frontend {
     fn lower_item(&mut self, item: &syn::Item) -> Option<IrItem> {
         match item {
             syn::Item::Fn(item_fn) => self.lower_fn(item_fn).map(IrItem::Function),
-            syn::Item::Struct(item_struct) => {
-                self.lower_struct(item_struct).map(IrItem::Struct)
-            }
+            syn::Item::Struct(item_struct) => self.lower_struct(item_struct).map(IrItem::Struct),
             syn::Item::Enum(item_enum) => self.lower_enum(item_enum).map(IrItem::Enum),
             syn::Item::Macro(m) => {
                 self.reject(
@@ -440,10 +438,7 @@ impl Frontend {
                         }
                     };
                     let ty = None;
-                    let init = local
-                        .init
-                        .as_ref()
-                        .map(|init| self.lower_expr(&init.expr));
+                    let init = local.init.as_ref().map(|init| self.lower_expr(&init.expr));
                     stmts.push(Stmt::Let {
                         name,
                         mutable,
@@ -492,7 +487,13 @@ impl Frontend {
             .map(|e| e.ty.clone())
             .unwrap_or(Type::Unit);
 
-        Expr::new(ExprKind::Block { stmts, expr: final_expr }, ty)
+        Expr::new(
+            ExprKind::Block {
+                stmts,
+                expr: final_expr,
+            },
+            ty,
+        )
     }
 
     pub fn lower_expr(&mut self, expr: &syn::Expr) -> Expr {
@@ -514,36 +515,46 @@ impl Frontend {
                 let ty = left.ty.clone();
 
                 let op = match bin.op {
-                    syn::BinOp::Add(_) => {
-                        BinaryOp::Arithmetic { op: IntegerOp::Add, mode: IntegerMode::Checked }
-                    }
-                    syn::BinOp::Sub(_) => {
-                        BinaryOp::Arithmetic { op: IntegerOp::Sub, mode: IntegerMode::Checked }
-                    }
-                    syn::BinOp::Mul(_) => {
-                        BinaryOp::Arithmetic { op: IntegerOp::Mul, mode: IntegerMode::Checked }
-                    }
-                    syn::BinOp::Div(_) => {
-                        BinaryOp::Arithmetic { op: IntegerOp::Div, mode: IntegerMode::Checked }
-                    }
-                    syn::BinOp::Rem(_) => {
-                        BinaryOp::Arithmetic { op: IntegerOp::Rem, mode: IntegerMode::Checked }
-                    }
-                    syn::BinOp::BitAnd(_) => {
-                        BinaryOp::Arithmetic { op: IntegerOp::BitAnd, mode: IntegerMode::Checked }
-                    }
-                    syn::BinOp::BitOr(_) => {
-                        BinaryOp::Arithmetic { op: IntegerOp::BitOr, mode: IntegerMode::Checked }
-                    }
-                    syn::BinOp::BitXor(_) => {
-                        BinaryOp::Arithmetic { op: IntegerOp::BitXor, mode: IntegerMode::Checked }
-                    }
-                    syn::BinOp::Shl(_) => {
-                        BinaryOp::Arithmetic { op: IntegerOp::Shl, mode: IntegerMode::Checked }
-                    }
-                    syn::BinOp::Shr(_) => {
-                        BinaryOp::Arithmetic { op: IntegerOp::Shr, mode: IntegerMode::Checked }
-                    }
+                    syn::BinOp::Add(_) => BinaryOp::Arithmetic {
+                        op: IntegerOp::Add,
+                        mode: IntegerMode::Checked,
+                    },
+                    syn::BinOp::Sub(_) => BinaryOp::Arithmetic {
+                        op: IntegerOp::Sub,
+                        mode: IntegerMode::Checked,
+                    },
+                    syn::BinOp::Mul(_) => BinaryOp::Arithmetic {
+                        op: IntegerOp::Mul,
+                        mode: IntegerMode::Checked,
+                    },
+                    syn::BinOp::Div(_) => BinaryOp::Arithmetic {
+                        op: IntegerOp::Div,
+                        mode: IntegerMode::Checked,
+                    },
+                    syn::BinOp::Rem(_) => BinaryOp::Arithmetic {
+                        op: IntegerOp::Rem,
+                        mode: IntegerMode::Checked,
+                    },
+                    syn::BinOp::BitAnd(_) => BinaryOp::Arithmetic {
+                        op: IntegerOp::BitAnd,
+                        mode: IntegerMode::Checked,
+                    },
+                    syn::BinOp::BitOr(_) => BinaryOp::Arithmetic {
+                        op: IntegerOp::BitOr,
+                        mode: IntegerMode::Checked,
+                    },
+                    syn::BinOp::BitXor(_) => BinaryOp::Arithmetic {
+                        op: IntegerOp::BitXor,
+                        mode: IntegerMode::Checked,
+                    },
+                    syn::BinOp::Shl(_) => BinaryOp::Arithmetic {
+                        op: IntegerOp::Shl,
+                        mode: IntegerMode::Checked,
+                    },
+                    syn::BinOp::Shr(_) => BinaryOp::Arithmetic {
+                        op: IntegerOp::Shr,
+                        mode: IntegerMode::Checked,
+                    },
                     syn::BinOp::Eq(_) => BinaryOp::Comparison(CmpOp::Eq),
                     syn::BinOp::Ne(_) => BinaryOp::Comparison(CmpOp::Ne),
                     syn::BinOp::Lt(_) => BinaryOp::Comparison(CmpOp::Lt),
@@ -687,7 +698,13 @@ impl Frontend {
                     _ => "unknown_func".into(),
                 };
                 let args = call.args.iter().map(|a| self.lower_expr(a)).collect();
-                Expr::new(ExprKind::Call { func: func_name, args }, Type::Unit)
+                Expr::new(
+                    ExprKind::Call {
+                        func: func_name,
+                        args,
+                    },
+                    Type::Unit,
+                )
             }
             syn::Expr::Field(field) => {
                 let receiver = Box::new(self.lower_expr(&field.base));
@@ -724,7 +741,10 @@ impl Frontend {
                     })
                     .collect();
                 Expr::new(
-                    ExprKind::StructInit { name: name.clone(), fields },
+                    ExprKind::StructInit {
+                        name: name.clone(),
+                        fields,
+                    },
                     Type::Named(name),
                 )
             }
@@ -850,8 +870,12 @@ impl Frontend {
                 _ => Pattern::Wildcard,
             },
             syn::Pat::Path(p) => {
-                let segments: Vec<String> =
-                    p.path.segments.iter().map(|s| s.ident.to_string()).collect();
+                let segments: Vec<String> = p
+                    .path
+                    .segments
+                    .iter()
+                    .map(|s| s.ident.to_string())
+                    .collect();
                 if segments.len() >= 2 {
                     Pattern::EnumVariant {
                         enum_name: Some(segments[..segments.len() - 1].join(".")),
@@ -916,16 +940,25 @@ impl Frontend {
                 };
                 if ty.is_signed_integer() {
                     let val: i128 = i.base10_parse().unwrap_or(0);
-                    Expr::new(ExprKind::Literal(Literal::Int { value: val, ty: ty.clone() }), ty)
+                    Expr::new(
+                        ExprKind::Literal(Literal::Int {
+                            value: val,
+                            ty: ty.clone(),
+                        }),
+                        ty,
+                    )
                 } else {
                     let val: u128 = i.base10_parse().unwrap_or(0);
-                    Expr::new(ExprKind::Literal(Literal::UInt { value: val, ty: ty.clone() }), ty)
+                    Expr::new(
+                        ExprKind::Literal(Literal::UInt {
+                            value: val,
+                            ty: ty.clone(),
+                        }),
+                        ty,
+                    )
                 }
             }
-            syn::Lit::Bool(b) => Expr::new(
-                ExprKind::Literal(Literal::Bool(b.value)),
-                Type::Bool,
-            ),
+            syn::Lit::Bool(b) => Expr::new(ExprKind::Literal(Literal::Bool(b.value)), Type::Bool),
             _ => Expr::new(ExprKind::Literal(Literal::Unit), Type::Unit),
         }
     }
@@ -978,8 +1011,12 @@ mod tests {
             }
         "#;
         let mut frontend = Frontend::new("unsafe.rs");
-        let errs = frontend.parse_and_lower(src).expect_err("Should reject unsafe");
-        assert!(errs.iter().any(|d| d.code == DiagnosticCode::UnsafeRejected));
+        let errs = frontend
+            .parse_and_lower(src)
+            .expect_err("Should reject unsafe");
+        assert!(errs
+            .iter()
+            .any(|d| d.code == DiagnosticCode::UnsafeRejected));
     }
 
     #[test]
@@ -990,7 +1027,9 @@ mod tests {
             }
         "#;
         let mut frontend = Frontend::new("async.rs");
-        let errs = frontend.parse_and_lower(src).expect_err("Should reject async");
+        let errs = frontend
+            .parse_and_lower(src)
+            .expect_err("Should reject async");
         assert!(errs.iter().any(|d| d.code == DiagnosticCode::AsyncRejected));
     }
 }
