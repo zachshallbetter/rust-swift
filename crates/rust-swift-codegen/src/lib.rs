@@ -113,6 +113,9 @@ impl SwiftGenerator {
                     .join(", ");
                 format!("({})", inner)
             }
+            Type::Array { element, .. } => {
+                format!("[{}]", self.map_type(element))
+            }
             Type::Ref { inner, mutable } => {
                 if *mutable {
                     format!("inout {}", self.map_type(inner))
@@ -735,12 +738,18 @@ impl SwiftGenerator {
                 args,
             } => {
                 let r_str = self.generate_expr(receiver);
+                let swift_method = match method.as_str() {
+                    "push" => "append",
+                    "len" => "count",
+                    "is_empty" => "isEmpty",
+                    other => other,
+                };
                 let args_str = args
                     .iter()
                     .map(|a| self.generate_expr(a))
                     .collect::<Vec<_>>()
                     .join(", ");
-                format!("{}.{}({})", r_str, method, args_str)
+                format!("{}.{}({})", r_str, swift_method, args_str)
             }
             ExprKind::FieldAccess { receiver, field } => {
                 format!("{}.{}", self.generate_expr(receiver), field)
@@ -782,6 +791,14 @@ impl SwiftGenerator {
                     .collect::<Vec<_>>()
                     .join(", ");
                 format!("({})", inner)
+            }
+            ExprKind::Array(elems) => {
+                let inner = elems
+                    .iter()
+                    .map(|e| self.generate_expr(e))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                format!("[{}]", inner)
             }
             ExprKind::Block {
                 stmts: _,

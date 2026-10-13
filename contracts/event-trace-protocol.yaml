@@ -1,0 +1,45 @@
+# Formal Event Dispatch & Trace Model Specification
+# rust-swift compiler v0.1
+
+contract_id: "rust-swift.contracts.event_trace.v0_1"
+schema_version: "1.0.0"
+title: "Observable State Machine Event Dispatch and Deterministic Trace Model"
+status: "active"
+
+description: >
+  Defines the deterministic execution, pure state transition interface,
+  and ordered JSON Lines trace emission protocol for state machines.
+  Ensures bit-exact differential execution parity between Rust and Swift binary runtimes.
+
+dispatch_interface:
+  signature: "step(state: State, input: Event) -> (State, [Effect])"
+  purity: "Pure total function without external I/O side effects"
+  ordering: "Strictly chronological, single-threaded deterministic sequence"
+  state_invariance: "State transitions yield a valid State and ordered sequence of Effect values"
+
+trace_schema:
+  format: "application/x-ndjson (JSON Lines)"
+  fields:
+    - name: "sequence_id"
+      type: "integer (64-bit unsigned)"
+      description: "Monotonically increasing transition sequence index (0-indexed or 1-indexed)."
+    - name: "state_before"
+      type: "string"
+      description: "State identifier before event consumption."
+    - name: "event_in"
+      type: "string"
+      description: "Event variant consumed during this transition."
+    - name: "state_after"
+      type: "string"
+      description: "Resulting state identifier after transition completion."
+    - name: "effects"
+      type: "array of strings"
+      description: "Ordered list of effect labels produced by the transition."
+
+verification:
+  differential_method: >
+    The qualification harness feeds an identical pseudorandom or systematic sequence of
+    50+ events into the native Rust executable and the compiled Swift binary. Each binary
+    emits an ordered trace of JSON Lines. The harness verifies:
+    1. Line-by-line field equality across state transitions and effect lists.
+    2. Exact cryptographic hash equivalence: Digest(Trace_Rust) == Digest(Trace_Swift).

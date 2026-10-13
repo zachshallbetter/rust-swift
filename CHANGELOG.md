@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Event Dispatch & Trace Model (`WI-EVENT-001`)**:
+  - Support for `Type::Array` and dynamic vectors `Vec<T>`, slices `[T]`, and fixed-size arrays `[T; N]`.
+  - Admitted array literals `[e1, e2]` and the `vec![...]` macro in expression positions.
+  - Swift codegen lowering of array expressions and types to native Swift arrays `[T]`.
+  - Method translation for `push` $\to$ `append`, `len` $\to$ `count`, and `is_empty` $\to$ `isEmpty`.
+  - Formal event trace contract specification in `contracts/event-trace-protocol.yaml`.
+  - Differential qualification suite verifying 50-step multi-transition state machine execution history with effect emission, asserting line-by-line parity and bit-exact SHA-256 trace digest equivalence between `rustc` and `swiftc`.
 - **Type System Expansion (`WI-TYPE-001`)**:
   - Struct inherent implementation blocks (`impl Type { ... }`) lowering into Swift `extension Type`.
   - Receiver classification: `&mut self` lowered to `mutating func`, `&self` and value receivers lowered to standard `func`, and static methods lowered to `static func`.
