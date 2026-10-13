@@ -7,11 +7,11 @@ pub mod diagnostic;
 
 use diagnostic::{Diagnostic, DiagnosticCode};
 use rust_swift_ir::{
-    BinaryOp, CmpOp, EnumDef, EnumVariant, Expr, ExprKind, FieldDef, Function, ImplBlock,
-    IntegerMode, IntegerOp, Item as IrItem, Literal, LogicalOp, MatchArm, Method, Module, Param,
-    Pattern, PropertyBindingKind, ReceiverKind, SourceSpan, Stmt, StructDef, TraitDef, TraitImpl,
-    TraitMethod, Type, UnaryOp, VariantPayload, ViewDef, ViewKind, ViewModifier, ViewNode,
-    ViewProperty,
+    AssociatedTypeDef, BinaryOp, CmpOp, EnumDef, EnumVariant, Expr, ExprKind, FieldDef, Function,
+    ImplBlock, IntegerMode, IntegerOp, Item as IrItem, Literal, LogicalOp, MatchArm, Method,
+    Module, Param, Pattern, PropertyBindingKind, ReceiverKind, SourceSpan, Stmt, StructDef,
+    TraitDef, TraitImpl, TraitMethod, Type, TypeAlias, UnaryOp, VariantPayload, ViewDef, ViewKind,
+    ViewModifier, ViewNode, ViewProperty,
 };
 use syn::spanned::Spanned;
 
@@ -396,6 +396,7 @@ impl Frontend {
 
         let name = item_trait.ident.to_string();
         let is_public = matches!(item_trait.vis, syn::Visibility::Public(_));
+        let mut associated_types = Vec::new();
         let mut methods = Vec::new();
 
         for item in &item_trait.items {
@@ -405,14 +406,11 @@ impl Frontend {
                         methods.push(m);
                     }
                 }
-                syn::TraitItem::Type(_) => {
-                    self.reject(
-                        DiagnosticCode::ComplexTraitRejected,
-                        "Associated types in traits are rejected in v0.2",
-                        item,
-                        Some("Use explicit return types in trait methods"),
-                    );
-                    return None;
+                syn::TraitItem::Type(trait_type) => {
+                    associated_types.push(AssociatedTypeDef {
+                        name: trait_type.ident.to_string(),
+                        span: self.make_span(trait_type),
+                    });
                 }
                 other => {
                     self.reject(
@@ -428,6 +426,7 @@ impl Frontend {
 
         Some(TraitDef {
             name,
+            associated_types,
             methods,
             is_public,
             span: self.make_span(item_trait),
@@ -500,18 +499,32 @@ impl Frontend {
             _ => "Target".into(),
         };
 
+        let mut type_aliases = Vec::new();
         let mut methods = Vec::new();
         for item in &imp.items {
-            if let syn::ImplItem::Fn(method) = item {
-                if let Some(m) = self.lower_method(method) {
-                    methods.push(m);
+            match item {
+                syn::ImplItem::Fn(method) => {
+                    if let Some(m) = self.lower_method(method) {
+                        methods.push(m);
+                    }
                 }
+                syn::ImplItem::Type(t) => {
+                    let name = t.ident.to_string();
+                    let target = self.lower_type(&t.ty);
+                    type_aliases.push(TypeAlias {
+                        name,
+                        target,
+                        span: self.make_span(t),
+                    });
+                }
+                _ => {}
             }
         }
 
         Some(TraitImpl {
             trait_name,
             target_type,
+            type_aliases,
             methods,
             span: self.make_span(imp),
         })
@@ -2363,14 +2376,14 @@ mod tests {
     #[test]
     fn test_complex_trait_rejected_with_e0006() {
         let src = r#"
-            pub trait ComplexTrait {
-                type Item;
+            pub trait ComplexTrait<T> {
+                fn process(&self, val: T);
             }
         "#;
         let mut frontend = Frontend::new("complex_trait.rs");
         let errs = frontend
             .parse_and_lower(src)
-            .expect_err("Should reject complex trait with associated types");
+            .expect_err("Should reject complex trait with generic parameters");
         assert!(errs
             .iter()
             .any(|d| d.code == DiagnosticCode::ComplexTraitRejected));
@@ -2416,6 +2429,50 @@ mod tests {
                 assert_eq!(timpl.methods.len(), 1);
             }
             _ => panic!("Expected IrItem::TraitImpl"),
+        }
+    }
+
+    #[test]
+    fn test_trait_with_associated_type_lowering() {
+        let src = r#"
+            pub trait Container {
+                type Item;
+                fn get(&self) -> i64;
+            }
+
+            pub struct IntBox {
+                pub value: i64,
+            }
+
+            impl Container for IntBox {
+                type Item = i64;
+                fn get(&self) -> i64 {
+                    self.value
+                }
+            }
+        "#;
+        let mut frontend = Frontend::new("container.rs");
+        let module = frontend
+            .parse_and_lower(src)
+            .expect("Should parse and lower trait with associated type and impl with type alias");
+        assert_eq!(module.items.len(), 3);
+        if let IrItem::Trait(trt) = &module.items[0] {
+            assert_eq!(trt.name, "Container");
+            assert_eq!(trt.associated_types.len(), 1);
+            assert_eq!(trt.associated_types[0].name, "Item");
+            assert_eq!(trt.methods.len(), 1);
+        } else {
+            panic!("Expected IrItem::Trait");
+        }
+        if let IrItem::TraitImpl(timpl) = &module.items[2] {
+            assert_eq!(timpl.trait_name, "Container");
+            assert_eq!(timpl.target_type, "IntBox");
+            assert_eq!(timpl.type_aliases.len(), 1);
+            assert_eq!(timpl.type_aliases[0].name, "Item");
+            assert_eq!(timpl.type_aliases[0].target, Type::I64);
+            assert_eq!(timpl.methods.len(), 1);
+        } else {
+            panic!("Expected IrItem::TraitImpl");
         }
     }
 
