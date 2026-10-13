@@ -418,6 +418,199 @@ pub fn bitwise_logic(a: u32, b: u32) -> u32 {
         })
     }
 
+    /// Run Contract System and Invariant Trap differential test
+    pub fn test_contracts(
+        &self,
+        out_dir: &Path,
+    ) -> Result<QualificationReport, Box<dyn std::error::Error>> {
+        let contract_source = r#"
+pub fn validate_step(x: i32, max: i32) -> i32 {
+    assert!(max > 0, "max must be positive");
+    assert!(x >= 0, "x must be non-negative");
+    assert!(x <= max, "x must not exceed max");
+    assert_eq!(x, x, "identity check");
+    if x == 999 {
+        panic!("explicit abort trigger");
+    }
+    x
+}
+"#;
+
+        let source_hash = Self::compute_sha256(contract_source);
+        let (rustc_ver, swift_ver) = Self::toolchain_versions();
+
+        // 1. Lower to IR
+        let mut frontend = Frontend::new("contracts.rs");
+        let module = frontend
+            .parse_and_lower(contract_source)
+            .map_err(|diags| format!("Frontend rejected Contract fixture: {:?}", diags))?;
+
+        // 2. Generate Swift package
+        let pkg_dir = out_dir.join("contract_pkg");
+        let mut generator = SwiftGenerator::new();
+        generator.emit_package(&module, &pkg_dir, "ContractModule")?;
+
+        // 3. Create Swift test runner
+        let runner_swift = r#"
+import Foundation
+
+@main
+struct ContractRunner {
+    static func main() {
+        let args = CommandLine.arguments
+        guard args.count >= 3,
+              let x = Int32(args[1]),
+              let max = Int32(args[2]) else {
+            exit(2)
+        }
+        let res = validate_step(x, max)
+        print("RESULT:\(res)")
+    }
+}
+"#;
+        let sources_dir = pkg_dir.join("Sources").join("ContractModule");
+        let main_swift_path = sources_dir.join("main.swift");
+        fs::write(&main_swift_path, runner_swift)?;
+
+        // 4. Compile Swift code
+        let swift_source = sources_dir.join("contracts.swift");
+        let swift_runner_bin = pkg_dir.join("contract_swift_runner");
+        let swiftc_out = Command::new("swiftc")
+            .arg("-parse-as-library")
+            .arg("-emit-executable")
+            .arg(&swift_source)
+            .arg(&main_swift_path)
+            .arg("-o")
+            .arg(&swift_runner_bin)
+            .output()?;
+
+        if !swiftc_out.status.success() {
+            return Err(format!(
+                "Failed to compile Swift Contract runner: {}",
+                String::from_utf8_lossy(&swiftc_out.stderr)
+            )
+            .into());
+        }
+
+        // 5. Compile Rust reference executable
+        let rust_runner_src = r#"
+fn validate_step(x: i32, max: i32) -> i32 {
+    assert!(max > 0, "max must be positive");
+    assert!(x >= 0, "x must be non-negative");
+    assert!(x <= max, "x must not exceed max");
+    assert_eq!(x, x, "identity check");
+    if x == 999 {
+        panic!("explicit abort trigger");
+    }
+    x
+}
+
+fn main() {
+    let args: Vec<String> = std::env::args().collect();
+    if args.len() < 3 {
+        std::process::exit(2);
+    }
+    let x: i32 = args[1].parse().unwrap();
+    let max: i32 = args[2].parse().unwrap();
+    let res = validate_step(x, max);
+    println!("RESULT:{}", res);
+}
+"#;
+        let rust_src_file = pkg_dir.join("contract_rust_runner.rs");
+        fs::write(&rust_src_file, rust_runner_src)?;
+        let rust_runner_bin = pkg_dir.join("contract_rust_runner");
+        let rustc_out = Command::new("rustc")
+            .arg(&rust_src_file)
+            .arg("-o")
+            .arg(&rust_runner_bin)
+            .output()?;
+
+        if !rustc_out.status.success() {
+            return Err(format!(
+                "Failed to compile Rust reference runner: {}",
+                String::from_utf8_lossy(&rustc_out.stderr)
+            )
+            .into());
+        }
+
+        // 6. Test vectors: positive cases (should succeed with matching outputs) and negative cases (should both trap/fail)
+        let test_cases = [
+            (0, 100, true),
+            (50, 100, true),
+            (100, 100, true),
+            (-1, 100, false),   // x < 0 violates precondition
+            (105, 100, false),  // x > max violates precondition
+            (999, 1000, false), // explicit panic! trigger
+            (10, -5, false),    // max <= 0 violates precondition
+        ];
+
+        let mut cases_passed = 0;
+        let mut details = Vec::new();
+
+        for &(x, max, should_pass) in &test_cases {
+            let r_out = Command::new(&rust_runner_bin)
+                .arg(x.to_string())
+                .arg(max.to_string())
+                .output()?;
+
+            let s_out = Command::new(&swift_runner_bin)
+                .arg(x.to_string())
+                .arg(max.to_string())
+                .output()?;
+
+            let r_success = r_out.status.success();
+            let s_success = s_out.status.success();
+
+            if should_pass {
+                let r_stdout = String::from_utf8_lossy(&r_out.stdout).trim().to_string();
+                let s_stdout = String::from_utf8_lossy(&s_out.stdout).trim().to_string();
+                if r_success && s_success && r_stdout == s_stdout {
+                    cases_passed += 1;
+                    details.push(format!("OK (Passed): ({}, {}) -> {}", x, max, r_stdout));
+                } else {
+                    details.push(format!(
+                        "FAIL (Expected success): ({}, {}) -> Rust=(success={}, out={}) Swift=(success={}, out={})",
+                        x, max, r_success, r_stdout, s_success, s_stdout
+                    ));
+                }
+            } else {
+                // Both MUST trap / fail with non-zero exit status
+                if !r_success && !s_success {
+                    cases_passed += 1;
+                    details.push(format!(
+                        "OK (Trap matched): ({}, {}) -> Rust trapped (code {:?}), Swift trapped (code {:?})",
+                        x, max, r_out.status.code(), s_out.status.code()
+                    ));
+                } else {
+                    details.push(format!(
+                        "FAIL (Expected trap): ({}, {}) -> Rust trapped={}, Swift trapped={}",
+                        x, max, !r_success, !s_success
+                    ));
+                }
+            }
+        }
+
+        let total = test_cases.len();
+        let status = if cases_passed == total {
+            "PASSED"
+        } else {
+            "FAILED"
+        };
+
+        Ok(QualificationReport {
+            fixture_name: "contract_assertions_and_traps".into(),
+            source_hash,
+            rustc_version: rustc_ver,
+            swift_version: swift_ver,
+            cases_tested: total,
+            cases_passed,
+            cases_failed: total - cases_passed,
+            status: status.into(),
+            timestamp: "2026-10-13T20:00:00Z".into(),
+            details,
+        })
+    }
+
     /// Run negative rejection tests asserting exact stable diagnostic codes
     pub fn test_negative_rejections(
         &self,
@@ -545,5 +738,18 @@ mod tests {
         for r in reports {
             assert_eq!(r.status, "REJECTED_AS_EXPECTED");
         }
+    }
+
+    #[test]
+    fn test_contract_system_differential_passes() {
+        let runner = DifferentialRunner::new(".");
+        let temp_dir = std::env::temp_dir().join("contract_diff_test");
+        let _ = fs::create_dir_all(&temp_dir);
+        let report = runner
+            .test_contracts(&temp_dir)
+            .expect("Contract differential test should pass");
+        assert_eq!(report.status, "PASSED");
+        assert_eq!(report.cases_passed, 7);
+        assert_eq!(report.cases_failed, 0);
     }
 }

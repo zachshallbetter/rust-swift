@@ -472,12 +472,9 @@ impl Frontend {
                     );
                 }
                 syn::Stmt::Macro(m) => {
-                    self.reject(
-                        DiagnosticCode::MacroRejected,
-                        "Macros inside statements are rejected in v0.1",
-                        m,
-                        None,
-                    );
+                    if let Some(stmt) = self.lower_macro_stmt(&m.mac) {
+                        stmts.push(stmt);
+                    }
                 }
             }
         }
@@ -842,12 +839,165 @@ impl Frontend {
                 );
                 Expr::new(ExprKind::Literal(Literal::Unit), Type::Unit)
             }
+            syn::Expr::Macro(m) => self.lower_macro_expr(&m.mac),
             other => {
                 self.reject(
                     DiagnosticCode::UnsupportedTypeRejected,
                     "Unsupported expression in v0.1",
                     other,
                     None,
+                );
+                Expr::new(ExprKind::Literal(Literal::Unit), Type::Unit)
+            }
+        }
+    }
+
+    fn extract_macro_str_literal(expr: &syn::Expr) -> Option<String> {
+        if let syn::Expr::Lit(syn::ExprLit {
+            lit: syn::Lit::Str(s),
+            ..
+        }) = expr
+        {
+            Some(s.value())
+        } else {
+            None
+        }
+    }
+
+    fn lower_macro_stmt(&mut self, mac: &syn::Macro) -> Option<Stmt> {
+        use syn::parse::Parser;
+        use syn::punctuated::Punctuated;
+        use syn::Token;
+
+        let macro_name = mac
+            .path
+            .segments
+            .last()
+            .map(|s| s.ident.to_string())
+            .unwrap_or_default();
+
+        match macro_name.as_str() {
+            "assert" => {
+                let parser = Punctuated::<syn::Expr, Token![,]>::parse_terminated;
+                match parser.parse2(mac.tokens.clone()) {
+                    Ok(args) if !args.is_empty() => {
+                        let condition = self.lower_expr(&args[0]);
+                        let message = if args.len() > 1 {
+                            Self::extract_macro_str_literal(&args[1])
+                        } else {
+                            None
+                        };
+                        Some(Stmt::Assert { condition, message })
+                    }
+                    _ => {
+                        self.reject(
+                            DiagnosticCode::SyntaxError,
+                            "Invalid arguments to assert! macro",
+                            mac,
+                            Some("assert!(condition, [message])"),
+                        );
+                        None
+                    }
+                }
+            }
+            "debug_assert" => {
+                let parser = Punctuated::<syn::Expr, Token![,]>::parse_terminated;
+                match parser.parse2(mac.tokens.clone()) {
+                    Ok(args) if !args.is_empty() => {
+                        let condition = self.lower_expr(&args[0]);
+                        let message = if args.len() > 1 {
+                            Self::extract_macro_str_literal(&args[1])
+                        } else {
+                            None
+                        };
+                        Some(Stmt::DebugAssert { condition, message })
+                    }
+                    _ => {
+                        self.reject(
+                            DiagnosticCode::SyntaxError,
+                            "Invalid arguments to debug_assert! macro",
+                            mac,
+                            Some("debug_assert!(condition, [message])"),
+                        );
+                        None
+                    }
+                }
+            }
+            "assert_eq" => {
+                let parser = Punctuated::<syn::Expr, Token![,]>::parse_terminated;
+                match parser.parse2(mac.tokens.clone()) {
+                    Ok(args) if args.len() >= 2 => {
+                        let left = self.lower_expr(&args[0]);
+                        let right = self.lower_expr(&args[1]);
+                        let message = if args.len() > 2 {
+                            Self::extract_macro_str_literal(&args[2])
+                        } else {
+                            None
+                        };
+                        Some(Stmt::AssertEq {
+                            left,
+                            right,
+                            message,
+                        })
+                    }
+                    _ => {
+                        self.reject(
+                            DiagnosticCode::SyntaxError,
+                            "assert_eq! expects at least two arguments",
+                            mac,
+                            Some("assert_eq!(left, right, [message])"),
+                        );
+                        None
+                    }
+                }
+            }
+            "panic" => {
+                let parser = Punctuated::<syn::Expr, Token![,]>::parse_terminated;
+                let message = match parser.parse2(mac.tokens.clone()) {
+                    Ok(args) if !args.is_empty() => Self::extract_macro_str_literal(&args[0]),
+                    _ => None,
+                };
+                Some(Stmt::Panic { message })
+            }
+            _ => {
+                self.reject(
+                    DiagnosticCode::MacroRejected,
+                    format!("Macro '{macro_name}!' is rejected in v0.1"),
+                    mac,
+                    Some("Only assert!, debug_assert!, assert_eq!, and panic! are admitted"),
+                );
+                None
+            }
+        }
+    }
+
+    fn lower_macro_expr(&mut self, mac: &syn::Macro) -> Expr {
+        use syn::parse::Parser;
+        use syn::punctuated::Punctuated;
+        use syn::Token;
+
+        let macro_name = mac
+            .path
+            .segments
+            .last()
+            .map(|s| s.ident.to_string())
+            .unwrap_or_default();
+
+        match macro_name.as_str() {
+            "panic" => {
+                let parser = Punctuated::<syn::Expr, Token![,]>::parse_terminated;
+                let message = match parser.parse2(mac.tokens.clone()) {
+                    Ok(args) if !args.is_empty() => Self::extract_macro_str_literal(&args[0]),
+                    _ => None,
+                };
+                Expr::new(ExprKind::Panic(message), Type::Unit)
+            }
+            _ => {
+                self.reject(
+                    DiagnosticCode::MacroRejected,
+                    format!("Macro '{macro_name}!' in expression position is rejected in v0.1"),
+                    mac,
+                    Some("Only panic! is admitted in expression position"),
                 );
                 Expr::new(ExprKind::Literal(Literal::Unit), Type::Unit)
             }
@@ -1031,5 +1181,50 @@ mod tests {
             .parse_and_lower(src)
             .expect_err("Should reject async");
         assert!(errs.iter().any(|d| d.code == DiagnosticCode::AsyncRejected));
+    }
+
+    #[test]
+    fn test_admitted_contract_macros_lower() {
+        let src = r#"
+            pub fn checked_step(x: i32) -> i32 {
+                assert!(x > 0);
+                debug_assert!(x < 100, "within range");
+                assert_eq!(x, 42, "magic value");
+                if x == 99 {
+                    panic!("illegal boundary");
+                }
+                x
+            }
+        "#;
+        let mut frontend = Frontend::new("contract.rs");
+        let module = frontend
+            .parse_and_lower(src)
+            .expect("Should parse contract macros");
+        assert_eq!(module.items.len(), 1);
+        if let IrItem::Function(func) = &module.items[0] {
+            if let ExprKind::Block { stmts, .. } = &func.body.kind {
+                assert!(stmts.iter().any(|s| matches!(s, Stmt::Assert { .. })));
+                assert!(stmts.iter().any(|s| matches!(s, Stmt::DebugAssert { .. })));
+                assert!(stmts.iter().any(|s| matches!(s, Stmt::AssertEq { .. })));
+            } else {
+                panic!("Expected block body");
+            }
+        } else {
+            panic!("Expected function");
+        }
+    }
+
+    #[test]
+    fn test_unadmitted_macro_rejected() {
+        let src = r#"
+            pub fn log() {
+                println!("unsupported macro in v0.1");
+            }
+        "#;
+        let mut frontend = Frontend::new("macro_reject.rs");
+        let errs = frontend
+            .parse_and_lower(src)
+            .expect_err("Should reject println!");
+        assert!(errs.iter().any(|d| d.code == DiagnosticCode::MacroRejected));
     }
 }

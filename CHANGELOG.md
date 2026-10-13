@@ -5,6 +5,20 @@ All notable changes to the Rust to Swift Compiler will be documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Contract System & Runtime Invariants (`WI-CONTRACT-001`)**:
+  - Support for `assert!`, `debug_assert!`, `assert_eq!`, and `panic!` in `rust-swift-frontend`.
+  - Semantic IR representation with `Stmt::Assert`, `Stmt::DebugAssert`, `Stmt::AssertEq`, `Stmt::Panic`, and `ExprKind::Panic`.
+  - Swift codegen lowering:
+    - `assert!(cond, msg)` lowered to Swift `precondition(cond, msg)`.
+    - `debug_assert!(cond, msg)` lowered to Swift `assert(cond, msg)`.
+    - `assert_eq!(a, b, msg)` lowered to Swift `precondition(a == b, msg)`.
+    - `panic!(msg)` lowered to Swift `fatalError(msg)`.
+  - Formal contract execution specification in `contracts/contract-execution.yaml`.
+  - Differential qualification suite verifying positive assertions and identical process trap behavior on invariant failure across `rustc` and `swiftc` binaries.
+
 ## [0.1.0] - 2026-10-13
 
 ### Added
