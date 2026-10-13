@@ -66,7 +66,10 @@ impl DifferentialRunner {
     }
 
     /// Run the Finite State Machine differential test
-    pub fn test_fsm(&self, out_dir: &Path) -> Result<QualificationReport, Box<dyn std::error::Error>> {
+    pub fn test_fsm(
+        &self,
+        out_dir: &Path,
+    ) -> Result<QualificationReport, Box<dyn std::error::Error>> {
         let fsm_source = r#"
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum State {
@@ -101,9 +104,9 @@ pub fn transition(state: State, event: Event) -> State {
 
         // 1. Lower to IR
         let mut frontend = Frontend::new("fsm.rs");
-        let module = frontend.parse_and_lower(fsm_source).map_err(|diags| {
-            format!("Frontend rejected FSM fixture: {:?}", diags)
-        })?;
+        let module = frontend
+            .parse_and_lower(fsm_source)
+            .map_err(|diags| format!("Frontend rejected FSM fixture: {:?}", diags))?;
 
         // 2. Generate Swift package
         let pkg_dir = out_dir.join("fsm_pkg");
@@ -181,8 +184,18 @@ struct FsmRunner {
             }
         }
 
-        let rust_states = [RustState::Idle, RustState::Active, RustState::Paused, RustState::Stopped];
-        let rust_events = [RustEvent::Start, RustEvent::Pause, RustEvent::Resume, RustEvent::Stop];
+        let rust_states = [
+            RustState::Idle,
+            RustState::Active,
+            RustState::Paused,
+            RustState::Stopped,
+        ];
+        let rust_events = [
+            RustEvent::Start,
+            RustEvent::Pause,
+            RustEvent::Resume,
+            RustEvent::Stop,
+        ];
         let mut rust_lines = Vec::new();
         for s in rust_states {
             for e in rust_events {
@@ -191,7 +204,11 @@ struct FsmRunner {
             }
         }
 
-        let swift_lines: Vec<&str> = swift_results.lines().map(|l| l.trim()).filter(|l| !l.is_empty()).collect();
+        let swift_lines: Vec<&str> = swift_results
+            .lines()
+            .map(|l| l.trim())
+            .filter(|l| !l.is_empty())
+            .collect();
         assert_eq!(rust_lines.len(), 16);
         assert_eq!(swift_lines.len(), 16);
 
@@ -206,7 +223,11 @@ struct FsmRunner {
             }
         }
 
-        let status = if cases_passed == 16 { "PASSED" } else { "FAILED" };
+        let status = if cases_passed == 16 {
+            "PASSED"
+        } else {
+            "FAILED"
+        };
 
         Ok(QualificationReport {
             fixture_name: "finite_state_machine".into(),
@@ -223,7 +244,10 @@ struct FsmRunner {
     }
 
     /// Run the Wrapping Arithmetic differential test
-    pub fn test_wrapping_arithmetic(&self, out_dir: &Path) -> Result<QualificationReport, Box<dyn std::error::Error>> {
+    pub fn test_wrapping_arithmetic(
+        &self,
+        out_dir: &Path,
+    ) -> Result<QualificationReport, Box<dyn std::error::Error>> {
         let arith_source = r#"
 pub fn add_wrapping(a: i32, b: i32) -> i32 {
     a.wrapping_add(b)
@@ -246,9 +270,9 @@ pub fn bitwise_logic(a: u32, b: u32) -> u32 {
         let (rustc_ver, swift_ver) = Self::toolchain_versions();
 
         let mut frontend = Frontend::new("arith.rs");
-        let module = frontend.parse_and_lower(arith_source).map_err(|diags| {
-            format!("Frontend rejected Arithmetic fixture: {:?}", diags)
-        })?;
+        let module = frontend
+            .parse_and_lower(arith_source)
+            .map_err(|diags| format!("Frontend rejected Arithmetic fixture: {:?}", diags))?;
 
         let pkg_dir = out_dir.join("arith_pkg");
         let mut generator = SwiftGenerator::new();
@@ -270,7 +294,9 @@ pub fn bitwise_logic(a: u32, b: u32) -> u32 {
         ];
 
         let mut runner_swift = String::new();
-        runner_swift.push_str("import Foundation\n\n@main\nstruct ArithRunner {\n    static func main() {\n");
+        runner_swift.push_str(
+            "import Foundation\n\n@main\nstruct ArithRunner {\n    static func main() {\n",
+        );
         for (i, (a, b)) in vectors.iter().enumerate() {
             runner_swift.push_str(&format!(
                 "        print(\"add_{}: \\(add_wrapping({}, {}))\")\n",
@@ -321,7 +347,10 @@ pub fn bitwise_logic(a: u32, b: u32) -> u32 {
             .filter_map(|l| {
                 let parts: Vec<&str> = l.split(": ").collect();
                 if parts.len() == 2 {
-                    Some((parts[0].trim().to_string(), parts[1].trim().parse::<i32>().unwrap()))
+                    Some((
+                        parts[0].trim().to_string(),
+                        parts[1].trim().parse::<i32>().unwrap(),
+                    ))
                 } else {
                     None
                 }
@@ -336,7 +365,10 @@ pub fn bitwise_logic(a: u32, b: u32) -> u32 {
             if r_add == s_add {
                 cases_passed += 1;
             } else {
-                details.push(format!("FAIL add({}, {}): Rust={} vs Swift={}", a, b, r_add, s_add));
+                details.push(format!(
+                    "FAIL add({}, {}): Rust={} vs Swift={}",
+                    a, b, r_add, s_add
+                ));
             }
 
             // Test sub
@@ -346,7 +378,10 @@ pub fn bitwise_logic(a: u32, b: u32) -> u32 {
             if r_sub == s_sub {
                 cases_passed += 1;
             } else {
-                details.push(format!("FAIL sub({}, {}): Rust={} vs Swift={}", a, b, r_sub, s_sub));
+                details.push(format!(
+                    "FAIL sub({}, {}): Rust={} vs Swift={}",
+                    a, b, r_sub, s_sub
+                ));
             }
 
             // Test mul
@@ -356,11 +391,18 @@ pub fn bitwise_logic(a: u32, b: u32) -> u32 {
             if r_mul == s_mul {
                 cases_passed += 1;
             } else {
-                details.push(format!("FAIL mul({}, {}): Rust={} vs Swift={}", a, b, r_mul, s_mul));
+                details.push(format!(
+                    "FAIL mul({}, {}): Rust={} vs Swift={}",
+                    a, b, r_mul, s_mul
+                ));
             }
         }
 
-        let status = if cases_passed == cases_tested { "PASSED" } else { "FAILED" };
+        let status = if cases_passed == cases_tested {
+            "PASSED"
+        } else {
+            "FAILED"
+        };
 
         Ok(QualificationReport {
             fixture_name: "wrapping_arithmetic".into(),
@@ -377,7 +419,9 @@ pub fn bitwise_logic(a: u32, b: u32) -> u32 {
     }
 
     /// Run negative rejection tests asserting exact stable diagnostic codes
-    pub fn test_negative_rejections(&self) -> Result<Vec<QualificationReport>, Box<dyn std::error::Error>> {
+    pub fn test_negative_rejections(
+        &self,
+    ) -> Result<Vec<QualificationReport>, Box<dyn std::error::Error>> {
         let (rustc_ver, swift_ver) = Self::toolchain_versions();
         let mut reports = Vec::new();
 
@@ -385,7 +429,11 @@ pub fn bitwise_logic(a: u32, b: u32) -> u32 {
         let unsafe_src = "pub fn foo() -> i32 { unsafe { 10 } }";
         let mut f1 = Frontend::new("unsafe.rs");
         let res1 = f1.parse_and_lower(unsafe_src);
-        let p1 = res1.is_err() && res1.unwrap_err().iter().any(|d| d.code == DiagnosticCode::UnsafeRejected);
+        let p1 = res1.is_err()
+            && res1
+                .unwrap_err()
+                .iter()
+                .any(|d| d.code == DiagnosticCode::UnsafeRejected);
         reports.push(QualificationReport {
             fixture_name: "rejected_unsafe".into(),
             source_hash: Self::compute_sha256(unsafe_src),
@@ -394,7 +442,11 @@ pub fn bitwise_logic(a: u32, b: u32) -> u32 {
             cases_tested: 1,
             cases_passed: if p1 { 1 } else { 0 },
             cases_failed: if p1 { 0 } else { 1 },
-            status: if p1 { "REJECTED_AS_EXPECTED".into() } else { "FAILED".into() },
+            status: if p1 {
+                "REJECTED_AS_EXPECTED".into()
+            } else {
+                "FAILED".into()
+            },
             timestamp: "2026-10-13T20:00:00Z".into(),
             details: vec!["Verified E0001_UNSAFE_REJECTED emitted".into()],
         });
@@ -403,7 +455,11 @@ pub fn bitwise_logic(a: u32, b: u32) -> u32 {
         let async_src = "pub async fn bar() -> i32 { 10 }";
         let mut f2 = Frontend::new("async.rs");
         let res2 = f2.parse_and_lower(async_src);
-        let p2 = res2.is_err() && res2.unwrap_err().iter().any(|d| d.code == DiagnosticCode::AsyncRejected);
+        let p2 = res2.is_err()
+            && res2
+                .unwrap_err()
+                .iter()
+                .any(|d| d.code == DiagnosticCode::AsyncRejected);
         reports.push(QualificationReport {
             fixture_name: "rejected_async".into(),
             source_hash: Self::compute_sha256(async_src),
@@ -412,7 +468,11 @@ pub fn bitwise_logic(a: u32, b: u32) -> u32 {
             cases_tested: 1,
             cases_passed: if p2 { 1 } else { 0 },
             cases_failed: if p2 { 0 } else { 1 },
-            status: if p2 { "REJECTED_AS_EXPECTED".into() } else { "FAILED".into() },
+            status: if p2 {
+                "REJECTED_AS_EXPECTED".into()
+            } else {
+                "FAILED".into()
+            },
             timestamp: "2026-10-13T20:00:00Z".into(),
             details: vec!["Verified E0002_ASYNC_REJECTED emitted".into()],
         });
@@ -421,7 +481,11 @@ pub fn bitwise_logic(a: u32, b: u32) -> u32 {
         let ptr_src = "pub fn deref(p: *const i32) -> i32 { 0 }";
         let mut f3 = Frontend::new("raw_ptr.rs");
         let res3 = f3.parse_and_lower(ptr_src);
-        let p3 = res3.is_err() && res3.unwrap_err().iter().any(|d| d.code == DiagnosticCode::RawPointerRejected);
+        let p3 = res3.is_err()
+            && res3
+                .unwrap_err()
+                .iter()
+                .any(|d| d.code == DiagnosticCode::RawPointerRejected);
         reports.push(QualificationReport {
             fixture_name: "rejected_raw_pointers".into(),
             source_hash: Self::compute_sha256(ptr_src),
@@ -430,7 +494,11 @@ pub fn bitwise_logic(a: u32, b: u32) -> u32 {
             cases_tested: 1,
             cases_passed: if p3 { 1 } else { 0 },
             cases_failed: if p3 { 0 } else { 1 },
-            status: if p3 { "REJECTED_AS_EXPECTED".into() } else { "FAILED".into() },
+            status: if p3 {
+                "REJECTED_AS_EXPECTED".into()
+            } else {
+                "FAILED".into()
+            },
             timestamp: "2026-10-13T20:00:00Z".into(),
             details: vec!["Verified E0003_RAW_POINTER_REJECTED emitted".into()],
         });
@@ -448,7 +516,9 @@ mod tests {
         let runner = DifferentialRunner::new(".");
         let temp_dir = std::env::temp_dir().join("fsm_diff_test");
         let _ = fs::create_dir_all(&temp_dir);
-        let report = runner.test_fsm(&temp_dir).expect("FSM differential test should pass");
+        let report = runner
+            .test_fsm(&temp_dir)
+            .expect("FSM differential test should pass");
         assert_eq!(report.status, "PASSED");
         assert_eq!(report.cases_passed, 16);
         assert_eq!(report.cases_failed, 0);
@@ -459,7 +529,9 @@ mod tests {
         let runner = DifferentialRunner::new(".");
         let temp_dir = std::env::temp_dir().join("arith_diff_test");
         let _ = fs::create_dir_all(&temp_dir);
-        let report = runner.test_wrapping_arithmetic(&temp_dir).expect("Arithmetic differential test should pass");
+        let report = runner
+            .test_wrapping_arithmetic(&temp_dir)
+            .expect("Arithmetic differential test should pass");
         assert_eq!(report.status, "PASSED");
         assert_eq!(report.cases_failed, 0);
     }
@@ -467,7 +539,9 @@ mod tests {
     #[test]
     fn test_negative_diagnostics_pass() {
         let runner = DifferentialRunner::new(".");
-        let reports = runner.test_negative_rejections().expect("Negative rejections should pass");
+        let reports = runner
+            .test_negative_rejections()
+            .expect("Negative rejections should pass");
         for r in reports {
             assert_eq!(r.status, "REJECTED_AS_EXPECTED");
         }
