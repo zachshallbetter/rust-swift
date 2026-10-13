@@ -6,20 +6,28 @@
   "selectedPaths": [],
   "sourceSelection": {
     "includedCount": 106,
-    "includedBytes": 596811,
+    "includedBytes": 596839,
     "excludedCounts": {
-      "excluded-directory": 6632,
+      "excluded-directory": 7727,
       "excluded-path": 1,
       "extension": 1319,
       "symlink": 1
     }
   },
   "repositoryState": {
-    "available": false,
+    "available": true,
     "validationRole": "provenance",
-    "repositories": []
+    "repositories": [
+      {
+        "path": ".",
+        "commit": "f3faa144eb30d30f3c7e8b87898c42d28c17026b",
+        "branch": "main",
+        "dirty": true,
+        "remote": "https://github.com/zachshallbetter/rust-swift.git"
+      }
+    ]
   },
-  "aggregateSourceDigest": "3e6be992252021b08bb44da9d0ceda1e5b5698a05eb713114e5c219aea5245a1",
+  "aggregateSourceDigest": "50068f6c7863ee5639a8631645d442787226d7b594b3cb7453da2f6d0aba1fcc",
   "sources": [
     {
       "path": ".agents/rules/ci.md",
@@ -88,13 +96,13 @@
     },
     {
       "path": "Cargo.toml",
-      "bytes": 824,
-      "sha256": "24a640f203f69c3d9863eab45785084f06117cf0431d455544ec9058cac5065c"
+      "bytes": 861,
+      "sha256": "ed1fe6284195972e9d800530e79eeb50fc4dd70dbe64dabad2069f86a8e108cb"
     },
     {
       "path": "FORMAL_RESOURCE_MANIFEST.json",
-      "bytes": 1324,
-      "sha256": "0f4d92e01e3f24dd00d655231f44c08564db9161ecd2668a18d53ba0eaab2013"
+      "bytes": 1315,
+      "sha256": "2e4100402309d2bd379d35fbdd5835f1e618036aad8fa7eeb573ff3e3e634330"
     },
     {
       "path": "NEW_AGENT_PROMPT.md",

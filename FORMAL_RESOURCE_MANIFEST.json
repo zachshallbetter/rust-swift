@@ -27,11 +27,11 @@
       "required": true,
       "version": "0.1.0",
       "revisionOrDigest": "rr-csg-0.1",
-      "canonicalSource": "../reflective-rust/crates/reflective-rust-csg",
-      "mountOrAddress": "../reflective-rust/crates/reflective-rust-csg",
+      "canonicalSource": "https://github.com/zachshallbetter/reflective-rust",
+      "mountOrAddress": "https://github.com/zachshallbetter/reflective-rust",
       "authorityRole": "compiler-semantic-graph-exchange",
       "inventory": [
-        "../reflective-rust/crates/reflective-rust-csg/src/lib.rs"
+        "crates/reflective-rust-csg/src/lib.rs"
       ]
     }
   ],
