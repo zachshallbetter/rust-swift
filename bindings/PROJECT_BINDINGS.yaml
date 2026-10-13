@@ -1,0 +1,78 @@
+project:
+  id: "rust-swift"
+  name: "Rust to Swift Compiler"
+
+concept_bindings:
+  - local: "protected effect"
+    source: "acp-gateway"
+    imported: "protected action"
+    relation: "constrained"
+    authority: "docs/AUTHORITY_MODEL.md"
+    compatibility_effect: "none"
+    notes: "Projected through contracts/acp-protected-effects.yaml. ACP action names are the wire vocabulary; effect classes remain the project's."
+  - local: "authorization decision"
+    source: "acp-gateway"
+    imported: "decision (A0-A7)"
+    relation: "exact"
+    authority: "schemas/acp-decision.schema.json"
+    compatibility_effect: "authority-change"
+    notes: "ACP is the authorizing instrument for governed effects. Evidence, reports and claims observe; they do not authorize."
+  - local: "work graph"
+    source: "github-projects-v2"
+    imported: "ProjectsV2 board"
+    relation: "equivalent"
+    authority: "docs/WORK_GRAPH.md"
+    compatibility_effect: "none"
+    notes: "Read through acp-gateway /internal/project-context; written through the worker's own scoped credentials."
+  - local: "<LOCAL_CONCEPT>"
+    source: "<SOURCE_ID>"
+    imported: "<SOURCE_CONCEPT>"
+    relation: "exact|equivalent|constrained|extended|analogue|conflicting|unmapped"
+    authority: "<CANONICAL_SOURCE>"
+    compatibility_effect: "none|semantic-change|authority-change|evidence-change|unknown"
+    notes: ""
+
+authority_bindings:
+  - effect: "git.protected_ref.update"
+    holder: "acp-gateway:decision"
+    scope: "repository declared in .agents/board.env and the ACP policy"
+    expires: null
+  - effect: "production.deploy"
+    holder: "acp-gateway:decision"
+    scope: "environments declared in PROJECT_PROFILE.json serviceOperations"
+    expires: null
+  - effect: "git.history.rewrite|git.default_branch.change|repository.transfer"
+    holder: "acp-gateway:recovery-authorization"
+    scope: "one exact ref/SHA transition per grant"
+    expires: "per grant"
+  - effect: "policy.modify|credential.modify"
+    holder: "acp-gateway:administrative-credential"
+    scope: "ACP itself; never held by a worker"
+    expires: null
+  - effect: "deviation"
+    holder: "<ACTOR_OR_ROLE>"
+    scope: "records/deviations.jsonl; registered with ACP where it overrides a decision"
+    expires: null
+  - effect: "<PROTECTED_EFFECT>"
+    holder: "<ACTOR_OR_ROLE>"
+    scope: "<SCOPE>"
+    expires: null
+
+provider_bindings:
+  work_graph: "github-projects-v2"
+  repository: "github"
+  dispatch: "<SYSTEM>"
+  verification: "<SYSTEM>"
+  protection: "acp-gateway"
+  authorization: "acp-gateway"
+  telemetry: "acp-gateway"
+
+acp:
+  gateway_url_env: "ACP_GATEWAY_URL"
+  gateway_token_env: "ACP_GATEWAY_TOKEN"
+  board_env_file: ".agents/board.env"
+  integration: "docs/ACP_INTEGRATION.md"
+  action_map: "contracts/acp-protected-effects.yaml"
+  fail_closed: true
+
+deviations: []

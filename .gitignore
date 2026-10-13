@@ -1,0 +1,15 @@
+
+# formal-project-bootstrap: secrets stay out; AGENTS.md and the .agents/ tree stay in
+.env
+.env.local
+.agents/llms.txt
+.agents/llms-full.txt
+__pycache__/
+!.agents/
+!**/.agents/
+!AGENTS.md
+target/
+.build/
+**/.build/
+.DS_Store
+**/.DS_Store

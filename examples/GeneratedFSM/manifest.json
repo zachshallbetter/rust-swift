@@ -1,0 +1,39 @@
+{
+  "package_name": "fsm_example",
+  "swift_tools_version": "5.9",
+  "generated_files": [
+    "Sources/fsm_example/fsm_example.swift",
+    "Sources/fsm_example/RustCompat.swift",
+    "Package.swift"
+  ],
+  "symbols": [
+    {
+      "rust_name": "PlayerState",
+      "swift_name": "PlayerState",
+      "kind": "enum",
+      "rust_file": "examples/fsm_example.rs",
+      "rust_line": 3
+    },
+    {
+      "rust_name": "PlayerAction",
+      "swift_name": "PlayerAction",
+      "kind": "enum",
+      "rust_file": "examples/fsm_example.rs",
+      "rust_line": 11
+    },
+    {
+      "rust_name": "update_player",
+      "swift_name": "update_player",
+      "kind": "function",
+      "rust_file": "examples/fsm_example.rs",
+      "rust_line": 19
+    },
+    {
+      "rust_name": "calculate_score",
+      "swift_name": "calculate_score",
+      "kind": "function",
+      "rust_file": "examples/fsm_example.rs",
+      "rust_line": 32
+    }
+  ]
+}

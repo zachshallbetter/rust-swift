@@ -1,0 +1,385 @@
+{
+  "name": "fsm_example",
+  "items": [
+    {
+      "enum": {
+        "name": "PlayerState",
+        "variants": [
+          "Standing",
+          "Running",
+          "Jumping",
+          "Falling"
+        ],
+        "is_public": true,
+        "span": {
+          "file": "examples/fsm_example.rs",
+          "start_line": 3,
+          "end_line": 9
+        }
+      }
+    },
+    {
+      "enum": {
+        "name": "PlayerAction",
+        "variants": [
+          "Move",
+          "Jump",
+          "Land",
+          "Stop"
+        ],
+        "is_public": true,
+        "span": {
+          "file": "examples/fsm_example.rs",
+          "start_line": 11,
+          "end_line": 17
+        }
+      }
+    },
+    {
+      "function": {
+        "name": "update_player",
+        "params": [
+          {
+            "name": "state",
+            "ty": {
+              "named": "PlayerState"
+            },
+            "mutable": false
+          },
+          {
+            "name": "action",
+            "ty": {
+              "named": "PlayerAction"
+            },
+            "mutable": false
+          }
+        ],
+        "return_type": {
+          "named": "PlayerState"
+        },
+        "body": {
+          "kind": {
+            "block": {
+              "stmts": [],
+              "expr": {
+                "kind": {
+                  "match": {
+                    "expr": {
+                      "kind": {
+                        "tuple": [
+                          {
+                            "kind": {
+                              "variable": "state"
+                            },
+                            "ty": "unit"
+                          },
+                          {
+                            "kind": {
+                              "variable": "action"
+                            },
+                            "ty": "unit"
+                          }
+                        ]
+                      },
+                      "ty": "unit"
+                    },
+                    "arms": [
+                      {
+                        "pattern": {
+                          "tuple": [
+                            {
+                              "enum-variant": {
+                                "enum_name": "PlayerState",
+                                "variant": "Standing"
+                              }
+                            },
+                            {
+                              "enum-variant": {
+                                "enum_name": "PlayerAction",
+                                "variant": "Move"
+                              }
+                            }
+                          ]
+                        },
+                        "guard": null,
+                        "body": {
+                          "kind": {
+                            "variable": "PlayerState.Running"
+                          },
+                          "ty": "unit"
+                        }
+                      },
+                      {
+                        "pattern": {
+                          "tuple": [
+                            {
+                              "enum-variant": {
+                                "enum_name": "PlayerState",
+                                "variant": "Running"
+                              }
+                            },
+                            {
+                              "enum-variant": {
+                                "enum_name": "PlayerAction",
+                                "variant": "Stop"
+                              }
+                            }
+                          ]
+                        },
+                        "guard": null,
+                        "body": {
+                          "kind": {
+                            "variable": "PlayerState.Standing"
+                          },
+                          "ty": "unit"
+                        }
+                      },
+                      {
+                        "pattern": {
+                          "tuple": [
+                            {
+                              "enum-variant": {
+                                "enum_name": "PlayerState",
+                                "variant": "Standing"
+                              }
+                            },
+                            {
+                              "enum-variant": {
+                                "enum_name": "PlayerAction",
+                                "variant": "Jump"
+                              }
+                            }
+                          ]
+                        },
+                        "guard": null,
+                        "body": {
+                          "kind": {
+                            "variable": "PlayerState.Jumping"
+                          },
+                          "ty": "unit"
+                        }
+                      },
+                      {
+                        "pattern": {
+                          "tuple": [
+                            {
+                              "enum-variant": {
+                                "enum_name": "PlayerState",
+                                "variant": "Running"
+                              }
+                            },
+                            {
+                              "enum-variant": {
+                                "enum_name": "PlayerAction",
+                                "variant": "Jump"
+                              }
+                            }
+                          ]
+                        },
+                        "guard": null,
+                        "body": {
+                          "kind": {
+                            "variable": "PlayerState.Jumping"
+                          },
+                          "ty": "unit"
+                        }
+                      },
+                      {
+                        "pattern": {
+                          "tuple": [
+                            {
+                              "enum-variant": {
+                                "enum_name": "PlayerState",
+                                "variant": "Jumping"
+                              }
+                            },
+                            {
+                              "enum-variant": {
+                                "enum_name": "PlayerAction",
+                                "variant": "Land"
+                              }
+                            }
+                          ]
+                        },
+                        "guard": null,
+                        "body": {
+                          "kind": {
+                            "variable": "PlayerState.Standing"
+                          },
+                          "ty": "unit"
+                        }
+                      },
+                      {
+                        "pattern": {
+                          "tuple": [
+                            {
+                              "enum-variant": {
+                                "enum_name": "PlayerState",
+                                "variant": "Jumping"
+                              }
+                            },
+                            {
+                              "enum-variant": {
+                                "enum_name": "PlayerAction",
+                                "variant": "Stop"
+                              }
+                            }
+                          ]
+                        },
+                        "guard": null,
+                        "body": {
+                          "kind": {
+                            "variable": "PlayerState.Falling"
+                          },
+                          "ty": "unit"
+                        }
+                      },
+                      {
+                        "pattern": {
+                          "tuple": [
+                            {
+                              "enum-variant": {
+                                "enum_name": "PlayerState",
+                                "variant": "Falling"
+                              }
+                            },
+                            {
+                              "enum-variant": {
+                                "enum_name": "PlayerAction",
+                                "variant": "Land"
+                              }
+                            }
+                          ]
+                        },
+                        "guard": null,
+                        "body": {
+                          "kind": {
+                            "variable": "PlayerState.Standing"
+                          },
+                          "ty": "unit"
+                        }
+                      },
+                      {
+                        "pattern": "wildcard",
+                        "guard": null,
+                        "body": {
+                          "kind": {
+                            "variable": "state"
+                          },
+                          "ty": "unit"
+                        }
+                      }
+                    ]
+                  }
+                },
+                "ty": "unit"
+              }
+            }
+          },
+          "ty": "unit"
+        },
+        "is_public": true,
+        "span": {
+          "file": "examples/fsm_example.rs",
+          "start_line": 19,
+          "end_line": 30
+        }
+      }
+    },
+    {
+      "function": {
+        "name": "calculate_score",
+        "params": [
+          {
+            "name": "base",
+            "ty": "i32",
+            "mutable": false
+          },
+          {
+            "name": "multiplier",
+            "ty": "i32",
+            "mutable": false
+          },
+          {
+            "name": "bonus",
+            "ty": "i32",
+            "mutable": false
+          }
+        ],
+        "return_type": "i32",
+        "body": {
+          "kind": {
+            "block": {
+              "stmts": [
+                {
+                  "let": {
+                    "name": "subtotal",
+                    "mutable": false,
+                    "ty": null,
+                    "init": {
+                      "kind": {
+                        "binary": {
+                          "op": {
+                            "arithmetic": {
+                              "op": "mul",
+                              "mode": "wrapping"
+                            }
+                          },
+                          "left": {
+                            "kind": {
+                              "variable": "base"
+                            },
+                            "ty": "unit"
+                          },
+                          "right": {
+                            "kind": {
+                              "variable": "multiplier"
+                            },
+                            "ty": "unit"
+                          }
+                        }
+                      },
+                      "ty": "unit"
+                    }
+                  }
+                }
+              ],
+              "expr": {
+                "kind": {
+                  "binary": {
+                    "op": {
+                      "arithmetic": {
+                        "op": "add",
+                        "mode": "wrapping"
+                      }
+                    },
+                    "left": {
+                      "kind": {
+                        "variable": "subtotal"
+                      },
+                      "ty": "unit"
+                    },
+                    "right": {
+                      "kind": {
+                        "variable": "bonus"
+                      },
+                      "ty": "unit"
+                    }
+                  }
+                },
+                "ty": "unit"
+              }
+            }
+          },
+          "ty": "unit"
+        },
+        "is_public": true,
+        "span": {
+          "file": "examples/fsm_example.rs",
+          "start_line": 32,
+          "end_line": 35
+        }
+      }
+    }
+  ]
+}

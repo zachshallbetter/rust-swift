@@ -1,0 +1,555 @@
+{
+  "format": "2",
+  "generatorVersion": "0.6.0",
+  "root": ".",
+  "validityBasis": "aggregate-source-digest",
+  "selectedPaths": [],
+  "sourceSelection": {
+    "includedCount": 106,
+    "includedBytes": 596811,
+    "excludedCounts": {
+      "excluded-directory": 6632,
+      "excluded-path": 1,
+      "extension": 1319,
+      "symlink": 1
+    }
+  },
+  "repositoryState": {
+    "available": false,
+    "validationRole": "provenance",
+    "repositories": []
+  },
+  "aggregateSourceDigest": "3e6be992252021b08bb44da9d0ceda1e5b5698a05eb713114e5c219aea5245a1",
+  "sources": [
+    {
+      "path": ".agents/rules/ci.md",
+      "bytes": 1139,
+      "sha256": "04f63a639bb87b537b2d059b6f252cfef0e648d392ec105e091e86ee2af3a2df"
+    },
+    {
+      "path": ".agents/rules/governance.md",
+      "bytes": 1181,
+      "sha256": "43ad0bca0a6b0533b075cf8d6057a9a10b31cfd45daf9fd185ba457040790143"
+    },
+    {
+      "path": ".agents/rules/security.md",
+      "bytes": 934,
+      "sha256": "fbc0c29f0c286a5f216bdc66d8d13a5c91dca8de12311806960d56669e7085ab"
+    },
+    {
+      "path": ".agents/rules/standards.md",
+      "bytes": 3223,
+      "sha256": "2dbf08cffb7497e349c61917f8620caab78a48773149cbc3204f3146b5f35a00"
+    },
+    {
+      "path": ".agents/skills/authorize-protected-effect/SKILL.md",
+      "bytes": 2758,
+      "sha256": "480ffefc42bc4d9d744484149f26a86ddb9b19a8d6adb63053720f5fc0c7865f"
+    },
+    {
+      "path": ".agents/skills/compile-context/SKILL.md",
+      "bytes": 561,
+      "sha256": "10c8156d05da083eddb606769183d8cabf4f924c241a3e3b462ef76f7aecf28d"
+    },
+    {
+      "path": ".agents/skills/coordinate-workers/SKILL.md",
+      "bytes": 593,
+      "sha256": "6be105841accc1f67dc11e12541b3b343fa2029a0ff6e5085c907b36381ba57b"
+    },
+    {
+      "path": ".agents/skills/operate-frontier/SKILL.md",
+      "bytes": 1006,
+      "sha256": "96cb68e6961b5b043603ff3c08f3984f504d5075a6b7db64dfbaee6b0fd96c71"
+    },
+    {
+      "path": ".agents/skills/reconcile-project/SKILL.md",
+      "bytes": 1161,
+      "sha256": "59f47ea393b477949a5e046a021e95032c3e3bf395842f82388c05ddde6d5c66"
+    },
+    {
+      "path": ".agents/skills/verify-outcome/SKILL.md",
+      "bytes": 599,
+      "sha256": "331bcc9c5179eef021d9edf48e76bedcaaef6fed17f97e91c6d20a20f1199117"
+    },
+    {
+      "path": ".formal-bootstrap.json",
+      "bytes": 296,
+      "sha256": "19eb168cc988e074ab77b6ab34fc562ac6ab956a0c1f9a663e8b56ff40025b75"
+    },
+    {
+      "path": "AGENTS.md",
+      "bytes": 10611,
+      "sha256": "9ccb7c144fbb9d26ccd74c0b5cb015b90de9cbe404fef95d20a2d941005a2469"
+    },
+    {
+      "path": "CONTEXT_SOURCES.json",
+      "bytes": 1213,
+      "sha256": "111b1b77d9c3aba3b78fe973b002d9356ce313d60d2cbc69c902a678a949e9b7"
+    },
+    {
+      "path": "Cargo.toml",
+      "bytes": 824,
+      "sha256": "24a640f203f69c3d9863eab45785084f06117cf0431d455544ec9058cac5065c"
+    },
+    {
+      "path": "FORMAL_RESOURCE_MANIFEST.json",
+      "bytes": 1324,
+      "sha256": "0f4d92e01e3f24dd00d655231f44c08564db9161ecd2668a18d53ba0eaab2013"
+    },
+    {
+      "path": "NEW_AGENT_PROMPT.md",
+      "bytes": 1010,
+      "sha256": "7fd2a102cb560b4e792ccf05a61aaf4fbf0d5139a708f03010d5d1577503bd2f"
+    },
+    {
+      "path": "PROJECT_INTENT.md",
+      "bytes": 2407,
+      "sha256": "440b53d0b5c9ef82bdf7248b93d7dc690f99a5e973dbb03db27b8dbb7fa6d95a"
+    },
+    {
+      "path": "PROJECT_PROFILE.json",
+      "bytes": 3387,
+      "sha256": "4503d9845ceeebc4217ac2608910558112870bf18589cf5e5d5e31eedce8bff0"
+    },
+    {
+      "path": "README.md",
+      "bytes": 5414,
+      "sha256": "23eb2506bffb37d5fc658bca022508b6766cc49023f3d4b9cfbf5a57f148c637"
+    },
+    {
+      "path": "VERSION",
+      "bytes": 6,
+      "sha256": "97a5d6e540a6120d09c39ddb667e0e8e2bac7fcc2ffef813b82e08fd60365bce"
+    },
+    {
+      "path": "bindings/PROJECT_BINDINGS.yaml",
+      "bytes": 2824,
+      "sha256": "1e41ae2a79d74b4abb55b774e43126d3d51aba2e906aedc392308d1f930a0946"
+    },
+    {
+      "path": "contracts/README.md",
+      "bytes": 387,
+      "sha256": "574c6218c0c957efb2eb3bfa4bf51fbf3ab0165cc81a033a249d4ba4cc2af78e"
+    },
+    {
+      "path": "contracts/acp-protected-effects.yaml",
+      "bytes": 4146,
+      "sha256": "6fd132dc67c4213fecb65461f0ee70987cfe41b765a55ab89c11d3f1a8a1a7dd"
+    },
+    {
+      "path": "crates/rust-swift-cli/Cargo.toml",
+      "bytes": 547,
+      "sha256": "c707b74c4d58a1a15a5554bfece735676f709eedcd4a9638dacf4aa8d84f2387"
+    },
+    {
+      "path": "crates/rust-swift-cli/src/main.rs",
+      "bytes": 8219,
+      "sha256": "2beddd2e78990bc4b071ed7d17149d1e9bcfd25166fe4953d0856b0d353a75ed"
+    },
+    {
+      "path": "crates/rust-swift-codegen/Cargo.toml",
+      "bytes": 263,
+      "sha256": "b68425b0c6a9b8bff940e572891a6acf2e4594e72b298744bc7d4bc1efd22259"
+    },
+    {
+      "path": "crates/rust-swift-codegen/src/lib.rs",
+      "bytes": 24945,
+      "sha256": "4ac5148f61aa381bbd94ca9f39b2f1a89a09f065fbc48eb46f2561b766165617"
+    },
+    {
+      "path": "crates/rust-swift-frontend/Cargo.toml",
+      "bytes": 388,
+      "sha256": "63af5c264b17a18941de45582a77694b94ae119ba3b5b497de2acf037a82ae9e"
+    },
+    {
+      "path": "crates/rust-swift-frontend/src/diagnostic.rs",
+      "bytes": 2540,
+      "sha256": "3e16a1f275f9a0ce313bd379f9bad750fd74d1b33575a59d4abed47a846ac12a"
+    },
+    {
+      "path": "crates/rust-swift-frontend/src/lib.rs",
+      "bytes": 38388,
+      "sha256": "a41834c234dea8f4615cb4779ee0844092bb7d408b499fe39705aceee23ecf52"
+    },
+    {
+      "path": "crates/rust-swift-ir/Cargo.toml",
+      "bytes": 303,
+      "sha256": "267f4103eda9ad8bf582995b22419a726816a53b4a55674c58052a7bdc288ced"
+    },
+    {
+      "path": "crates/rust-swift-ir/src/lib.rs",
+      "bytes": 13726,
+      "sha256": "7057bfe434971cb1d2f30451e234de76ddc9a18398870e0751e43008dffeee39"
+    },
+    {
+      "path": "crates/rust-swift-qualification/Cargo.toml",
+      "bytes": 411,
+      "sha256": "24d154260bc643e079694dfdb0d7de5c48fe8deaf206518f8cc405c628e086e3"
+    },
+    {
+      "path": "crates/rust-swift-qualification/src/differential.rs",
+      "bytes": 16740,
+      "sha256": "a308e395674ff543d0851ff15a09705083b41f1318b789a9832d9ff75d09efa7"
+    },
+    {
+      "path": "crates/rust-swift-qualification/src/lib.rs",
+      "bytes": 110,
+      "sha256": "18a6706fbb2bbb59c84ec742b3f0bcb1c42123b960bc521f1fdce70134ec5b71"
+    },
+    {
+      "path": "docs/01-product-definition.md",
+      "bytes": 929,
+      "sha256": "4c00e4d7bf0131aa6955b78a045ce94d159b0e01010d583dc19e8e923b4c67d0"
+    },
+    {
+      "path": "docs/02-architecture.md",
+      "bytes": 1197,
+      "sha256": "9f2757f372f452a1e305c2f695645e6f7fe8559c34a806f83d56caff0ed5d9bd"
+    },
+    {
+      "path": "docs/03-semantic-contract.md",
+      "bytes": 1366,
+      "sha256": "e34374d44245db4e8714d0776161b25969bef55d2b82de50663b9bd166108152"
+    },
+    {
+      "path": "docs/04-language-matrix.md",
+      "bytes": 1184,
+      "sha256": "349860fc9b87734de3f2f8a0f5ab1da6eb50dda754d7bf8eebcf56367fcbcb37"
+    },
+    {
+      "path": "docs/05-validation.md",
+      "bytes": 1213,
+      "sha256": "f69c4609c74da9b2f4c58d1b2475186a6f4c5a30fbf1e0871b9f920fce743544"
+    },
+    {
+      "path": "docs/06-implementation-plan.md",
+      "bytes": 1344,
+      "sha256": "d5c811193c2feca6580af9253b498dbd67f7f4a4926d8fc16b04219a514fa547"
+    },
+    {
+      "path": "docs/07-rfc.md",
+      "bytes": 1394,
+      "sha256": "1fbebfce1ad7088908d4e06dd917c84fd2ffd03c07ffb8ed20bd85e90f74f5ab"
+    },
+    {
+      "path": "docs/ACP_INTEGRATION.md",
+      "bytes": 15964,
+      "sha256": "8b5bf32e3040581e842718942f52cfd0f00ce1c37f6cc76498b127e4f5f449d9"
+    },
+    {
+      "path": "docs/AGENT_CAPABILITIES.md",
+      "bytes": 1095,
+      "sha256": "9dd7e5efd745a85880c8b428ab41d25c994c033e7f5d1376a6defd343cbfdb68"
+    },
+    {
+      "path": "docs/ALIGNMENT.md",
+      "bytes": 1588,
+      "sha256": "9e241f47e102b9feeb3b8e6bff3c95a146d69384f196eefc2327b363a96bf7a0"
+    },
+    {
+      "path": "docs/AUTHORITY_MODEL.md",
+      "bytes": 2912,
+      "sha256": "1d371d913fee51b89da6b2b39a587c9e143ff4146a484edd79eb3210bd938e62"
+    },
+    {
+      "path": "docs/BOOTSTRAP_SEQUENCE.md",
+      "bytes": 6140,
+      "sha256": "82d04fa96aa477837c64b61a7c5f9e7617d0e325ef3e205dbd037f6ff1e91d51"
+    },
+    {
+      "path": "docs/CONFORMANCE.md",
+      "bytes": 3027,
+      "sha256": "91a89475f94537685db35af38306d5455ee9bb30488fb5247527293a2e0320ba"
+    },
+    {
+      "path": "docs/CONTEXT_COMPILATION.md",
+      "bytes": 2568,
+      "sha256": "cedad34d38ef2363ab29c40d29f38a5a93168e95ed647b6f729757648d748117"
+    },
+    {
+      "path": "docs/EVIDENCE_METHOD.md",
+      "bytes": 1039,
+      "sha256": "a7422b9cc99adfc462a8c6d44ee883f9483c1127fbcaf0f44b1328d1d30fd4c9"
+    },
+    {
+      "path": "docs/EXECUTION_PIPELINE.md",
+      "bytes": 1861,
+      "sha256": "529c01ec25ac7d0552a19d591514244ec7bbe3f1966f1dd38d2c2f69494ba2db"
+    },
+    {
+      "path": "docs/EXECUTION_PROVIDER_CONTRACT.md",
+      "bytes": 2134,
+      "sha256": "f8884fe13ab6503ddc5fdb53264001b24a6bf846b00473e3f8deca5d018d5ee5"
+    },
+    {
+      "path": "docs/EXISTING_PROJECT_ADOPTION.md",
+      "bytes": 4615,
+      "sha256": "549abfc3926076d522d677ba6dcaec5e6a4e1d9e3043aba70880632ffcdcbbe5"
+    },
+    {
+      "path": "docs/FORMAL_RESOURCES.md",
+      "bytes": 2845,
+      "sha256": "bf93374182ba0212c7e64328a751c9dc3cfacd816779f983eca50f9157851289"
+    },
+    {
+      "path": "docs/INITIAL_EPICS_TEMPLATE.md",
+      "bytes": 1234,
+      "sha256": "c3e6414393bbfb7905b4113f10571a695204538c19bbab90b5a486e7ae6a3039"
+    },
+    {
+      "path": "docs/LANDING_AND_PROMOTION.md",
+      "bytes": 1135,
+      "sha256": "675a228edb135427a399e08c7fdf3a983a7802da5a20d63deb83af40fe366a23"
+    },
+    {
+      "path": "docs/MULTI_AGENT_COORDINATION.md",
+      "bytes": 2078,
+      "sha256": "c27fc5594ef31ff4574582b4c6f2e69dc684bb897b9f9455fce1b50ca44f968a"
+    },
+    {
+      "path": "docs/NEGATIVE_KNOWLEDGE.md",
+      "bytes": 2169,
+      "sha256": "01ef93bc7c5b75ce991d6ed0cd78faba1d8e6cdc8f1b43b10231025a0975a91e"
+    },
+    {
+      "path": "docs/PROTOCOL_ADAPTERS.md",
+      "bytes": 2229,
+      "sha256": "1b546812abd66d29217fb8b11370201760ad43769f5e9c1f5e685625a7bb40aa"
+    },
+    {
+      "path": "docs/RECOVERY.md",
+      "bytes": 1115,
+      "sha256": "b084f0a4bbad4012bd9d2525a07239e38ff4f563bbdefbd8491518fec14882e9"
+    },
+    {
+      "path": "docs/SKILLS_INDEX.md",
+      "bytes": 914,
+      "sha256": "2c763122a98e23607adf52f4029b3559b779bf2d3bb3a575b7a11f1ebf1f7874"
+    },
+    {
+      "path": "docs/UPGRADING.md",
+      "bytes": 1998,
+      "sha256": "123cf17c5ac29a5530da30388d1342a200b1c09b7543523862c5eeef03627a06"
+    },
+    {
+      "path": "docs/WORK_GRAPH.md",
+      "bytes": 1790,
+      "sha256": "427012a108e0b551cf656690da51c74675d0aa99cb138b8d4cf61bfa32691a22"
+    },
+    {
+      "path": "examples/GeneratedFSM/.build/out/Intermediates.noindex/GeneratedModuleMaps/fsm_example-Swift.h",
+      "bytes": 13008,
+      "sha256": "7142a77760d1c18e7d59d18b0869163808aae1256449f1c7be9a154ab58d956f"
+    },
+    {
+      "path": "examples/GeneratedFSM/.build/out/Intermediates.noindex/XCBuildData/c99e9c43d499cd58ea8ea944b59d03fc.xcbuilddata/build-request.json",
+      "bytes": 6081,
+      "sha256": "511ea96af4c0bbc39febf217645b02a3eb38638a571567dd0ee1137edd8e4fc6"
+    },
+    {
+      "path": "examples/GeneratedFSM/.build/out/Intermediates.noindex/XCBuildData/c99e9c43d499cd58ea8ea944b59d03fc.xcbuilddata/manifest.json",
+      "bytes": 154815,
+      "sha256": "3ae53906a55d98ac2e91122811e5ca323afcf1e6ca2a0bc52b7c6d7ae4c7d999"
+    },
+    {
+      "path": "examples/GeneratedFSM/.build/out/Intermediates.noindex/XCBuildData/c99e9c43d499cd58ea8ea944b59d03fc.xcbuilddata/target-graph.txt",
+      "bytes": 430,
+      "sha256": "21e0cfabda387a8540a02edd159825f873e49bb30a644f895e42187adbf524a0"
+    },
+    {
+      "path": "examples/GeneratedFSM/.build/out/Intermediates.noindex/XCBuildData/prior-build-descriptions.txt",
+      "bytes": 33,
+      "sha256": "a2a8025a76abdcd7d2e981715e552f4418d825a88e6f650b1bbb50da52c750be"
+    },
+    {
+      "path": "examples/GeneratedFSM/.build/out/Intermediates.noindex/fsm_example.build/Debug/fsm_example-t.build/Objects-normal/arm64/fsm_example-OutputFileMap.json",
+      "bytes": 4470,
+      "sha256": "a464034280a6f13a3078e9f65d55526b03b9e001a374097f73cf72baac095cde"
+    },
+    {
+      "path": "examples/GeneratedFSM/.build/out/Intermediates.noindex/fsm_example.build/Debug/fsm_example-t.build/Objects-normal/arm64/fsm_example-Swift.h",
+      "bytes": 12912,
+      "sha256": "7ef2cf1083a9023fec59e6ea728e024545d722dc3aa1dd48b5a8a8d44890a822"
+    },
+    {
+      "path": "examples/GeneratedFSM/.build/out/Intermediates.noindex/fsm_example.build/Debug/fsm_example-t.build/Objects-normal/arm64/fsm_example-dependencies-1.json",
+      "bytes": 21214,
+      "sha256": "71e421ef859169b582f38ca5dae2e6bb1a91d750f9342ec198875d61d05f2de1"
+    },
+    {
+      "path": "examples/GeneratedFSM/.build/out/Intermediates.noindex/fsm_example.build/Debug/fsm_example-t.build/Objects-normal/arm64/fsm_example.abi.json",
+      "bytes": 149,
+      "sha256": "4277ac6b49f8511196028a5ac20f5b1b1dfa754c24615d34068089f0b1739728"
+    },
+    {
+      "path": "examples/GeneratedFSM/.build/out/Intermediates.noindex/fsm_example.build/Debug/fsm_example-t.build/Objects-normal/arm64/fsm_example_const_extract_protocols.json",
+      "bytes": 386,
+      "sha256": "deb34a50c6dd08a80341a6229940a0cc38dbc93f989afd9897d76ebe392625b3"
+    },
+    {
+      "path": "examples/GeneratedFSM/.build/out/Products/Debug/fsm_example.swiftmodule/arm64-apple-macos.abi.json",
+      "bytes": 149,
+      "sha256": "4277ac6b49f8511196028a5ac20f5b1b1dfa754c24615d34068089f0b1739728"
+    },
+    {
+      "path": "examples/GeneratedFSM/.build/workspace-state.json",
+      "bytes": 125,
+      "sha256": "ec16aca52867cd83a5331c6d05a2cc3d930ab25179f77469715c144773e9d5c6"
+    },
+    {
+      "path": "examples/GeneratedFSM/csg.json",
+      "bytes": 2424,
+      "sha256": "9942cb13ffe6d7e1d699edcd8b19614447816e9fa6c01e67ee9a4f2f4c2d15ee"
+    },
+    {
+      "path": "examples/GeneratedFSM/ir.json",
+      "bytes": 11936,
+      "sha256": "92953129a4636dd502295eed6aee3e11e96bc895263e31f4c101cbe49e269159"
+    },
+    {
+      "path": "examples/GeneratedFSM/manifest.json",
+      "bytes": 932,
+      "sha256": "34090c2688e8469624b69a2117da3f8c3ac0898fcf792092e4330c9398689c3c"
+    },
+    {
+      "path": "examples/fsm_example.rs",
+      "bytes": 1103,
+      "sha256": "3a56ecb7c3df388c3ca9b3754d9019aa4c4b4096687cb089db196655195b06b8"
+    },
+    {
+      "path": "schemas/acp-decision.schema.json",
+      "bytes": 5605,
+      "sha256": "2a870190e4a3d208b765054b04de35819570770639e93e16ebb52d4365e8c76c"
+    },
+    {
+      "path": "schemas/agent-message.schema.json",
+      "bytes": 2269,
+      "sha256": "88c346d6ce2cf34d3bba9f35e2ef54e77776707b125b22bbc4ecc910ac33bedc"
+    },
+    {
+      "path": "schemas/context-lock.schema.json",
+      "bytes": 3274,
+      "sha256": "977a8963c6e58c1f3c68b96878e8082c09ad0fd48f43558a712beb671544d728"
+    },
+    {
+      "path": "schemas/context-sources.schema.json",
+      "bytes": 1330,
+      "sha256": "a12460da1fda3c38c5810b4adb6c17225bb92ce14c67cf98b641883cbb77c224"
+    },
+    {
+      "path": "schemas/external-state-instance.schema.json",
+      "bytes": 1750,
+      "sha256": "fe28e2309ba983eb46d9dcca11d2fa3ea6c29808d5d91b5b9ce2e031472c43cb"
+    },
+    {
+      "path": "schemas/formal-resource-manifest.schema.json",
+      "bytes": 1676,
+      "sha256": "465c3eae445d530087e1149d7f14e267400b32df00fa5b506e0b3af278a9b928"
+    },
+    {
+      "path": "schemas/interaction-contract.schema.json",
+      "bytes": 2509,
+      "sha256": "77772853ca61f842d778001873c5bab35922d9d2f3b9281f9616871987ae98cd"
+    },
+    {
+      "path": "schemas/protocol-adapter.schema.json",
+      "bytes": 2590,
+      "sha256": "7ee509a9e37c8104e18781871e9b2455baf560c1920c5c97ca5a6c927cc0d4b2"
+    },
+    {
+      "path": "schemas/qualification-record.schema.json",
+      "bytes": 1612,
+      "sha256": "e1561f13338dfe675a064803422d028de9efce07f35c235f8ef50c340bfb8335"
+    },
+    {
+      "path": "schemas/recipient-contract.schema.json",
+      "bytes": 1027,
+      "sha256": "273e599266d5a87bfc6dec1aea779dd3225f18ec9f6e85b272949577af3a15bc"
+    },
+    {
+      "path": "schemas/semantic-surface.schema.json",
+      "bytes": 1010,
+      "sha256": "460473f332f3b6f9eab8efad14a7c6f73d2a4dec4a0f9660138bcb6ed101cefd"
+    },
+    {
+      "path": "schemas/work-disposition.schema.json",
+      "bytes": 2062,
+      "sha256": "a0426bb2095e37891627c5b3de78266863522bf36e5305dc0ba525e9617d2987"
+    },
+    {
+      "path": "scripts/acp-check.py",
+      "bytes": 11196,
+      "sha256": "ef1863692a470634adae144c0b6f3aadfc375543915c7b9c428b6b99f4c9225a"
+    },
+    {
+      "path": "scripts/acp.py",
+      "bytes": 25463,
+      "sha256": "6fca8c5738deb7864a77838d95214cf388a6b80dcfac97fe9446eb0aa83176dd"
+    },
+    {
+      "path": "scripts/check-protocol-integrity.py",
+      "bytes": 6917,
+      "sha256": "fdac207980574121a5a7be9316c6cbb436c9f32c521c2d6100d14ce16733f96d"
+    },
+    {
+      "path": "scripts/esp-instance.py",
+      "bytes": 6455,
+      "sha256": "50d18578225fd4956c12d1aad4a3641d6749cc1c3a945f0eea27f00497550f91"
+    },
+    {
+      "path": "scripts/esp-record.py",
+      "bytes": 3349,
+      "sha256": "bef91b795da6027db2d607d4e97278dce0f170c478fd27d130b00d6e86d3a464"
+    },
+    {
+      "path": "scripts/gen-context.py",
+      "bytes": 13025,
+      "sha256": "eee7f301274b03d452987e5f3eb82891c828a951900454cf983cca3a97b25c87"
+    },
+    {
+      "path": "scripts/iepe-adopt.py",
+      "bytes": 3463,
+      "sha256": "cb992581bd7f1436b7049387ef9bdb19708cb384af0bcf10eeac9ef73a149931"
+    },
+    {
+      "path": "scripts/recipient-status.py",
+      "bytes": 1417,
+      "sha256": "1c513611c928a6a4b7a8c16ae071172fd434a9e8c4675a7fb91089f469a26e78"
+    },
+    {
+      "path": "scripts/reconcile-project.py",
+      "bytes": 11596,
+      "sha256": "a9d4002736f1fef51ba2c124f4abb2414e67fd131016b42604bd57c633facedd"
+    },
+    {
+      "path": "scripts/upgrade-project.py",
+      "bytes": 14138,
+      "sha256": "e0ac6478ec44fee27f8ead869ebaae80952a817203d253e1556701b6d522e346"
+    },
+    {
+      "path": "scripts/validate-bootstrap.py",
+      "bytes": 10636,
+      "sha256": "377ee4ba3f343373db6c4a6f12f04bd2176995b3b2df2dde7966020f78338f76"
+    },
+    {
+      "path": "scripts/validate-interaction-contract.py",
+      "bytes": 2441,
+      "sha256": "74de7cf8d3efa6cca102e2982377d9829f35218632dbea1eb0f6ab7d39706b2a"
+    },
+    {
+      "path": "scripts/validate-protocol-adapters.py",
+      "bytes": 2670,
+      "sha256": "ac74eb0216a520051b10bf86c31c078b4b7a5723fd0e8862bc30a4590114ec95"
+    },
+    {
+      "path": "scripts/validate-qualification.py",
+      "bytes": 2530,
+      "sha256": "5bb33c997b5ef86dc69a8b6b4d39b8fe4931c3c6a44521250aea7739d1a42188"
+    },
+    {
+      "path": "scripts/validate-semantic-surface.py",
+      "bytes": 1973,
+      "sha256": "3de4a4152442b5bb34fbbfd94ee6fdad6839fda8f80a41bbfb7f6647c6897797"
+    }
+  ]
+}

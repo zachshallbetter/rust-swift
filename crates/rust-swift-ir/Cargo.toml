@@ -1,0 +1,12 @@
+[package]
+name = "rust-swift-ir"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+reflective-rust-csg = { workspace = true }
+reflective-rust-protocol = { workspace = true }
