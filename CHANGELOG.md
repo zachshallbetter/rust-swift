@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Type System Expansion (`WI-TYPE-001`)**:
+  - Struct inherent implementation blocks (`impl Type { ... }`) lowering into Swift `extension Type`.
+  - Receiver classification: `&mut self` lowered to `mutating func`, `&self` and value receivers lowered to standard `func`, and static methods lowered to `static func`.
+  - Associated value / payload enums (`enum Value { Stop, Move(i64, i64), Teleport { x: i64, y: i64 } }`) lowering to Swift enums with associated values (`case Stop`, `case Move(Int64, Int64)`, `case Teleport(x: Int64, y: Int64)`).
+  - Advanced pattern matching with value binding extraction (`case .Move(let dx, let dy):`, `case .Teleport(x: let x, y: let y):`) and tuple matching.
+  - Native tuple types, tuple literals, and tuple field indexing (`.0`, `.1`).
+  - Strict rejection of complex traits (`impl Trait for Type`, `E0006`) and dynamic dispatch (`&dyn Trait`, `E0005`).
+  - Differential qualification suite verifying mutating struct methods, payload enums, and tuple workflows between `rustc` and `swiftc`.
 - **Contract System & Runtime Invariants (`WI-CONTRACT-001`)**:
   - Support for `assert!`, `debug_assert!`, `assert_eq!`, and `panic!` in `rust-swift-frontend`.
   - Semantic IR representation with `Stmt::Assert`, `Stmt::DebugAssert`, `Stmt::AssertEq`, `Stmt::Panic`, and `ExprKind::Panic`.

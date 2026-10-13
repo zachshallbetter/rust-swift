@@ -5,8 +5,9 @@
 //! for exact compatibility with Rust wrapping operations.
 
 use rust_swift_ir::{
-    BinaryOp, CmpOp, EnumDef, Expr, ExprKind, Function, IntegerMode, IntegerOp, Item, Literal,
-    LogicalOp, MatchArm, Module, Pattern, Stmt, StructDef, Type, UnaryOp,
+    BinaryOp, CmpOp, EnumDef, Expr, ExprKind, Function, ImplBlock, IntegerMode, IntegerOp, Item,
+    Literal, LogicalOp, MatchArm, Method, Module, Pattern, ReceiverKind, Stmt, StructDef, Type,
+    UnaryOp, VariantPayload,
 };
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -73,6 +74,10 @@ impl SwiftGenerator {
                     out.push_str(&self.generate_struct(strct));
                     out.push_str("\n\n");
                 }
+                Item::Impl(imp) => {
+                    out.push_str(&self.generate_impl(imp));
+                    out.push_str("\n\n");
+                }
                 Item::Function(func) => {
                     out.push_str(&self.generate_function(func));
                     out.push_str("\n\n");
@@ -129,21 +134,65 @@ impl SwiftGenerator {
 
         let mut out = String::new();
         let vis = if enm.is_public { "public " } else { "" };
-        out.push_str(&format!(
-            "{}enum {}: String, CaseIterable, Equatable, Hashable, Sendable {{\n",
-            vis, enm.name
-        ));
-        self.indent_level += 1;
-        for variant in &enm.variants {
+
+        if enm.is_fieldless() {
             out.push_str(&format!(
-                "{}case {} = \"{}\"\n",
-                self.indent(),
-                variant,
-                variant
+                "{}enum {}: String, CaseIterable, Equatable, Hashable, Sendable {{\n",
+                vis, enm.name
             ));
+            self.indent_level += 1;
+            for variant in &enm.variants {
+                out.push_str(&format!(
+                    "{}case {} = \"{}\"\n",
+                    self.indent(),
+                    variant.name,
+                    variant.name
+                ));
+            }
+            self.indent_level -= 1;
+            out.push_str(&format!("{}}}", self.indent()));
+        } else {
+            out.push_str(&format!(
+                "{}enum {}: Equatable, Hashable, Sendable {{\n",
+                vis, enm.name
+            ));
+            self.indent_level += 1;
+            for variant in &enm.variants {
+                match &variant.payload {
+                    VariantPayload::Unit => {
+                        out.push_str(&format!("{}case {}\n", self.indent(), variant.name));
+                    }
+                    VariantPayload::Tuple(types) => {
+                        let types_str = types
+                            .iter()
+                            .map(|t| self.map_type(t))
+                            .collect::<Vec<_>>()
+                            .join(", ");
+                        out.push_str(&format!(
+                            "{}case {}({})\n",
+                            self.indent(),
+                            variant.name,
+                            types_str
+                        ));
+                    }
+                    VariantPayload::Struct(fields) => {
+                        let fields_str = fields
+                            .iter()
+                            .map(|f| format!("{}: {}", f.name, self.map_type(&f.ty)))
+                            .collect::<Vec<_>>()
+                            .join(", ");
+                        out.push_str(&format!(
+                            "{}case {}({})\n",
+                            self.indent(),
+                            variant.name,
+                            fields_str
+                        ));
+                    }
+                }
+            }
+            self.indent_level -= 1;
+            out.push_str(&format!("{}}}", self.indent()));
         }
-        self.indent_level -= 1;
-        out.push_str(&format!("{}}}", self.indent()));
         out
     }
 
@@ -199,6 +248,77 @@ impl SwiftGenerator {
         out.push_str(&format!("{}}}\n", self.indent()));
 
         self.indent_level -= 1;
+        out.push_str(&format!("{}}}", self.indent()));
+        out
+    }
+
+    fn generate_impl(&mut self, imp: &ImplBlock) -> String {
+        let mut out = String::new();
+        out.push_str(&format!("extension {} {{\n", imp.target_type));
+        self.indent_level += 1;
+        for (i, method) in imp.methods.iter().enumerate() {
+            if i > 0 {
+                out.push_str("\n\n");
+            }
+            out.push_str(&self.generate_method(&imp.target_type, method));
+        }
+        out.push('\n');
+        self.indent_level -= 1;
+        out.push_str(&format!("{}}}", self.indent()));
+        out
+    }
+
+    fn generate_method(&mut self, target_type: &str, method: &Method) -> String {
+        self.symbols.push(SymbolMapping {
+            rust_name: format!("{}::{}", target_type, method.name),
+            swift_name: format!("{}.{}", target_type, method.name),
+            kind: "method".into(),
+            rust_file: method.span.file.clone(),
+            rust_line: method.span.start_line,
+        });
+
+        let mut out = String::new();
+        let vis = if method.is_public { "public " } else { "" };
+        let modifier = match method.receiver {
+            None => "static ",
+            Some(ReceiverKind::MutRef) => "mutating ",
+            Some(ReceiverKind::Ref) | Some(ReceiverKind::Value) => "",
+        };
+
+        let params_str = method
+            .params
+            .iter()
+            .map(|p| {
+                let ty_str = self.map_type(&p.ty);
+                if p.mutable {
+                    format!("_ {}: inout {}", p.name, ty_str)
+                } else {
+                    format!("_ {}: {}", p.name, ty_str)
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
+
+        let ret_str = if method.return_type == Type::Unit {
+            "".into()
+        } else {
+            format!(" -> {}", self.map_type(&method.return_type))
+        };
+
+        out.push_str(&format!(
+            "{}{}{}func {}({}){} {{\n",
+            self.indent(),
+            vis,
+            modifier,
+            method.name,
+            params_str,
+            ret_str
+        ));
+
+        self.indent_level += 1;
+        out.push_str(&self.generate_function_body(&method.body, method.return_type != Type::Unit));
+        self.indent_level -= 1;
+
         out.push_str(&format!("{}}}", self.indent()));
         out
     }
@@ -497,12 +617,24 @@ impl SwiftGenerator {
         match pat {
             Pattern::Wildcard => "_".into(),
             Pattern::Literal(lit) => self.generate_literal(lit),
-            Pattern::Variable(v) => v.clone(),
+            Pattern::Variable(v) => format!("let {}", v),
             Pattern::EnumVariant {
                 enum_name: _,
                 variant,
             } => {
                 format!(".{}", variant)
+            }
+            Pattern::EnumVariantPayload {
+                enum_name: _,
+                variant,
+                patterns,
+            } => {
+                let inner = patterns
+                    .iter()
+                    .map(|p| self.generate_pattern(p))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                format!(".{}({})", variant, inner)
             }
             Pattern::Tuple(elems) => {
                 let inner = elems
@@ -512,13 +644,14 @@ impl SwiftGenerator {
                     .join(", ");
                 format!("({})", inner)
             }
-            Pattern::Struct { name: _, fields } => {
+            Pattern::Struct { name, fields } => {
+                let variant = name.split('.').next_back().unwrap_or(name);
                 let inner = fields
                     .iter()
                     .map(|(k, v)| format!("{}: {}", k, self.generate_pattern(v)))
                     .collect::<Vec<_>>()
                     .join(", ");
-                format!("({})", inner)
+                format!(".{}({})", variant, inner)
             }
         }
     }
@@ -767,7 +900,7 @@ public struct RustCompat {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rust_swift_ir::{Param, SourceSpan};
+    use rust_swift_ir::{EnumVariant, FieldDef, Param, SourceSpan};
 
     #[test]
     fn test_generate_enum_and_function() {
@@ -911,5 +1044,121 @@ mod tests {
         assert!(code.contains("assert(x)"));
         assert!(code.contains("precondition(x == 10, \"equal to 10\")"));
         assert!(code.contains("fatalError(\"aborting\")"));
+    }
+
+    #[test]
+    fn test_generate_impl_and_payload_enum() {
+        let mut module = Module::new("TypesTest");
+        module.items.push(Item::Struct(StructDef {
+            name: "Counter".into(),
+            fields: vec![FieldDef {
+                name: "count".into(),
+                ty: Type::I64,
+                is_public: true,
+            }],
+            is_public: true,
+            span: SourceSpan {
+                file: "types.rs".into(),
+                start_line: 1,
+                end_line: 3,
+            },
+        }));
+
+        module.items.push(Item::Impl(ImplBlock {
+            target_type: "Counter".into(),
+            methods: vec![Method {
+                name: "increment".into(),
+                receiver: Some(ReceiverKind::MutRef),
+                params: vec![Param {
+                    name: "delta".into(),
+                    ty: Type::I64,
+                    mutable: false,
+                }],
+                return_type: Type::Unit,
+                body: Expr::new(
+                    ExprKind::Block {
+                        stmts: vec![Stmt::Assign {
+                            target: Expr::new(
+                                ExprKind::FieldAccess {
+                                    receiver: Box::new(Expr::new(
+                                        ExprKind::Variable("self".into()),
+                                        Type::Named("Counter".into()),
+                                    )),
+                                    field: "count".into(),
+                                },
+                                Type::I64,
+                            ),
+                            value: Expr::new(
+                                ExprKind::Binary {
+                                    op: BinaryOp::Arithmetic {
+                                        op: IntegerOp::Add,
+                                        mode: IntegerMode::Checked,
+                                    },
+                                    left: Box::new(Expr::new(
+                                        ExprKind::FieldAccess {
+                                            receiver: Box::new(Expr::new(
+                                                ExprKind::Variable("self".into()),
+                                                Type::Named("Counter".into()),
+                                            )),
+                                            field: "count".into(),
+                                        },
+                                        Type::I64,
+                                    )),
+                                    right: Box::new(Expr::new(
+                                        ExprKind::Variable("delta".into()),
+                                        Type::I64,
+                                    )),
+                                },
+                                Type::I64,
+                            ),
+                        }],
+                        expr: None,
+                    },
+                    Type::Unit,
+                ),
+                is_public: true,
+                span: SourceSpan {
+                    file: "types.rs".into(),
+                    start_line: 5,
+                    end_line: 7,
+                },
+            }],
+            span: SourceSpan {
+                file: "types.rs".into(),
+                start_line: 4,
+                end_line: 8,
+            },
+        }));
+
+        module.items.push(Item::Enum(EnumDef {
+            name: "Action".into(),
+            variants: vec![
+                EnumVariant {
+                    name: "Stop".into(),
+                    payload: VariantPayload::Unit,
+                },
+                EnumVariant {
+                    name: "Move".into(),
+                    payload: VariantPayload::Tuple(vec![Type::I64, Type::I64]),
+                },
+            ],
+            is_public: true,
+            span: SourceSpan {
+                file: "types.rs".into(),
+                start_line: 9,
+                end_line: 12,
+            },
+        }));
+
+        let mut gen = SwiftGenerator::new();
+        let (code, symbols) = gen.generate_module(&module);
+        assert!(code.contains("public struct Counter"));
+        assert!(code.contains("extension Counter"));
+        assert!(code.contains("public mutating func increment(_ delta: Int64)"));
+        assert!(code.contains("public enum Action: Equatable, Hashable, Sendable"));
+        assert!(code.contains("case Stop"));
+        assert!(code.contains("case Move(Int64, Int64)"));
+        assert!(!code.contains("String, CaseIterable"));
+        assert!(symbols.iter().any(|s| s.swift_name == "Counter.increment"));
     }
 }

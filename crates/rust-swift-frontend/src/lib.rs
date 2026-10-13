@@ -7,9 +7,9 @@ pub mod diagnostic;
 
 use diagnostic::{Diagnostic, DiagnosticCode};
 use rust_swift_ir::{
-    BinaryOp, CmpOp, EnumDef, Expr, ExprKind, FieldDef, Function, IntegerMode, IntegerOp,
-    Item as IrItem, Literal, LogicalOp, MatchArm, Module, Param, Pattern, SourceSpan, Stmt,
-    StructDef, Type, UnaryOp,
+    BinaryOp, CmpOp, EnumDef, EnumVariant, Expr, ExprKind, FieldDef, Function, ImplBlock,
+    IntegerMode, IntegerOp, Item as IrItem, Literal, LogicalOp, MatchArm, Method, Module, Param,
+    Pattern, ReceiverKind, SourceSpan, Stmt, StructDef, Type, UnaryOp, VariantPayload,
 };
 use syn::spanned::Spanned;
 
@@ -122,14 +122,30 @@ impl Frontend {
                     );
                     None
                 } else {
+                    let target_type = match &*imp.self_ty {
+                        syn::Type::Path(p) => p
+                            .path
+                            .segments
+                            .last()
+                            .map(|s| s.ident.to_string())
+                            .unwrap_or_else(|| "Target".into()),
+                        _ => "Target".into(),
+                    };
+
+                    let mut methods = Vec::new();
                     for item in &imp.items {
                         if let syn::ImplItem::Fn(method) = item {
-                            if let Some(func) = self.lower_impl_fn(&imp.self_ty, method) {
-                                return Some(IrItem::Function(func));
+                            if let Some(m) = self.lower_method(method) {
+                                methods.push(m);
                             }
                         }
                     }
-                    None
+
+                    Some(IrItem::Impl(ImplBlock {
+                        target_type,
+                        methods,
+                        span: self.make_span(imp),
+                    }))
                 }
             }
             other => {
@@ -223,49 +239,40 @@ impl Frontend {
         })
     }
 
-    fn lower_impl_fn(&mut self, self_ty: &syn::Type, method: &syn::ImplItemFn) -> Option<Function> {
-        let type_prefix = match self_ty {
-            syn::Type::Path(p) => p
-                .path
-                .segments
-                .last()
-                .map(|s| s.ident.to_string())
-                .unwrap_or_else(|| "Self".into()),
-            _ => "Self".into(),
-        };
-
-        let fn_name = format!("{}_{}", type_prefix, method.sig.ident);
+    fn lower_method(&mut self, method: &syn::ImplItemFn) -> Option<Method> {
+        let name = method.sig.ident.to_string();
         let is_public = matches!(method.vis, syn::Visibility::Public(_));
 
+        let mut receiver = None;
         let mut params = Vec::new();
+
         for input in &method.sig.inputs {
             match input {
                 syn::FnArg::Receiver(r) => {
-                    let self_t = self.lower_type(self_ty);
-                    let ty = if r.reference.is_some() {
-                        Type::Ref {
-                            inner: Box::new(self_t),
-                            mutable: r.mutability.is_some(),
+                    if r.reference.is_some() {
+                        if r.mutability.is_some() {
+                            receiver = Some(ReceiverKind::MutRef);
+                        } else {
+                            receiver = Some(ReceiverKind::Ref);
                         }
                     } else {
-                        self_t
-                    };
-                    params.push(Param {
-                        name: "self".into(),
-                        ty,
-                        mutable: r.mutability.is_some(),
-                    });
+                        receiver = Some(ReceiverKind::Value);
+                    }
                 }
                 syn::FnArg::Typed(pat_type) => {
                     let param_name = match &*pat_type.pat {
                         syn::Pat::Ident(id) => id.ident.to_string(),
                         _ => "arg".into(),
                     };
+                    let mutable = match &*pat_type.pat {
+                        syn::Pat::Ident(id) => id.mutability.is_some(),
+                        _ => false,
+                    };
                     let ty = self.lower_type(&pat_type.ty);
                     params.push(Param {
                         name: param_name,
                         ty,
-                        mutable: false,
+                        mutable,
                     });
                 }
             }
@@ -278,8 +285,9 @@ impl Frontend {
 
         let body = self.lower_block(&method.block);
 
-        Some(Function {
-            name: fn_name,
+        Some(Method {
+            name,
+            receiver,
             params,
             return_type,
             body,
@@ -331,15 +339,39 @@ impl Frontend {
         let mut variants = Vec::new();
 
         for variant in &item_enum.variants {
-            if !matches!(variant.fields, syn::Fields::Unit) {
-                self.reject(
-                    DiagnosticCode::UnsupportedTypeRejected,
-                    "Enum variants with payloads are deferred to v0.2",
-                    variant,
-                    Some("Use fieldless enums in v0.1"),
-                );
-            }
-            variants.push(variant.ident.to_string());
+            let v_name = variant.ident.to_string();
+            let payload = match &variant.fields {
+                syn::Fields::Unit => VariantPayload::Unit,
+                syn::Fields::Unnamed(unnamed) => {
+                    let types = unnamed
+                        .unnamed
+                        .iter()
+                        .map(|f| self.lower_type(&f.ty))
+                        .collect();
+                    VariantPayload::Tuple(types)
+                }
+                syn::Fields::Named(named) => {
+                    let fields = named
+                        .named
+                        .iter()
+                        .map(|f| {
+                            let fname = f.ident.as_ref().map(|i| i.to_string()).unwrap_or_default();
+                            let ty = self.lower_type(&f.ty);
+                            let field_pub = matches!(f.vis, syn::Visibility::Public(_));
+                            FieldDef {
+                                name: fname,
+                                ty,
+                                is_public: field_pub,
+                            }
+                        })
+                        .collect();
+                    VariantPayload::Struct(fields)
+                }
+            };
+            variants.push(EnumVariant {
+                name: v_name,
+                payload,
+            });
         }
 
         Some(EnumDef {
@@ -1044,6 +1076,33 @@ impl Frontend {
                 let pats = t.elems.iter().map(|p| self.lower_pattern(p)).collect();
                 Pattern::Tuple(pats)
             }
+            syn::Pat::TupleStruct(ts) => {
+                let segments: Vec<String> = ts
+                    .path
+                    .segments
+                    .iter()
+                    .map(|s| s.ident.to_string())
+                    .collect();
+                let (enum_name, variant) = if segments.len() >= 2 {
+                    (
+                        Some(segments[..segments.len() - 1].join(".")),
+                        segments.last().unwrap().clone(),
+                    )
+                } else if let Some(last) = segments.last() {
+                    (None, last.clone())
+                } else {
+                    (None, "Unknown".into())
+                };
+
+                let patterns = ts.elems.iter().map(|p| self.lower_pattern(p)).collect();
+                Pattern::EnumVariantPayload {
+                    enum_name,
+                    variant,
+                    patterns,
+                }
+            }
+            syn::Pat::Paren(p) => self.lower_pattern(&p.pat),
+            syn::Pat::Reference(r) => self.lower_pattern(&r.pat),
             syn::Pat::Struct(s) => {
                 let name = s
                     .path
@@ -1226,5 +1285,74 @@ mod tests {
             .parse_and_lower(src)
             .expect_err("Should reject println!");
         assert!(errs.iter().any(|d| d.code == DiagnosticCode::MacroRejected));
+    }
+
+    #[test]
+    fn test_impl_methods_and_payload_enums_parse_and_lower() {
+        let src = r#"
+            pub struct Counter {
+                pub count: i64,
+            }
+
+            impl Counter {
+                pub fn new(initial: i64) -> Counter {
+                    Counter { count: initial }
+                }
+
+                pub fn increment(&mut self, delta: i64) {
+                    self.count = self.count + delta;
+                }
+
+                pub fn get(&self) -> i64 {
+                    self.count
+                }
+            }
+
+            pub enum Action {
+                Stop,
+                Move(i64, i64),
+                Teleport { x: i64, y: i64 },
+            }
+
+            pub fn apply(action: Action) -> (i64, i64) {
+                match action {
+                    Action::Stop => (0, 0),
+                    Action::Move(dx, dy) => (dx, dy),
+                    Action::Teleport { x, y } => (x, y),
+                }
+            }
+        "#;
+        let mut frontend = Frontend::new("types.rs");
+        let module = frontend.parse_and_lower(src).expect("Should succeed");
+        assert_eq!(module.items.len(), 4);
+    }
+
+    #[test]
+    fn test_trait_impl_rejected_with_e0006() {
+        let src = r#"
+            pub struct Foo;
+            impl Bar for Foo {}
+        "#;
+        let mut frontend = Frontend::new("trait_impl.rs");
+        let errs = frontend
+            .parse_and_lower(src)
+            .expect_err("Should reject trait impl");
+        assert!(errs
+            .iter()
+            .any(|d| d.code == DiagnosticCode::ComplexTraitRejected));
+    }
+
+    #[test]
+    fn test_dyn_trait_rejected_with_e0005() {
+        let src = r#"
+            pub fn call_dyn(x: &dyn Display) {}
+        "#;
+        let mut frontend = Frontend::new("dyn_trait.rs");
+        let errs = frontend
+            .parse_and_lower(src)
+            .expect_err("Should reject dynamic dispatch");
+        assert!(errs
+            .iter()
+            .any(|d| d.code == DiagnosticCode::DynamicDispatchRejected));
     }
 }

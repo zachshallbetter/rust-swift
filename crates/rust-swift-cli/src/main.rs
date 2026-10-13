@@ -159,7 +159,7 @@ fn diff_test_command(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>
     let mut reports = Vec::new();
 
     // 1. Finite State Machine
-    println!("\n[1/3] Running Finite State Machine differential test...");
+    println!("\n[1/5] Running Finite State Machine differential test...");
     match runner.test_fsm(output_dir) {
         Ok(report) => {
             println!(
@@ -174,7 +174,7 @@ fn diff_test_command(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>
     }
 
     // 2. Wrapping Arithmetic
-    println!("\n[2/3] Running Wrapping Arithmetic differential test...");
+    println!("\n[2/5] Running Wrapping Arithmetic differential test...");
     match runner.test_wrapping_arithmetic(output_dir) {
         Ok(report) => {
             println!(
@@ -189,7 +189,7 @@ fn diff_test_command(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>
     }
 
     // 3. Contract System & Invariant Traps
-    println!("\n[3/4] Running Contract & Invariant Trap differential test...");
+    println!("\n[3/5] Running Contract & Invariant Trap differential test...");
     match runner.test_contracts(output_dir) {
         Ok(report) => {
             println!(
@@ -203,8 +203,23 @@ fn diff_test_command(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>
         }
     }
 
-    // 4. Negative rejections
-    println!("\n[4/4] Running Negative Rejection policy test...");
+    // 4. Type System & Enums
+    println!("\n[4/5] Running Type System (Methods, Payload Enums, Tuples) differential test...");
+    match runner.test_types(output_dir) {
+        Ok(report) => {
+            println!(
+                "  Status: {} ({} of {} cases passed)",
+                report.status, report.cases_passed, report.cases_tested
+            );
+            reports.push(report);
+        }
+        Err(e) => {
+            eprintln!("  Error in Type System differential test: {}", e);
+        }
+    }
+
+    // 5. Negative rejections
+    println!("\n[5/5] Running Negative Rejection policy test...");
     match runner.test_negative_rejections() {
         Ok(neg_reports) => {
             for r in neg_reports {
