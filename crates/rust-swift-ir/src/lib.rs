@@ -371,6 +371,8 @@ pub struct StructDef {
     pub is_codable: bool,
     #[serde(default)]
     pub is_observable: bool,
+    #[serde(default)]
+    pub is_bitflags: bool,
     pub span: SourceSpan,
 }
 
@@ -447,11 +449,23 @@ pub struct Method {
     pub span: SourceSpan,
 }
 
+/// Associated constant definition in an impl block.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ConstantDef {
+    pub name: String,
+    pub ty: Type,
+    pub value: Expr,
+    pub is_public: bool,
+    pub span: SourceSpan,
+}
+
 /// Inherent implementation block for a struct or enum type.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ImplBlock {
     pub target_type: String,
     pub methods: Vec<Method>,
+    #[serde(default)]
+    pub constants: Vec<ConstantDef>,
     pub span: SourceSpan,
 }
 
@@ -749,6 +763,27 @@ impl Module {
                         edges.push(CsgEdge {
                             from: root_id.clone(),
                             to: method_id,
+                            relationship: "contains_item".into(),
+                            minimum_access: AccessLevel::Public,
+                        });
+                    }
+                    for constant in &imp.constants {
+                        let const_id = format!("{}::{}", impl_id, constant.name);
+                        nodes.push(CsgNode {
+                            id: const_id.clone(),
+                            name: constant.name.clone(),
+                            kind: CsgNodeKind::Field,
+                            span: constant.span.clone().into(),
+                            minimum_access: if constant.is_public {
+                                AccessLevel::Public
+                            } else {
+                                AccessLevel::Owner
+                            },
+                            size_bytes: None,
+                        });
+                        edges.push(CsgEdge {
+                            from: root_id.clone(),
+                            to: const_id,
                             relationship: "contains_item".into(),
                             minimum_access: AccessLevel::Public,
                         });

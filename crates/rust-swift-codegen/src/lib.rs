@@ -339,6 +339,77 @@ impl SwiftGenerator {
         let vis = if strct.is_public { "public " } else { "" };
         let is_observable = strct.is_observable || self.emit_observable;
 
+        if strct.is_bitflags {
+            let raw_type = strct
+                .fields
+                .iter()
+                .find(|f| f.name == "raw_value" || f.name == "rawValue" || f.name == "bits")
+                .map(|f| self.map_type(&f.ty))
+                .or_else(|| strct.fields.first().map(|f| self.map_type(&f.ty)))
+                .unwrap_or_else(|| "UInt64".to_string());
+
+            let conformances = if strct.is_codable {
+                "OptionSet, Codable, Sendable"
+            } else {
+                "OptionSet, Sendable"
+            };
+
+            out.push_str(&format!(
+                "{}{}struct {}: {} {{\n",
+                self.indent(),
+                vis,
+                strct.name,
+                conformances
+            ));
+            self.indent_level += 1;
+            out.push_str(&format!(
+                "{}{}let rawValue: {}\n\n",
+                self.indent(),
+                vis,
+                raw_type
+            ));
+            out.push_str(&format!(
+                "{}{}init(rawValue: {}) {{\n",
+                self.indent(),
+                vis,
+                raw_type
+            ));
+            self.indent_level += 1;
+            out.push_str(&format!("{}self.rawValue = rawValue\n", self.indent()));
+            self.indent_level -= 1;
+            out.push_str(&format!("{}}}\n\n", self.indent()));
+
+            out.push_str(&format!(
+                "{}{}static func | (lhs: {}, rhs: {}) -> {} {{\n",
+                self.indent(),
+                vis,
+                strct.name,
+                strct.name,
+                strct.name
+            ));
+            self.indent_level += 1;
+            out.push_str(&format!("{}lhs.union(rhs)\n", self.indent()));
+            self.indent_level -= 1;
+            out.push_str(&format!("{}}}\n\n", self.indent()));
+
+            out.push_str(&format!(
+                "{}{}static func & (lhs: {}, rhs: {}) -> {} {{\n",
+                self.indent(),
+                vis,
+                strct.name,
+                strct.name,
+                strct.name
+            ));
+            self.indent_level += 1;
+            out.push_str(&format!("{}lhs.intersection(rhs)\n", self.indent()));
+            self.indent_level -= 1;
+            out.push_str(&format!("{}}}\n", self.indent()));
+
+            self.indent_level -= 1;
+            out.push_str(&format!("{}}}\n", self.indent()));
+            return out;
+        }
+
         if is_observable {
             let has_id = strct.fields.iter().any(|f| f.name == "id");
             let conformances = if has_id { ": Identifiable" } else { "" };
@@ -707,12 +778,34 @@ impl SwiftGenerator {
                 imp.span.start_line
             ));
         }
-        out.push_str(&format!("extension {} {{\n", imp.target_type));
+        out.push_str(&format!(
+            "{}extension {} {{\n",
+            self.indent(),
+            imp.target_type
+        ));
         self.indent_level += 1;
-        for (i, method) in imp.methods.iter().enumerate() {
-            if i > 0 {
+        let mut has_emitted = false;
+        for constant in &imp.constants {
+            if has_emitted {
                 out.push_str("\n\n");
             }
+            has_emitted = true;
+            let vis = if constant.is_public { "public " } else { "" };
+            let val_str = self.generate_expr(&constant.value);
+            out.push_str(&format!(
+                "{}{}static let {}: {} = {}",
+                self.indent(),
+                vis,
+                constant.name,
+                self.map_type(&constant.ty),
+                val_str
+            ));
+        }
+        for method in &imp.methods {
+            if has_emitted {
+                out.push_str("\n\n");
+            }
+            has_emitted = true;
             out.push_str(&self.generate_method(&imp.target_type, method, false));
         }
         out.push('\n');
@@ -1555,12 +1648,24 @@ impl SwiftGenerator {
                 format!("{}.{}({})", r_str, swift_method, args_str)
             }
             ExprKind::FieldAccess { receiver, field } => {
-                format!("{}.{}", self.generate_expr(receiver), field)
+                let f = if field == "raw_value" {
+                    "rawValue"
+                } else {
+                    field.as_str()
+                };
+                format!("{}.{}", self.generate_expr(receiver), f)
             }
             ExprKind::StructInit { name, fields } => {
                 let fields_str = fields
                     .iter()
-                    .map(|(k, v)| format!("{}: {}", k, self.generate_expr(v)))
+                    .map(|(k, v)| {
+                        let k_str = if k == "raw_value" {
+                            "rawValue"
+                        } else {
+                            k.as_str()
+                        };
+                        format!("{}: {}", k_str, self.generate_expr(v))
+                    })
                     .collect::<Vec<_>>()
                     .join(", ");
                 format!("{}({})", name, fields_str)
@@ -1903,7 +2008,7 @@ final class {pkg}Tests: XCTestCase {{
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rust_swift_ir::{EnumVariant, FieldDef, Param, SourceSpan};
+    use rust_swift_ir::{ConstantDef, EnumVariant, FieldDef, Param, SourceSpan};
 
     #[test]
     fn test_generate_enum_and_function() {
@@ -2063,6 +2168,7 @@ mod tests {
             is_public: true,
             is_codable: false,
             is_observable: false,
+            is_bitflags: false,
             span: SourceSpan {
                 file: "types.rs".into(),
                 start_line: 1,
@@ -2129,6 +2235,7 @@ mod tests {
                     end_line: 7,
                 },
             }],
+            constants: vec![],
             span: SourceSpan {
                 file: "types.rs".into(),
                 start_line: 4,
@@ -2575,6 +2682,7 @@ mod tests {
             is_public: true,
             is_codable: true,
             is_observable: false,
+            is_bitflags: false,
             span: SourceSpan::default(),
         }));
         module.items.push(Item::Enum(EnumDef {
@@ -2622,6 +2730,7 @@ mod tests {
             is_public: true,
             is_codable: false,
             is_observable: true,
+            is_bitflags: false,
             span: SourceSpan::default(),
         }));
         module.items.push(Item::Impl(ImplBlock {
@@ -2678,6 +2787,7 @@ mod tests {
                 is_public: true,
                 span: SourceSpan::default(),
             }],
+            constants: vec![],
             span: SourceSpan::default(),
         }));
 
@@ -2777,5 +2887,90 @@ mod tests {
         assert!(code.contains("Button(\"Decrement\") {"));
         assert!(code.contains("model.decrement()"));
         assert!(code.contains("Spacer()"));
+    }
+
+    #[test]
+    fn test_codegen_bitflags_optionset() {
+        let mut module = Module::new("BitflagsTest");
+        module.items.push(Item::Struct(StructDef {
+            name: "FilePermissions".into(),
+            fields: vec![FieldDef {
+                name: "raw_value".into(),
+                ty: Type::U32,
+                is_public: true,
+            }],
+            is_public: true,
+            is_codable: false,
+            is_observable: false,
+            is_bitflags: true,
+            span: SourceSpan::default(),
+        }));
+
+        module.items.push(Item::Impl(ImplBlock {
+            target_type: "FilePermissions".into(),
+            methods: vec![],
+            constants: vec![
+                ConstantDef {
+                    name: "READ".into(),
+                    ty: Type::Named("FilePermissions".into()),
+                    value: Expr::new(
+                        ExprKind::StructInit {
+                            name: "FilePermissions".into(),
+                            fields: vec![(
+                                "raw_value".into(),
+                                Expr::new(
+                                    ExprKind::Literal(Literal::Int {
+                                        value: 1,
+                                        ty: Type::U32,
+                                    }),
+                                    Type::U32,
+                                ),
+                            )],
+                        },
+                        Type::Named("FilePermissions".into()),
+                    ),
+                    is_public: true,
+                    span: SourceSpan::default(),
+                },
+                ConstantDef {
+                    name: "WRITE".into(),
+                    ty: Type::Named("FilePermissions".into()),
+                    value: Expr::new(
+                        ExprKind::StructInit {
+                            name: "FilePermissions".into(),
+                            fields: vec![(
+                                "raw_value".into(),
+                                Expr::new(
+                                    ExprKind::Literal(Literal::Int {
+                                        value: 2,
+                                        ty: Type::U32,
+                                    }),
+                                    Type::U32,
+                                ),
+                            )],
+                        },
+                        Type::Named("FilePermissions".into()),
+                    ),
+                    is_public: true,
+                    span: SourceSpan::default(),
+                },
+            ],
+            span: SourceSpan::default(),
+        }));
+
+        let mut gen = SwiftGenerator::new();
+        let (code, _) = gen.generate_module(&module);
+        assert!(code.contains("public struct FilePermissions: OptionSet, Sendable {"));
+        assert!(code.contains("public let rawValue: UInt32"));
+        assert!(code.contains("public init(rawValue: UInt32) {"));
+        assert!(code.contains("self.rawValue = rawValue"));
+        assert!(code.contains("public static func | (lhs: FilePermissions, rhs: FilePermissions) -> FilePermissions {"));
+        assert!(code.contains("public static func & (lhs: FilePermissions, rhs: FilePermissions) -> FilePermissions {"));
+        assert!(code.contains("extension FilePermissions {"));
+        assert!(
+            code.contains("public static let READ: FilePermissions = FilePermissions(rawValue: 1)")
+        );
+        assert!(code
+            .contains("public static let WRITE: FilePermissions = FilePermissions(rawValue: 2)"));
     }
 }
