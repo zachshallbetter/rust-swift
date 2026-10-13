@@ -1,12 +1,12 @@
 {
   "format": "2",
-  "generatorVersion": "0.6.0",
+  "generatorVersion": "0.1.0",
   "root": ".",
   "validityBasis": "aggregate-source-digest",
   "selectedPaths": [],
   "sourceSelection": {
-    "includedCount": 107,
-    "includedBytes": 600324,
+    "includedCount": 108,
+    "includedBytes": 602496,
     "excludedCounts": {
       "excluded-directory": 7727,
       "excluded-path": 1,
@@ -20,14 +20,14 @@
     "repositories": [
       {
         "path": ".",
-        "commit": "a704dc0168d94ded938ab7274dafb369c2c02cdf",
-        "branch": "feature/ci-workflow",
+        "commit": "0e78081497891124dff2fa6a6b54c43df042a213",
+        "branch": "main",
         "dirty": true,
         "remote": "https://github.com/zachshallbetter/rust-swift.git"
       }
     ]
   },
-  "aggregateSourceDigest": "e4275e618db885e6838d25885beded8f3392f3d80763ad0872d86666bef04cde",
+  "aggregateSourceDigest": "dd49d268f3b96c94562863d2a48e00e228e3c64b1b36ae0223faf30a7a82b3a7",
   "sources": [
     {
       "path": ".agents/rules/ci.md",
@@ -95,6 +95,11 @@
       "sha256": "9ccb7c144fbb9d26ccd74c0b5cb015b90de9cbe404fef95d20a2d941005a2469"
     },
     {
+      "path": "CHANGELOG.md",
+      "bytes": 2172,
+      "sha256": "c3197ff68c6b3720279171bbfa3422c799f31f4775fc12fbbabfcd053c0cac34"
+    },
+    {
       "path": "CONTEXT_SOURCES.json",
       "bytes": 1213,
       "sha256": "111b1b77d9c3aba3b78fe973b002d9356ce313d60d2cbc69c902a678a949e9b7"
@@ -122,7 +127,7 @@
     {
       "path": "PROJECT_PROFILE.json",
       "bytes": 3387,
-      "sha256": "4503d9845ceeebc4217ac2608910558112870bf18589cf5e5d5e31eedce8bff0"
+      "sha256": "88f79c94b06b5da7b0e9084b8daffef1e1b48e07360ad10e55288ae58d7a332f"
     },
     {
       "path": "README.md",
@@ -132,7 +137,7 @@
     {
       "path": "VERSION",
       "bytes": 6,
-      "sha256": "97a5d6e540a6120d09c39ddb667e0e8e2bac7fcc2ffef813b82e08fd60365bce"
+      "sha256": "e9dd8507f4bf0c6f42458e41aea833ad0bd3f6127272335eee9bf4d58541ed67"
     },
     {
       "path": "bindings/PROJECT_BINDINGS.yaml",

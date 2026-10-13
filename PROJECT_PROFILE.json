@@ -1,7 +1,7 @@
 {
   "projectId": "rust-swift",
   "projectName": "Rust to Swift Compiler",
-  "profileVersion": "0.6.0",
+  "profileVersion": "0.1.0",
   "profileStatus": "provisional",
   "intentRef": "PROJECT_INTENT.md",
   "authorityRef": "docs/AUTHORITY_MODEL.md",
