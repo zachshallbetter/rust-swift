@@ -40,6 +40,23 @@ jobs:
       - name: Validate Formal Bootstrap
         run: python3 scripts/validate-bootstrap.py
 
+      - name: Validate Epistemic Proof Dossier (rust-swift-proof)
+        run: |
+          mkdir -p target/qualification
+          cargo run -p rust-swift-cli -- proof examples/fsm_example.rs -o target/qualification/proof-receipt.json
+          test -f target/qualification/proof-receipt.json
+
+      - name: Validate Incremental CSG Delta Synchronizer (rust-swift-sync)
+        run: |
+          cargo run -p rust-swift-cli -- sync --input-dir examples/PluginDemoApp/Sources/PluginDemoApp --output-dir target/qualification/sync-ci
+          test -f target/qualification/sync-ci/.rust-swift-sync-cache.json
+
+      - name: Validate SPM Build Tool Plugin (rust-swift-spm-plugin)
+        run: |
+          cargo build
+          cd examples/PluginDemoApp
+          swift run
+
       - name: Validate App Store Connect & Notarization Pipeline
         run: |
           python3 scripts/asc-token.py --test
