@@ -5,13 +5,13 @@
   "validityBasis": "aggregate-source-digest",
   "selectedPaths": [],
   "sourceSelection": {
-    "includedCount": 190,
-    "includedBytes": 3093071,
+    "includedCount": 204,
+    "includedBytes": 3366042,
     "excludedCounts": {
-      "excluded-directory": 45870,
+      "excluded-directory": 45993,
       "excluded-path": 1,
-      "extension": 5974,
-      "symlink": 4
+      "extension": 8226,
+      "symlink": 5
     }
   },
   "repositoryState": {
@@ -20,14 +20,14 @@
     "repositories": [
       {
         "path": ".",
-        "commit": "bcbcef856dfccdefe96ea591b4fcad047373fa60",
-        "branch": "main",
+        "commit": "5aa7d0a90002a747fe4ce8952918c40426603894",
+        "branch": "feature/swiftui-demo-app",
         "dirty": true,
         "remote": "https://github.com/zachshallbetter/rust-swift.git"
       }
     ]
   },
-  "aggregateSourceDigest": "76565aa3869b06b771a4d3824e1d0f168273881b12540abb45e4d2dc600bb7e4",
+  "aggregateSourceDigest": "37530fa8d024487928f45e3faf3b2b0e41f2cfbe67867fa3a6da6bdc8672b9df",
   "sources": [
     {
       "path": ".agents/rules/ci.md",
@@ -86,8 +86,8 @@
     },
     {
       "path": ".github/workflows/ci.yml",
-      "bytes": 1294,
-      "sha256": "23cda23bc87b6283f3f274e563a52177c3e8b99eda99bc3f8f3503ee7911c295"
+      "bytes": 2063,
+      "sha256": "130429c4a5adf870fc3f27e51f7ddb398c742dd4a4f2b79d93ad454cc2a4d26a"
     },
     {
       "path": "AGENTS.md",
@@ -131,8 +131,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 20998,
-      "sha256": "875b945e308585d4892e214e8a82bee459c35038d2eb5111d84d76c1a1c21c58"
+      "bytes": 21044,
+      "sha256": "f1e8c955183883d753b038b1892ffdd131a47f7ff62cb0a16ae3d99a652b81c5"
     },
     {
       "path": "VERSION",
@@ -721,8 +721,8 @@
     },
     {
       "path": "examples/PluginDemoApp/.build/out/Intermediates.noindex/PluginDemoApp.build/Debug/PluginDemoApp-p.build/Objects-normal/arm64/PluginDemoApp-dependencies-1.json",
-      "bytes": 21245,
-      "sha256": "d6382c1615ebbfb113a8d6af93480bf9809c6e4b74f07506ec2c616f25052c7e"
+      "bytes": 21247,
+      "sha256": "3ffb3f2e581cdbda5f9277a7332ca6edcbf45ebd2cf525c8ab4612f8d1154fc6"
     },
     {
       "path": "examples/PluginDemoApp/.build/out/Intermediates.noindex/PluginDemoApp.build/Debug/PluginDemoApp-p.build/Objects-normal/arm64/PluginDemoApp.abi.json",
@@ -791,8 +791,8 @@
     },
     {
       "path": "examples/PluginDemoApp/.build/plugins/cache/RustSwiftPlugin-state.json",
-      "bytes": 10937,
-      "sha256": "f4951787abaed62896dccb66135c4d52bc758c8bf9f423125b4b322948bbb5fa"
+      "bytes": 9151,
+      "sha256": "6c5d2ecf09d3090c9d17c7f9e9446e22f069ebd281bc823a842c00e8e6ccbd3f"
     },
     {
       "path": "examples/PluginDemoApp/.build/plugins/cache/RustSwiftPlugin.dSYM/Contents/Resources/Relocations/aarch64/RustSwiftPlugin.yml",
@@ -821,8 +821,78 @@
     },
     {
       "path": "examples/README.md",
-      "bytes": 2173,
-      "sha256": "5ff4bd6b90f98947fd9be2128951b0e4a733aad975383076c2664a354805c47d"
+      "bytes": 2394,
+      "sha256": "4f5eae02cb842217fa1ac4f4566506bdbabd469dd2da915ac9a6f3b8215bb2e4"
+    },
+    {
+      "path": "examples/SwiftUIDemoApp/.build/out/Intermediates.noindex/SwiftUIDemoApp.build/Debug/SwiftUIDemoApp-p.build/Objects-normal/arm64/SwiftUIDemoApp-OutputFileMap.json",
+      "bytes": 6444,
+      "sha256": "ed7471b6d366d0ccf226e8ff8251ed73af4a375abd090b45153b6dc0060f4c93"
+    },
+    {
+      "path": "examples/SwiftUIDemoApp/.build/out/Intermediates.noindex/SwiftUIDemoApp.build/Debug/SwiftUIDemoApp-p.build/Objects-normal/arm64/SwiftUIDemoApp-dependencies-1.json",
+      "bytes": 44219,
+      "sha256": "33ccde3eacd431a6cd830e5df2989b005c93f0603d26f9acb079963a6290cc41"
+    },
+    {
+      "path": "examples/SwiftUIDemoApp/.build/out/Intermediates.noindex/SwiftUIDemoApp.build/Debug/SwiftUIDemoApp-p.build/Objects-normal/arm64/SwiftUIDemoApp.abi.json",
+      "bytes": 149,
+      "sha256": "4277ac6b49f8511196028a5ac20f5b1b1dfa754c24615d34068089f0b1739728"
+    },
+    {
+      "path": "examples/SwiftUIDemoApp/.build/out/Intermediates.noindex/SwiftUIDemoApp.build/Debug/SwiftUIDemoApp-p.build/Objects-normal/arm64/SwiftUIDemoApp_const_extract_protocols.json",
+      "bytes": 386,
+      "sha256": "deb34a50c6dd08a80341a6229940a0cc38dbc93f989afd9897d76ebe392625b3"
+    },
+    {
+      "path": "examples/SwiftUIDemoApp/.build/out/Intermediates.noindex/XCBuildData/efdb414b7008e96fcb2b6ffa4fbe76d3.xcbuilddata/build-request.json",
+      "bytes": 6105,
+      "sha256": "23ab573c5b831b6b5dd0fb90a4ecfc23344b3b323e835335ee2480e845c46549"
+    },
+    {
+      "path": "examples/SwiftUIDemoApp/.build/out/Intermediates.noindex/XCBuildData/efdb414b7008e96fcb2b6ffa4fbe76d3.xcbuilddata/manifest.json",
+      "bytes": 191599,
+      "sha256": "6822cfc1370d64ddd94248ed8d094f959802cf639ed511d29df11220bb2a9650"
+    },
+    {
+      "path": "examples/SwiftUIDemoApp/.build/out/Intermediates.noindex/XCBuildData/efdb414b7008e96fcb2b6ffa4fbe76d3.xcbuilddata/target-graph.txt",
+      "bytes": 516,
+      "sha256": "62d457ccb4879915c753220e4b10405d8b77f36347ba06cfe3b924510c7742e2"
+    },
+    {
+      "path": "examples/SwiftUIDemoApp/.build/out/Intermediates.noindex/XCBuildData/prior-build-descriptions.txt",
+      "bytes": 33,
+      "sha256": "c1fa480d82ac200ce077cf15c27e161e949552d02fe296d28a32dc3c7c49ee13"
+    },
+    {
+      "path": "examples/SwiftUIDemoApp/.build/plugins/cache/RustSwiftPlugin-state.json",
+      "bytes": 9175,
+      "sha256": "d2df6d9f7c870327ae0d0bc9bbeebab9206628b36e26174c38578b45eb66edc3"
+    },
+    {
+      "path": "examples/SwiftUIDemoApp/.build/plugins/cache/RustSwiftPlugin.dSYM/Contents/Resources/Relocations/aarch64/RustSwiftPlugin.yml",
+      "bytes": 10723,
+      "sha256": "4c43af22920c72150cc70b84e570d3ab92caf54b509fe40bf0ac52763df75f08"
+    },
+    {
+      "path": "examples/SwiftUIDemoApp/.build/plugins/outputs/swiftuidemoapp/SwiftUIDemoApp/destination/RustSwiftPlugin/manifest.json",
+      "bytes": 1776,
+      "sha256": "076e6c021e459aaece56d2d0ddd4611d39e5ac25c4704c4292ed42a4b7d2c15f"
+    },
+    {
+      "path": "examples/SwiftUIDemoApp/.build/workspace-state.json",
+      "bytes": 534,
+      "sha256": "67da73d9fddaa46d5ff2211789036be3f5418f1f5b5dd54f8547265b70ee2fea"
+    },
+    {
+      "path": "examples/SwiftUIDemoApp/README.md",
+      "bytes": 1259,
+      "sha256": "076b8f95ea77b3f96108c6caebcf66b930677323e89b651d93a365c283582939"
+    },
+    {
+      "path": "examples/SwiftUIDemoApp/Sources/SwiftUIDemoApp/Model.rs",
+      "bytes": 801,
+      "sha256": "77917af4626a29d333cb9d18fae6ccb9a7f11362637d5ccba4901f2cb5a7a18c"
     },
     {
       "path": "examples/fsm_example.rs",
