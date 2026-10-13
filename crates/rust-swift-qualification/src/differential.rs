@@ -821,6 +821,403 @@ struct TypesRunner {
         })
     }
 
+    /// Run the Event Dispatch & Trace Model (50 sequential transitions with effect streams) differential test
+    pub fn test_event_trace(
+        &self,
+        out_dir: &Path,
+    ) -> Result<QualificationReport, Box<dyn std::error::Error>> {
+        let player_source = r#"
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum PlayerState {
+    Idle,
+    Loading,
+    Playing,
+    Paused,
+    Buffering,
+    Stopped,
+    Error,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum PlayerEvent {
+    Load,
+    Play,
+    Pause,
+    BufferUnderflow,
+    BufferReady,
+    Stop,
+    Fail,
+    Reset,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum PlayerEffect {
+    StartDecoder,
+    StopDecoder,
+    RenderFrame,
+    MuteAudio,
+    UnmuteAudio,
+    LogNotice,
+    RaiseAlert,
+}
+
+pub fn step_player(state: PlayerState, event: PlayerEvent) -> (PlayerState, Vec<PlayerEffect>) {
+    match (state, event) {
+        (PlayerState::Idle, PlayerEvent::Load) => {
+            (PlayerState::Loading, vec![PlayerEffect::StartDecoder, PlayerEffect::LogNotice])
+        }
+        (PlayerState::Loading, PlayerEvent::BufferReady) => {
+            (PlayerState::Paused, vec![PlayerEffect::UnmuteAudio])
+        }
+        (PlayerState::Paused, PlayerEvent::Play) => {
+            (PlayerState::Playing, vec![PlayerEffect::RenderFrame])
+        }
+        (PlayerState::Playing, PlayerEvent::Pause) => {
+            (PlayerState::Paused, vec![PlayerEffect::MuteAudio])
+        }
+        (PlayerState::Playing, PlayerEvent::BufferUnderflow) => {
+            (PlayerState::Buffering, vec![PlayerEffect::MuteAudio, PlayerEffect::LogNotice])
+        }
+        (PlayerState::Buffering, PlayerEvent::BufferReady) => {
+            (PlayerState::Playing, vec![PlayerEffect::UnmuteAudio, PlayerEffect::RenderFrame])
+        }
+        (PlayerState::Playing, PlayerEvent::Stop) => {
+            (PlayerState::Stopped, vec![PlayerEffect::StopDecoder, PlayerEffect::MuteAudio])
+        }
+        (PlayerState::Paused, PlayerEvent::Stop) => {
+            (PlayerState::Stopped, vec![PlayerEffect::StopDecoder])
+        }
+        (PlayerState::Stopped, PlayerEvent::Reset) => {
+            (PlayerState::Idle, vec![PlayerEffect::LogNotice])
+        }
+        (PlayerState::Error, PlayerEvent::Reset) => {
+            (PlayerState::Idle, vec![PlayerEffect::LogNotice])
+        }
+        (PlayerState::Idle, PlayerEvent::Fail) => {
+            (PlayerState::Error, vec![PlayerEffect::StopDecoder, PlayerEffect::RaiseAlert])
+        }
+        (PlayerState::Loading, PlayerEvent::Fail) => {
+            (PlayerState::Error, vec![PlayerEffect::StopDecoder, PlayerEffect::RaiseAlert])
+        }
+        (PlayerState::Playing, PlayerEvent::Fail) => {
+            (PlayerState::Error, vec![PlayerEffect::StopDecoder, PlayerEffect::RaiseAlert])
+        }
+        (PlayerState::Paused, PlayerEvent::Fail) => {
+            (PlayerState::Error, vec![PlayerEffect::StopDecoder, PlayerEffect::RaiseAlert])
+        }
+        (PlayerState::Buffering, PlayerEvent::Fail) => {
+            (PlayerState::Error, vec![PlayerEffect::StopDecoder, PlayerEffect::RaiseAlert])
+        }
+        (PlayerState::Stopped, PlayerEvent::Fail) => {
+            (PlayerState::Error, vec![PlayerEffect::StopDecoder, PlayerEffect::RaiseAlert])
+        }
+        _ => (state, vec![]),
+    }
+}
+"#;
+
+        let source_hash = Self::compute_sha256(player_source);
+        let (rustc_ver, swift_ver) = Self::toolchain_versions();
+
+        // 1. Lower to IR
+        let mut frontend = Frontend::new("player_fsm.rs");
+        let module = frontend
+            .parse_and_lower(player_source)
+            .map_err(|diags| format!("Frontend rejected player FSM fixture: {:?}", diags))?;
+
+        // 2. Generate Swift package
+        let pkg_dir = out_dir.join("player_pkg");
+        let mut generator = SwiftGenerator::new();
+        generator.emit_package(&module, &pkg_dir, "PlayerModule")?;
+
+        // 3. Create a Swift test runner executable
+        let runner_swift = r#"
+import Foundation
+
+@main
+struct EventTraceRunner {
+    static func main() {
+        let events: [PlayerEvent] = [
+            .Load, .BufferReady, .Play, .BufferUnderflow, .BufferReady,
+            .Pause, .Play, .Stop, .Reset, .Load,
+            .Play, .BufferReady, .Play, .Pause, .Play,
+            .BufferUnderflow, .Fail, .Reset, .Load, .BufferReady,
+            .Play, .Pause, .Stop, .Reset, .Load,
+            .BufferReady, .Play, .BufferUnderflow, .BufferReady, .Pause,
+            .Play, .Stop, .Reset, .Load, .BufferReady,
+            .Play, .BufferUnderflow, .BufferReady, .Pause, .Play,
+            .Stop, .Reset, .Load, .Fail, .Reset,
+            .Load, .BufferReady, .Play, .Stop, .Reset
+        ]
+
+        var current_state = PlayerState.Idle
+        for (idx, evt) in events.enumerated() {
+            let before = current_state
+            let (next_state, effects) = step_player(current_state, evt)
+            current_state = next_state
+            let effects_json = effects.map { "\"\($0.rawValue)\"" }.joined(separator: ",")
+            print("{\"sequence_id\":\(idx),\"state_before\":\"\(before.rawValue)\",\"event_in\":\"\(evt.rawValue)\",\"state_after\":\"\(next_state.rawValue)\",\"effects\":[\(effects_json)]}")
+        }
+    }
+}
+"#;
+        let sources_dir = pkg_dir.join("Sources").join("PlayerModule");
+        let main_swift_path = sources_dir.join("main.swift");
+        fs::write(&main_swift_path, runner_swift)?;
+
+        // 4. Compile and execute Swift code
+        let swift_source = sources_dir.join("player_fsm.swift");
+        let swiftc_out = Command::new("swiftc")
+            .arg("-parse-as-library")
+            .arg("-emit-executable")
+            .arg(&swift_source)
+            .arg(&main_swift_path)
+            .arg("-o")
+            .arg(pkg_dir.join("player_runner"))
+            .output()?;
+
+        if !swiftc_out.status.success() {
+            return Err(format!(
+                "Failed to compile Swift EventTrace runner: {}",
+                String::from_utf8_lossy(&swiftc_out.stderr)
+            )
+            .into());
+        }
+
+        let exec_out = Command::new(pkg_dir.join("player_runner")).output()?;
+        let swift_results = String::from_utf8(exec_out.stdout)?;
+
+        // 5. Compute expected results using Rust implementation
+        #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+        enum RustPlayerState {
+            Idle,
+            Loading,
+            Playing,
+            Paused,
+            Buffering,
+            Stopped,
+            Error,
+        }
+        #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+        enum RustPlayerEvent {
+            Load,
+            Play,
+            Pause,
+            BufferUnderflow,
+            BufferReady,
+            Stop,
+            Fail,
+            Reset,
+        }
+        #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+        enum RustPlayerEffect {
+            StartDecoder,
+            StopDecoder,
+            RenderFrame,
+            MuteAudio,
+            UnmuteAudio,
+            LogNotice,
+            RaiseAlert,
+        }
+        fn rust_step_player(
+            state: RustPlayerState,
+            event: RustPlayerEvent,
+        ) -> (RustPlayerState, Vec<RustPlayerEffect>) {
+            match (state, event) {
+                (RustPlayerState::Idle, RustPlayerEvent::Load) => (
+                    RustPlayerState::Loading,
+                    vec![RustPlayerEffect::StartDecoder, RustPlayerEffect::LogNotice],
+                ),
+                (RustPlayerState::Loading, RustPlayerEvent::BufferReady) => {
+                    (RustPlayerState::Paused, vec![RustPlayerEffect::UnmuteAudio])
+                }
+                (RustPlayerState::Paused, RustPlayerEvent::Play) => (
+                    RustPlayerState::Playing,
+                    vec![RustPlayerEffect::RenderFrame],
+                ),
+                (RustPlayerState::Playing, RustPlayerEvent::Pause) => {
+                    (RustPlayerState::Paused, vec![RustPlayerEffect::MuteAudio])
+                }
+                (RustPlayerState::Playing, RustPlayerEvent::BufferUnderflow) => (
+                    RustPlayerState::Buffering,
+                    vec![RustPlayerEffect::MuteAudio, RustPlayerEffect::LogNotice],
+                ),
+                (RustPlayerState::Buffering, RustPlayerEvent::BufferReady) => (
+                    RustPlayerState::Playing,
+                    vec![RustPlayerEffect::UnmuteAudio, RustPlayerEffect::RenderFrame],
+                ),
+                (RustPlayerState::Playing, RustPlayerEvent::Stop) => (
+                    RustPlayerState::Stopped,
+                    vec![RustPlayerEffect::StopDecoder, RustPlayerEffect::MuteAudio],
+                ),
+                (RustPlayerState::Paused, RustPlayerEvent::Stop) => (
+                    RustPlayerState::Stopped,
+                    vec![RustPlayerEffect::StopDecoder],
+                ),
+                (RustPlayerState::Stopped, RustPlayerEvent::Reset) => {
+                    (RustPlayerState::Idle, vec![RustPlayerEffect::LogNotice])
+                }
+                (RustPlayerState::Error, RustPlayerEvent::Reset) => {
+                    (RustPlayerState::Idle, vec![RustPlayerEffect::LogNotice])
+                }
+                (RustPlayerState::Idle, RustPlayerEvent::Fail) => (
+                    RustPlayerState::Error,
+                    vec![RustPlayerEffect::StopDecoder, RustPlayerEffect::RaiseAlert],
+                ),
+                (RustPlayerState::Loading, RustPlayerEvent::Fail) => (
+                    RustPlayerState::Error,
+                    vec![RustPlayerEffect::StopDecoder, RustPlayerEffect::RaiseAlert],
+                ),
+                (RustPlayerState::Playing, RustPlayerEvent::Fail) => (
+                    RustPlayerState::Error,
+                    vec![RustPlayerEffect::StopDecoder, RustPlayerEffect::RaiseAlert],
+                ),
+                (RustPlayerState::Paused, RustPlayerEvent::Fail) => (
+                    RustPlayerState::Error,
+                    vec![RustPlayerEffect::StopDecoder, RustPlayerEffect::RaiseAlert],
+                ),
+                (RustPlayerState::Buffering, RustPlayerEvent::Fail) => (
+                    RustPlayerState::Error,
+                    vec![RustPlayerEffect::StopDecoder, RustPlayerEffect::RaiseAlert],
+                ),
+                (RustPlayerState::Stopped, RustPlayerEvent::Fail) => (
+                    RustPlayerState::Error,
+                    vec![RustPlayerEffect::StopDecoder, RustPlayerEffect::RaiseAlert],
+                ),
+                _ => (state, vec![]),
+            }
+        }
+
+        let events = [
+            RustPlayerEvent::Load,
+            RustPlayerEvent::BufferReady,
+            RustPlayerEvent::Play,
+            RustPlayerEvent::BufferUnderflow,
+            RustPlayerEvent::BufferReady,
+            RustPlayerEvent::Pause,
+            RustPlayerEvent::Play,
+            RustPlayerEvent::Stop,
+            RustPlayerEvent::Reset,
+            RustPlayerEvent::Load,
+            RustPlayerEvent::Play,
+            RustPlayerEvent::BufferReady,
+            RustPlayerEvent::Play,
+            RustPlayerEvent::Pause,
+            RustPlayerEvent::Play,
+            RustPlayerEvent::BufferUnderflow,
+            RustPlayerEvent::Fail,
+            RustPlayerEvent::Reset,
+            RustPlayerEvent::Load,
+            RustPlayerEvent::BufferReady,
+            RustPlayerEvent::Play,
+            RustPlayerEvent::Pause,
+            RustPlayerEvent::Stop,
+            RustPlayerEvent::Reset,
+            RustPlayerEvent::Load,
+            RustPlayerEvent::BufferReady,
+            RustPlayerEvent::Play,
+            RustPlayerEvent::BufferUnderflow,
+            RustPlayerEvent::BufferReady,
+            RustPlayerEvent::Pause,
+            RustPlayerEvent::Play,
+            RustPlayerEvent::Stop,
+            RustPlayerEvent::Reset,
+            RustPlayerEvent::Load,
+            RustPlayerEvent::BufferReady,
+            RustPlayerEvent::Play,
+            RustPlayerEvent::BufferUnderflow,
+            RustPlayerEvent::BufferReady,
+            RustPlayerEvent::Pause,
+            RustPlayerEvent::Play,
+            RustPlayerEvent::Stop,
+            RustPlayerEvent::Reset,
+            RustPlayerEvent::Load,
+            RustPlayerEvent::Fail,
+            RustPlayerEvent::Reset,
+            RustPlayerEvent::Load,
+            RustPlayerEvent::BufferReady,
+            RustPlayerEvent::Play,
+            RustPlayerEvent::Stop,
+            RustPlayerEvent::Reset,
+        ];
+
+        let mut current_state = RustPlayerState::Idle;
+        let mut rust_lines = Vec::new();
+        for (idx, &evt) in events.iter().enumerate() {
+            let before = current_state;
+            let (next_state, effects) = rust_step_player(current_state, evt);
+            current_state = next_state;
+            let effects_json = effects
+                .iter()
+                .map(|e| format!("\"{:?}\"", e))
+                .collect::<Vec<_>>()
+                .join(",");
+            rust_lines.push(format!(
+                "{{\"sequence_id\":{},\"state_before\":\"{:?}\",\"event_in\":\"{:?}\",\"state_after\":\"{:?}\",\"effects\":[{}]}}",
+                idx, before, evt, next_state, effects_json
+            ));
+        }
+
+        let swift_lines: Vec<&str> = swift_results
+            .lines()
+            .map(|l| l.trim())
+            .filter(|l| !l.is_empty())
+            .collect();
+
+        let total = rust_lines.len();
+        let mut cases_passed = 0;
+        let mut details = Vec::new();
+
+        for (idx, expected) in rust_lines.iter().enumerate() {
+            if idx < swift_lines.len() && expected == swift_lines[idx] {
+                cases_passed += 1;
+                details.push(format!("Transition #{}: PASS ({})", idx + 1, expected));
+            } else {
+                let actual = if idx < swift_lines.len() {
+                    swift_lines[idx]
+                } else {
+                    "<missing>"
+                };
+                details.push(format!(
+                    "Transition #{}: FAIL (Expected: {}, Got: {})",
+                    idx + 1,
+                    expected,
+                    actual
+                ));
+            }
+        }
+
+        let rust_full_trace = rust_lines.join("\n");
+        let swift_full_trace = swift_lines.join("\n");
+        let rust_digest = Self::compute_sha256(&rust_full_trace);
+        let swift_digest = Self::compute_sha256(&swift_full_trace);
+
+        let digests_match = rust_digest == swift_digest;
+        details.push(format!(
+            "Trace digest verification: Rust={}, Swift={}, Equal={}",
+            rust_digest, swift_digest, digests_match
+        ));
+
+        let status = if cases_passed == total && digests_match {
+            "PASSED"
+        } else {
+            "FAILED"
+        };
+
+        Ok(QualificationReport {
+            fixture_name: "event_dispatch_and_trace_stream".into(),
+            source_hash,
+            rustc_version: rustc_ver,
+            swift_version: swift_ver,
+            cases_tested: total,
+            cases_passed,
+            cases_failed: total - cases_passed,
+            status: status.into(),
+            timestamp: "2026-10-13T20:00:00Z".into(),
+            details,
+        })
+    }
+
     /// Run negative rejection tests asserting exact stable diagnostic codes
     pub fn test_negative_rejections(
         &self,
@@ -1026,6 +1423,19 @@ mod tests {
             .expect("Types differential test should pass");
         assert_eq!(report.status, "PASSED");
         assert_eq!(report.cases_passed, 5);
+        assert_eq!(report.cases_failed, 0);
+    }
+
+    #[test]
+    fn test_event_trace_differential_passes() {
+        let runner = DifferentialRunner::new(".");
+        let temp_dir = std::env::temp_dir().join("event_trace_diff_test");
+        let _ = fs::create_dir_all(&temp_dir);
+        let report = runner
+            .test_event_trace(&temp_dir)
+            .expect("Event trace differential test should pass");
+        assert_eq!(report.status, "PASSED");
+        assert_eq!(report.cases_passed, 50);
         assert_eq!(report.cases_failed, 0);
     }
 }

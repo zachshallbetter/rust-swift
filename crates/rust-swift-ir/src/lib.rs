@@ -48,7 +48,14 @@ pub enum Type {
     Unit,
     Named(String),
     Tuple(Vec<Type>),
-    Ref { inner: Box<Type>, mutable: bool },
+    Array {
+        element: Box<Type>,
+        size: Option<usize>,
+    },
+    Ref {
+        inner: Box<Type>,
+        mutable: bool,
+    },
 }
 
 impl Type {
@@ -236,6 +243,7 @@ pub enum ExprKind {
         body: Box<Expr>,
     },
     Tuple(Vec<Expr>),
+    Array(Vec<Expr>),
     Return(Option<Box<Expr>>),
     Break(Option<Box<Expr>>),
     Continue,
