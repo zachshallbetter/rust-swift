@@ -46,6 +46,12 @@ pub enum Type {
     Usize,
     Bool,
     Unit,
+    String,
+    Option(Box<Type>),
+    Result {
+        ok: Box<Type>,
+        err: Box<Type>,
+    },
     Named(String),
     Tuple(Vec<Type>),
     Array {
@@ -156,6 +162,7 @@ pub enum Literal {
     Int { value: i128, ty: Type },
     UInt { value: u128, ty: Type },
     Bool(bool),
+    String(String),
     Unit,
 }
 
@@ -244,6 +251,15 @@ pub enum ExprKind {
     },
     Tuple(Vec<Expr>),
     Array(Vec<Expr>),
+    Index {
+        expr: Box<Expr>,
+        index: Box<Expr>,
+    },
+    Slice {
+        expr: Box<Expr>,
+        start: Option<Box<Expr>>,
+        end: Option<Box<Expr>>,
+    },
     Return(Option<Box<Expr>>),
     Break(Option<Box<Expr>>),
     Continue,

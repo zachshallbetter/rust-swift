@@ -181,6 +181,16 @@ impl Frontend {
             return None;
         }
 
+        if !item_fn.sig.generics.params.is_empty() {
+            self.reject(
+                DiagnosticCode::UnspecializableGenericRejected,
+                "Generic functions without monomorphization are rejected in v0.1",
+                &item_fn.sig.generics,
+                Some("Specialize with concrete types (e.g. Option<i64>, Result<u32, Error>)"),
+            );
+            return None;
+        }
+
         let is_public = matches!(item_fn.vis, syn::Visibility::Public(_));
         let name = item_fn.sig.ident.to_string();
 
@@ -401,6 +411,33 @@ impl Frontend {
                         "u128" => Type::U128,
                         "usize" => Type::Usize,
                         "bool" => Type::Bool,
+                        "String" | "str" => Type::String,
+                        "Option" => {
+                            if let syn::PathArguments::AngleBracketed(args) = &segment.arguments {
+                                if let Some(syn::GenericArgument::Type(inner_ty)) =
+                                    args.args.first()
+                                {
+                                    let elem = self.lower_type(inner_ty);
+                                    return Type::Option(Box::new(elem));
+                                }
+                            }
+                            Type::Named("Option".into())
+                        }
+                        "Result" => {
+                            if let syn::PathArguments::AngleBracketed(args) = &segment.arguments {
+                                let mut iter = args.args.iter().filter_map(|a| match a {
+                                    syn::GenericArgument::Type(t) => Some(self.lower_type(t)),
+                                    _ => None,
+                                });
+                                if let (Some(ok), Some(err)) = (iter.next(), iter.next()) {
+                                    return Type::Result {
+                                        ok: Box::new(ok),
+                                        err: Box::new(err),
+                                    };
+                                }
+                            }
+                            Type::Named("Result".into())
+                        }
                         "Vec" => {
                             if let syn::PathArguments::AngleBracketed(args) = &segment.arguments {
                                 if let Some(syn::GenericArgument::Type(inner_ty)) =
@@ -918,6 +955,47 @@ impl Frontend {
                     },
                 )
             }
+            syn::Expr::Reference(r) => self.lower_expr(&r.expr),
+            syn::Expr::Index(idx) => {
+                let expr = Box::new(self.lower_expr(&idx.expr));
+                match &*idx.index {
+                    syn::Expr::Range(r) => {
+                        let start = r.start.as_ref().map(|s| Box::new(self.lower_expr(s)));
+                        let end = r.end.as_ref().map(|e| Box::new(self.lower_expr(e)));
+                        Expr::new(ExprKind::Slice { expr, start, end }, Type::String)
+                    }
+                    _ => {
+                        let index = Box::new(self.lower_expr(&idx.index));
+                        Expr::new(ExprKind::Index { expr, index }, Type::Unit)
+                    }
+                }
+            }
+            syn::Expr::Cast(c) => {
+                let expr = self.lower_expr(&c.expr);
+                let target_ty = self.lower_type(&c.ty);
+                let func_name = match &target_ty {
+                    Type::I8 => "Int8",
+                    Type::I16 => "Int16",
+                    Type::I32 => "Int32",
+                    Type::I64 => "Int64",
+                    Type::I128 => "Int64",
+                    Type::Isize => "Int",
+                    Type::U8 => "UInt8",
+                    Type::U16 => "UInt16",
+                    Type::U32 => "UInt32",
+                    Type::U64 => "UInt64",
+                    Type::U128 => "UInt64",
+                    Type::Usize => "UInt",
+                    _ => return expr,
+                };
+                Expr::new(
+                    ExprKind::Call {
+                        func: func_name.into(),
+                        args: vec![expr],
+                    },
+                    target_ty,
+                )
+            }
             syn::Expr::Macro(m) => self.lower_macro_expr(&m.mac),
             other => {
                 self.reject(
@@ -1100,7 +1178,17 @@ impl Frontend {
     fn lower_pattern(&mut self, pat: &syn::Pat) -> Pattern {
         match pat {
             syn::Pat::Wild(_) => Pattern::Wildcard,
-            syn::Pat::Ident(id) => Pattern::Variable(id.ident.to_string()),
+            syn::Pat::Ident(id) => {
+                let name = id.ident.to_string();
+                if name == "None" {
+                    Pattern::EnumVariant {
+                        enum_name: None,
+                        variant: "None".into(),
+                    }
+                } else {
+                    Pattern::Variable(name)
+                }
+            }
             syn::Pat::Lit(lit) => match &lit.lit {
                 syn::Lit::Int(i) => {
                     let val: i128 = i.base10_parse().unwrap_or(0);
@@ -1110,6 +1198,7 @@ impl Frontend {
                     })
                 }
                 syn::Lit::Bool(b) => Pattern::Literal(Literal::Bool(b.value)),
+                syn::Lit::Str(s) => Pattern::Literal(Literal::String(s.value())),
                 _ => Pattern::Wildcard,
             },
             syn::Pat::Path(p) => {
@@ -1229,6 +1318,9 @@ impl Frontend {
                 }
             }
             syn::Lit::Bool(b) => Expr::new(ExprKind::Literal(Literal::Bool(b.value)), Type::Bool),
+            syn::Lit::Str(s) => {
+                Expr::new(ExprKind::Literal(Literal::String(s.value())), Type::String)
+            }
             _ => Expr::new(ExprKind::Literal(Literal::Unit), Type::Unit),
         }
     }
@@ -1415,5 +1507,40 @@ mod tests {
         assert!(errs
             .iter()
             .any(|d| d.code == DiagnosticCode::DynamicDispatchRejected));
+    }
+
+    #[test]
+    fn test_generics_rejected_with_e0011() {
+        let src = r#"
+            pub fn identity<T>(x: T) -> T {
+                x
+            }
+        "#;
+        let mut frontend = Frontend::new("generic.rs");
+        let errs = frontend
+            .parse_and_lower(src)
+            .expect_err("Should reject unspecialized generic function");
+        assert!(errs
+            .iter()
+            .any(|d| d.code == DiagnosticCode::UnspecializableGenericRejected));
+    }
+
+    #[test]
+    fn test_option_result_string_parse_and_lower() {
+        let src = r#"
+            pub fn process_data(opt: Option<i64>, res: Result<i64, i32>, s: String) -> i64 {
+                let is_s = opt.is_some();
+                let sub = &s[0..5];
+                match res {
+                    Ok(val) => val,
+                    Err(e) => 0,
+                }
+            }
+        "#;
+        let mut frontend = Frontend::new("data.rs");
+        let module = frontend
+            .parse_and_lower(src)
+            .expect("Should parse and lower data semantics");
+        assert_eq!(module.items.len(), 1);
     }
 }

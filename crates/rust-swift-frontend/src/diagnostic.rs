@@ -16,6 +16,7 @@ pub enum DiagnosticCode {
     ClosureBorrowRejected,
     UnsupportedTypeRejected,
     SyntaxError,
+    UnspecializableGenericRejected,
 }
 
 impl DiagnosticCode {
@@ -30,6 +31,7 @@ impl DiagnosticCode {
             Self::ClosureBorrowRejected => "E0007_CLOSURE_BORROW_REJECTED",
             Self::UnsupportedTypeRejected => "E0008_UNSUPPORTED_TYPE_REJECTED",
             Self::SyntaxError => "E0009_SYNTAX_ERROR",
+            Self::UnspecializableGenericRejected => "E0011_UNSPECIALIZABLE_GENERIC_REJECTED",
         }
     }
 }
