@@ -1,0 +1,44 @@
+# Formal Contract Execution Specification
+# rust-swift compiler v0.1
+
+contract_id: "rust-swift.contracts.execution.v0_1"
+schema_version: "1.0.0"
+title: "Runtime Contract and Invariant Trap Protocol"
+status: "active"
+
+description: >
+  Defines the semantic mapping, trap obligations, and failure determinism
+  for assertions, invariants, and explicit panics lowered from Rust into Swift.
+
+lowering_rules:
+  - rust_primitive: "assert!(condition, [message])"
+    swift_target: "precondition(condition, [message])"
+    execution_mode: "Debug and Release"
+    failure_behavior: "Immediate process termination via SIGABRT / illegal instruction trap"
+    preservation: "Guaranteed invariant verification; condition evaluates before downstream mutations."
+
+  - rust_primitive: "debug_assert!(condition, [message])"
+    swift_target: "assert(condition, [message])"
+    execution_mode: "Debug only"
+    failure_behavior: "Trap during qualification / debug execution; optimized out in unchecked release mode."
+    preservation: "Internal consistency checking without release overhead."
+
+  - rust_primitive: "assert_eq!(left, right, [message])"
+    swift_target: "precondition(left == right, [message])"
+    execution_mode: "Debug and Release"
+    failure_behavior: "Immediate process termination on value inequality."
+    preservation: "Bit-level equality verification across native integer and value types."
+
+  - rust_primitive: "panic!([message])"
+    swift_target: "fatalError([message])"
+    execution_mode: "Unconditional"
+    failure_behavior: "Unconditional immediate fatal trap (Swift Never return type)."
+    preservation: "Unreachable branch trap; rejects undefined state transitions."
+
+invariants:
+  - name: "Fail-Closed Invariant"
+    rule: "A failing assertion in compiled Rust and its compiled Swift equivalent must both abort before any state divergence or observation can occur."
+  - name: "Zero Unwind Escape"
+    rule: "No unwind exception is permitted to escape or be caught across language boundaries in admitted pure runtimes."
+  - name: "Trace Message Fidelity"
+    rule: "String literal error messages in assertions and panics are passed verbatim to Swift precondition and fatalError calls."

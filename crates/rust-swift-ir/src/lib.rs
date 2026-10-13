@@ -234,6 +234,7 @@ pub enum ExprKind {
     Return(Option<Box<Expr>>),
     Break(Option<Box<Expr>>),
     Continue,
+    Panic(Option<String>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -262,6 +263,22 @@ pub enum Stmt {
     Assign {
         target: Expr,
         value: Expr,
+    },
+    Assert {
+        condition: Expr,
+        message: Option<String>,
+    },
+    DebugAssert {
+        condition: Expr,
+        message: Option<String>,
+    },
+    AssertEq {
+        left: Expr,
+        right: Expr,
+        message: Option<String>,
+    },
+    Panic {
+        message: Option<String>,
     },
 }
 

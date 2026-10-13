@@ -319,8 +319,87 @@ impl SwiftGenerator {
                     self.generate_expr(value)
                 )
             }
+            Stmt::Expr(Expr {
+                kind:
+                    ExprKind::If {
+                        cond,
+                        then_branch,
+                        else_branch,
+                    },
+                ..
+            }) => {
+                let mut out = String::new();
+                out.push_str(&format!(
+                    "{}if {} {{\n",
+                    self.indent(),
+                    self.generate_expr(cond)
+                ));
+                self.indent_level += 1;
+                out.push_str(&self.generate_function_body(then_branch, false));
+                self.indent_level -= 1;
+                if let Some(eb) = else_branch {
+                    out.push_str(&format!("{}}} else {{\n", self.indent()));
+                    self.indent_level += 1;
+                    out.push_str(&self.generate_function_body(eb, false));
+                    self.indent_level -= 1;
+                }
+                out.push_str(&format!("{}}}\n", self.indent()));
+                out
+            }
+            Stmt::Expr(Expr {
+                kind: ExprKind::Panic(msg),
+                ..
+            }) => {
+                if let Some(msg) = msg {
+                    format!("{}fatalError(\"{}\")\n", self.indent(), msg)
+                } else {
+                    format!("{}fatalError(\"panic\")\n", self.indent())
+                }
+            }
             Stmt::Expr(expr) => {
                 format!("{}{}\n", self.indent(), self.generate_expr(expr))
+            }
+            Stmt::Assert { condition, message } => {
+                let cond_str = self.generate_expr(condition);
+                if let Some(msg) = message {
+                    format!("{}precondition({}, \"{}\")\n", self.indent(), cond_str, msg)
+                } else {
+                    format!("{}precondition({})\n", self.indent(), cond_str)
+                }
+            }
+            Stmt::DebugAssert { condition, message } => {
+                let cond_str = self.generate_expr(condition);
+                if let Some(msg) = message {
+                    format!("{}assert({}, \"{}\")\n", self.indent(), cond_str, msg)
+                } else {
+                    format!("{}assert({})\n", self.indent(), cond_str)
+                }
+            }
+            Stmt::AssertEq {
+                left,
+                right,
+                message,
+            } => {
+                let l_str = self.generate_expr(left);
+                let r_str = self.generate_expr(right);
+                if let Some(msg) = message {
+                    format!(
+                        "{}precondition({} == {}, \"{}\")\n",
+                        self.indent(),
+                        l_str,
+                        r_str,
+                        msg
+                    )
+                } else {
+                    format!("{}precondition({} == {})\n", self.indent(), l_str, r_str)
+                }
+            }
+            Stmt::Panic { message } => {
+                if let Some(msg) = message {
+                    format!("{}fatalError(\"{}\")\n", self.indent(), msg)
+                } else {
+                    format!("{}fatalError(\"panic\")\n", self.indent())
+                }
             }
         }
     }
@@ -364,6 +443,13 @@ impl SwiftGenerator {
                 }
                 out.push_str(&format!("{}}}\n", self.indent()));
                 out
+            }
+            ExprKind::Panic(message) => {
+                if let Some(msg) = message {
+                    format!("{}fatalError(\"{}\")\n", self.indent(), msg)
+                } else {
+                    format!("{}fatalError(\"panic\")\n", self.indent())
+                }
             }
             ExprKind::Return(Some(inner)) => self.generate_return_expr(inner),
             _ => {
@@ -568,6 +654,13 @@ impl SwiftGenerator {
                 stmts: _,
                 expr: Some(final_e),
             } => self.generate_expr(final_e),
+            ExprKind::Panic(message) => {
+                if let Some(msg) = message {
+                    format!("fatalError(\"{}\")", msg)
+                } else {
+                    "fatalError(\"panic\")".into()
+                }
+            }
             _ => "/* unsupported inline expression */".into(),
         }
     }
@@ -758,5 +851,65 @@ mod tests {
         let mut gen = SwiftGenerator::new();
         let (code, _) = gen.generate_module(&module);
         assert!(code.contains("(a &+ b)"));
+    }
+
+    #[test]
+    fn test_contracts_emit_precondition_assert_and_fatal_error() {
+        let mut module = Module::new("Contracts");
+        module.items.push(Item::Function(Function {
+            name: "validate".into(),
+            params: vec![Param {
+                name: "x".into(),
+                ty: Type::I32,
+                mutable: false,
+            }],
+            return_type: Type::I32,
+            body: Expr::new(
+                ExprKind::Block {
+                    stmts: vec![
+                        Stmt::Assert {
+                            condition: Expr::new(ExprKind::Variable("x".into()), Type::Bool),
+                            message: Some("x must be valid".into()),
+                        },
+                        Stmt::DebugAssert {
+                            condition: Expr::new(ExprKind::Variable("x".into()), Type::Bool),
+                            message: None,
+                        },
+                        Stmt::AssertEq {
+                            left: Expr::new(ExprKind::Variable("x".into()), Type::I32),
+                            right: Expr::new(
+                                ExprKind::Literal(Literal::Int {
+                                    value: 10,
+                                    ty: Type::I32,
+                                }),
+                                Type::I32,
+                            ),
+                            message: Some("equal to 10".into()),
+                        },
+                        Stmt::Panic {
+                            message: Some("aborting".into()),
+                        },
+                    ],
+                    expr: Some(Box::new(Expr::new(
+                        ExprKind::Variable("x".into()),
+                        Type::I32,
+                    ))),
+                },
+                Type::I32,
+            ),
+            is_public: true,
+            span: SourceSpan {
+                file: "contracts.rs".into(),
+                start_line: 1,
+                end_line: 10,
+            },
+        }));
+
+        let mut gen = SwiftGenerator::new();
+        let (code, _) = gen.generate_module(&module);
+        assert!(code.contains("precondition(x, \"x must be valid\")"));
+        assert!(code.contains("assert(x)"));
+        assert!(code.contains("precondition(x == 10, \"equal to 10\")"));
+        assert!(code.contains("fatalError(\"aborting\")"));
     }
 }

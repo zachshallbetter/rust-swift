@@ -188,8 +188,23 @@ fn diff_test_command(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>
         }
     }
 
-    // 3. Negative rejections
-    println!("\n[3/3] Running Negative Rejection policy test...");
+    // 3. Contract System & Invariant Traps
+    println!("\n[3/4] Running Contract & Invariant Trap differential test...");
+    match runner.test_contracts(output_dir) {
+        Ok(report) => {
+            println!(
+                "  Status: {} ({} of {} cases passed)",
+                report.status, report.cases_passed, report.cases_tested
+            );
+            reports.push(report);
+        }
+        Err(e) => {
+            eprintln!("  Error in Contract differential test: {}", e);
+        }
+    }
+
+    // 4. Negative rejections
+    println!("\n[4/4] Running Negative Rejection policy test...");
     match runner.test_negative_rejections() {
         Ok(neg_reports) => {
             for r in neg_reports {
