@@ -2099,9 +2099,18 @@ pub trait Tunable {
     fn adjust_gain(&mut self, delta: i32);
 }
 
+pub trait Storage {
+    type Item;
+    fn read_item(&self) -> i32;
+}
+
 pub struct AudioChannel {
     pub name: String,
     pub gain: i32,
+}
+
+pub struct Register {
+    pub value: i32,
 }
 
 impl Describable for AudioChannel {
@@ -2113,6 +2122,13 @@ impl Describable for AudioChannel {
 impl Tunable for AudioChannel {
     fn adjust_gain(&mut self, delta: i32) {
         self.gain = self.gain + delta;
+    }
+}
+
+impl Storage for Register {
+    type Item = i32;
+    fn read_item(&self) -> i32 {
+        self.value
     }
 }
 "#;
@@ -2135,25 +2151,37 @@ impl Tunable for AudioChannel {
         let swift_source = fs::read_to_string(sources_dir.join("traits_test.swift"))?;
 
         let mut cases_passed = 0;
-        let total = 4;
+        let total = 5;
         let mut details = Vec::new();
 
         // Case 1: Protocol & extension structure verification
         let has_protocol_desc = swift_source.contains("public protocol Describable {");
         let has_protocol_tune = swift_source.contains("public protocol Tunable {");
+        let has_protocol_storage = swift_source.contains("public protocol Storage {");
+        let has_assoc_type = swift_source.contains("associatedtype Item");
         let has_ext_desc = swift_source.contains("public extension Describable {");
         let has_impl_desc = swift_source.contains("extension AudioChannel: Describable {");
         let has_impl_tune = swift_source.contains("extension AudioChannel: Tunable {");
+        let has_impl_storage = swift_source.contains("extension Register: Storage {");
+        let has_typealias = swift_source.contains("public typealias Item = Int32");
 
-        if has_protocol_desc && has_protocol_tune && has_ext_desc && has_impl_desc && has_impl_tune
+        if has_protocol_desc
+            && has_protocol_tune
+            && has_protocol_storage
+            && has_assoc_type
+            && has_ext_desc
+            && has_impl_desc
+            && has_impl_tune
+            && has_impl_storage
+            && has_typealias
         {
             cases_passed += 1;
             details.push(
-                "Case #1: PASS (Swift protocol, extension, and conformance generated)".into(),
+                "Case #1: PASS (Swift protocol, associatedtype, extension, and typealias conformance generated)".into(),
             );
         } else {
             details.push(
-                "Case #1: FAIL (Missing protocol/extension definitions in Swift code)".into(),
+                "Case #1: FAIL (Missing protocol/associatedtype definitions in Swift code)".into(),
             );
         }
 
@@ -2167,6 +2195,8 @@ fn main() {{
     println!("tag:{{}}", ch.default_tag());
     ch.adjust_gain(5);
     println!("gain:{{}}", ch.gain);
+    let reg = Register {{ value: 100 }};
+    println!("item:{{}}", reg.read_item());
 }}
 "#
         );
@@ -2197,6 +2227,8 @@ struct TraitRunner {
         print("tag:\(ch.default_tag())")
         ch.adjust_gain(5)
         print("gain:\(ch.gain)")
+        let reg = Register(value: 100)
+        print("item:\(reg.read_item())")
     }
 }
 "#;
@@ -2243,6 +2275,16 @@ struct TraitRunner {
                 .push("Case #4: PASS (Mutating trait method adjust_gain() output parity)".into());
         } else {
             details.push("Case #4: FAIL (adjust_gain() output mismatch)".into());
+        }
+
+        // Case 5: Output parity for associated type resolution
+        if rust_stdout.contains("item:100") && swift_stdout.contains("item:100") {
+            cases_passed += 1;
+            details.push(
+                "Case #5: PASS (Associated type protocol and typealias output parity)".into(),
+            );
+        } else {
+            details.push("Case #5: FAIL (read_item() associated type output mismatch)".into());
         }
 
         let status = if cases_passed == total {
@@ -3482,8 +3524,8 @@ struct UIRunner {
             details: vec!["Verified E0003_RAW_POINTER_REJECTED emitted".into()],
         });
 
-        // 4. Complex trait rejection
-        let trait_src = "pub trait ComplexTrait { type Output; }";
+        // 4. Complex trait rejection (generic trait parameters)
+        let trait_src = "pub trait ComplexTrait<T> { fn process(&self, val: T); }";
         let mut f4 = Frontend::new("complex_trait.rs");
         let res4 = f4.parse_and_lower(trait_src);
         let p4 = res4.is_err()
@@ -3809,7 +3851,7 @@ mod tests {
             .test_protocols_and_traits(&temp_dir)
             .expect("Protocols and traits differential test should pass");
         assert_eq!(report.status, "PASSED");
-        assert_eq!(report.cases_passed, 4);
+        assert_eq!(report.cases_passed, 5);
         assert_eq!(report.cases_failed, 0);
     }
 

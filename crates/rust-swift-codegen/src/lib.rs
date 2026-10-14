@@ -748,6 +748,12 @@ impl SwiftGenerator {
             trt.name
         ));
         self.indent_level += 1;
+        for assoc in &trt.associated_types {
+            out.push_str(&format!("{}associatedtype {}\n", self.indent(), assoc.name));
+        }
+        if !trt.associated_types.is_empty() && !trt.methods.is_empty() {
+            out.push('\n');
+        }
         for method in &trt.methods {
             let mutating_kw = if matches!(method.receiver, Some(ReceiverKind::MutRef)) {
                 "mutating "
@@ -890,6 +896,17 @@ impl SwiftGenerator {
             timpl.trait_name
         ));
         self.indent_level += 1;
+        for alias in &timpl.type_aliases {
+            out.push_str(&format!(
+                "{}public typealias {} = {}\n",
+                self.indent(),
+                alias.name,
+                self.map_type(&alias.target)
+            ));
+        }
+        if !timpl.type_aliases.is_empty() && !timpl.methods.is_empty() {
+            out.push('\n');
+        }
         for (i, method) in timpl.methods.iter().enumerate() {
             if i > 0 {
                 out.push_str("\n\n");
@@ -2435,6 +2452,7 @@ mod tests {
         let mut module = Module::new("TraitsDemo");
         module.items.push(Item::Trait(TraitDef {
             name: "Describable".into(),
+            associated_types: vec![],
             methods: vec![
                 TraitMethod {
                     name: "describe".into(),
@@ -2478,6 +2496,7 @@ mod tests {
         module.items.push(Item::TraitImpl(TraitImpl {
             trait_name: "Describable".into(),
             target_type: "Track".into(),
+            type_aliases: vec![],
             methods: vec![Method {
                 name: "describe".into(),
                 receiver: Some(ReceiverKind::Ref),
