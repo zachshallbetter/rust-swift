@@ -3912,4 +3912,45 @@ mod tests {
         assert_eq!(report.cases_passed, 4);
         assert_eq!(report.cases_failed, 0);
     }
+
+    #[test]
+    fn test_csg_delta_synchronization_differential_passes() {
+        let temp_dir = std::env::temp_dir().join("csg_sync_diff_test");
+        let src_dir = temp_dir.join("src");
+        let out_dir = temp_dir.join("out");
+        let _ = fs::remove_dir_all(&temp_dir);
+        fs::create_dir_all(&src_dir).unwrap();
+        fs::create_dir_all(&out_dir).unwrap();
+
+        let file_path = src_dir.join("StateEngine.rs");
+        fs::write(
+            &file_path,
+            r#"
+            #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+            pub enum SystemMode {
+                Standby,
+                Operating,
+            }
+            pub fn next(mode: SystemMode) -> SystemMode {
+                match mode {
+                    SystemMode::Standby => SystemMode::Operating,
+                    SystemMode::Operating => SystemMode::Standby,
+                }
+            }
+            "#,
+        )
+        .unwrap();
+
+        let mut engine = crate::sync::SyncEngine::new(&src_dir, &out_dir);
+
+        // Pass 1: Initial emit
+        let r1 = engine.sync_once().unwrap();
+        assert_eq!(r1.len(), 1);
+        assert_eq!(r1[0].action, crate::sync::SyncAction::SyncedUpdated);
+
+        // Pass 2: Invariant skip
+        let r2 = engine.sync_once().unwrap();
+        assert_eq!(r2.len(), 1);
+        assert_eq!(r2[0].action, crate::sync::SyncAction::SkippedInvariant);
+    }
 }

@@ -101,6 +101,24 @@ enum Commands {
         #[arg(short, long, default_value = "proof-receipt.json")]
         output: PathBuf,
     },
+    /// Continuous bi-directional delta synchronization and CSG file watcher daemon
+    Sync {
+        /// Input directory containing Rust sources
+        #[arg(short, long, default_value = ".")]
+        input_dir: PathBuf,
+
+        /// Output directory for generated Swift packages
+        #[arg(short, long, default_value = "generated-swift")]
+        output_dir: PathBuf,
+
+        /// Run continuous file watcher daemon
+        #[arg(long)]
+        watch: bool,
+
+        /// Polling interval in milliseconds for watch mode (default: 500ms)
+        #[arg(long, default_value_t = 500)]
+        interval_ms: u64,
+    },
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -148,6 +166,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         Commands::Proof { input, output } => {
             proof_command(&input, &output)?;
+        }
+        Commands::Sync {
+            input_dir,
+            output_dir,
+            watch,
+            interval_ms,
+        } => {
+            sync_command(&input_dir, &output_dir, watch, interval_ms)?;
         }
     }
 
@@ -829,6 +855,55 @@ fn proof_command(input: &Path, output: &Path) -> Result<(), Box<dyn std::error::
 
     if !receipt.is_certified {
         std::process::exit(1);
+    }
+
+    Ok(())
+}
+
+fn sync_command(
+    input_dir: &Path,
+    output_dir: &Path,
+    watch: bool,
+    interval_ms: u64,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut engine = rust_swift_qualification::sync::SyncEngine::new(input_dir, output_dir);
+
+    if watch {
+        println!("Starting rust-swift-sync daemon in continuous watch mode...");
+        engine.watch_loop(interval_ms, None)?;
+    } else {
+        println!("Running one-shot CSG delta synchronization pass...");
+        let records = engine.sync_once()?;
+        let mut updated = 0;
+        let mut skipped = 0;
+        for r in &records {
+            match r.action {
+                rust_swift_qualification::sync::SyncAction::SyncedUpdated => {
+                    updated += 1;
+                    let short_hash = if r.current_csg_hash.len() >= 8 {
+                        &r.current_csg_hash[..8]
+                    } else {
+                        &r.current_csg_hash
+                    };
+                    println!(
+                        "  [UPDATED] {} (CSG: {}) in {}ms",
+                        r.source_file, short_hash, r.duration_ms
+                    );
+                }
+                rust_swift_qualification::sync::SyncAction::SkippedInvariant => {
+                    skipped += 1;
+                    println!("  [SKIPPED] {} (CSG Invariant)", r.source_file);
+                }
+                rust_swift_qualification::sync::SyncAction::Error => {
+                    eprintln!("  [ERROR] {} - {}", r.source_file, r.details);
+                }
+            }
+        }
+        println!(
+            "\nSynchronization pass complete: {} updated, {} skipped (invariant).",
+            updated, skipped
+        );
+        println!("Appended synchronization telemetry to records/sync.jsonl");
     }
 
     Ok(())
