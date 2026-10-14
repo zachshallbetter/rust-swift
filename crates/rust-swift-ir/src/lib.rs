@@ -369,6 +369,8 @@ pub struct StructDef {
     pub is_public: bool,
     #[serde(default)]
     pub is_codable: bool,
+    #[serde(default)]
+    pub is_observable: bool,
     pub span: SourceSpan,
 }
 

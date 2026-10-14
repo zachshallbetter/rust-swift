@@ -18,6 +18,7 @@ pub struct Frontend {
     file_name: String,
     diagnostics: Vec<Diagnostic>,
     default_codable: bool,
+    default_observable: bool,
 }
 
 impl Frontend {
@@ -26,11 +27,17 @@ impl Frontend {
             file_name: file_name.into(),
             diagnostics: Vec::new(),
             default_codable: false,
+            default_observable: false,
         }
     }
 
     pub fn with_default_codable(mut self, enabled: bool) -> Self {
         self.default_codable = enabled;
+        self
+    }
+
+    pub fn with_default_observable(mut self, enabled: bool) -> Self {
+        self.default_observable = enabled;
         self
     }
 
@@ -475,6 +482,26 @@ impl Frontend {
         })
     }
 
+    fn has_observable_attr(attrs: &[syn::Attribute]) -> bool {
+        attrs.iter().any(|attr| {
+            if attr.path().is_ident("observable") {
+                return true;
+            }
+            if attr.path().is_ident("derive") {
+                let mut found = false;
+                let _ = attr.parse_nested_meta(|meta| {
+                    if meta.path.is_ident("Observable") {
+                        found = true;
+                    }
+                    Ok(())
+                });
+                found
+            } else {
+                false
+            }
+        })
+    }
+
     fn lower_struct(&mut self, item_struct: &syn::ItemStruct) -> Option<StructDef> {
         let name = item_struct.ident.to_string();
         let is_public = matches!(item_struct.vis, syn::Visibility::Public(_));
@@ -505,12 +532,15 @@ impl Frontend {
         }
 
         let is_codable = self.default_codable || Self::has_codable_derive(&item_struct.attrs);
+        let is_observable =
+            self.default_observable || Self::has_observable_attr(&item_struct.attrs);
 
         Some(StructDef {
             name,
             fields,
             is_public,
             is_codable,
+            is_observable,
             span: self.make_span(item_struct),
         })
     }

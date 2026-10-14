@@ -41,6 +41,8 @@ pub struct SwiftGenerator {
     symbols: Vec<SymbolMapping>,
     fn_inouts: std::collections::HashMap<String, Vec<bool>>,
     emit_source_locations: bool,
+    emit_observable: bool,
+    observable_types: std::collections::HashSet<String>,
 }
 
 impl Default for SwiftGenerator {
@@ -56,6 +58,8 @@ impl SwiftGenerator {
             symbols: Vec::new(),
             fn_inouts: std::collections::HashMap::new(),
             emit_source_locations: false,
+            emit_observable: false,
+            observable_types: std::collections::HashSet::new(),
         }
     }
 
@@ -66,6 +70,15 @@ impl SwiftGenerator {
 
     pub fn set_source_locations(&mut self, enabled: bool) {
         self.emit_source_locations = enabled;
+    }
+
+    pub fn with_observable(mut self, enabled: bool) -> Self {
+        self.emit_observable = enabled;
+        self
+    }
+
+    pub fn set_observable(&mut self, enabled: bool) {
+        self.emit_observable = enabled;
     }
 
     fn indent(&self) -> String {
@@ -102,6 +115,16 @@ impl SwiftGenerator {
             }
         }
 
+        self.observable_types.clear();
+        for item in &module.items {
+            if let Item::Struct(strct) = item {
+                if strct.is_observable || self.emit_observable {
+                    self.observable_types.insert(strct.name.clone());
+                }
+            }
+        }
+        let has_observable = !self.observable_types.is_empty();
+
         let mut out = String::new();
         out.push_str("//\n");
         out.push_str(&format!(
@@ -110,7 +133,11 @@ impl SwiftGenerator {
         ));
         out.push_str("// Strict semantic preservation - do not edit directly.\n");
         out.push_str("//\n\n");
-        out.push_str("import Foundation\n\n");
+        out.push_str("import Foundation\n");
+        if has_observable {
+            out.push_str("import Observation\n");
+        }
+        out.push('\n');
 
         for item in &module.items {
             match item {
@@ -301,15 +328,30 @@ impl SwiftGenerator {
             ));
         }
         let vis = if strct.is_public { "public " } else { "" };
-        let conformances = if strct.is_codable {
-            "Equatable, Hashable, Codable, Sendable"
+        let is_observable = strct.is_observable || self.emit_observable;
+
+        if is_observable {
+            let has_id = strct.fields.iter().any(|f| f.name == "id");
+            let conformances = if has_id { ": Identifiable" } else { "" };
+            out.push_str(&format!(
+                "{}@Observable\n{}{}final class {}{} {{\n",
+                self.indent(),
+                self.indent(),
+                vis,
+                strct.name,
+                conformances
+            ));
         } else {
-            "Equatable, Hashable, Sendable"
-        };
-        out.push_str(&format!(
-            "{}struct {}: {} {{\n",
-            vis, strct.name, conformances
-        ));
+            let conformances = if strct.is_codable {
+                "Equatable, Hashable, Codable, Sendable"
+            } else {
+                "Equatable, Hashable, Sendable"
+            };
+            out.push_str(&format!(
+                "{}struct {}: {} {{\n",
+                vis, strct.name, conformances
+            ));
+        }
         self.indent_level += 1;
 
         for field in &strct.fields {
@@ -587,9 +629,16 @@ impl SwiftGenerator {
         } else {
             ""
         };
+        let is_class_method = self.observable_types.contains(target_type);
         let modifier = match method.receiver {
             None => "static ",
-            Some(ReceiverKind::MutRef) => "mutating ",
+            Some(ReceiverKind::MutRef) => {
+                if is_class_method {
+                    ""
+                } else {
+                    "mutating "
+                }
+            }
             Some(ReceiverKind::Ref) | Some(ReceiverKind::Value) => "",
         };
 
@@ -1677,6 +1726,7 @@ mod tests {
             }],
             is_public: true,
             is_codable: false,
+            is_observable: false,
             span: SourceSpan {
                 file: "types.rs".into(),
                 start_line: 1,
@@ -2186,6 +2236,7 @@ mod tests {
             }],
             is_public: true,
             is_codable: true,
+            is_observable: false,
             span: SourceSpan::default(),
         }));
         module.items.push(Item::Enum(EnumDef {
@@ -2211,5 +2262,92 @@ mod tests {
         assert!(
             code.contains("public enum Command: Equatable, Hashable, Codable, Sendable, Error {")
         );
+    }
+
+    #[test]
+    fn test_codegen_observable_class() {
+        let mut module = Module::new("ObservableTest");
+        module.items.push(Item::Struct(StructDef {
+            name: "ItemState".into(),
+            fields: vec![
+                FieldDef {
+                    name: "id".into(),
+                    ty: Type::I64,
+                    is_public: true,
+                },
+                FieldDef {
+                    name: "count".into(),
+                    ty: Type::I64,
+                    is_public: true,
+                },
+            ],
+            is_public: true,
+            is_codable: false,
+            is_observable: true,
+            span: SourceSpan::default(),
+        }));
+        module.items.push(Item::Impl(ImplBlock {
+            target_type: "ItemState".into(),
+            methods: vec![Method {
+                name: "increment".into(),
+                receiver: Some(ReceiverKind::MutRef),
+                params: vec![],
+                return_type: Type::Unit,
+                body: Expr::new(
+                    ExprKind::Block {
+                        stmts: vec![Stmt::Assign {
+                            target: Expr::new(
+                                ExprKind::FieldAccess {
+                                    receiver: Box::new(Expr::new(
+                                        ExprKind::Variable("self".into()),
+                                        Type::Named("ItemState".into()),
+                                    )),
+                                    field: "count".into(),
+                                },
+                                Type::I64,
+                            ),
+                            value: Expr::new(
+                                ExprKind::Binary {
+                                    op: BinaryOp::Arithmetic {
+                                        op: IntegerOp::Add,
+                                        mode: IntegerMode::Wrapping,
+                                    },
+                                    left: Box::new(Expr::new(
+                                        ExprKind::FieldAccess {
+                                            receiver: Box::new(Expr::new(
+                                                ExprKind::Variable("self".into()),
+                                                Type::Named("ItemState".into()),
+                                            )),
+                                            field: "count".into(),
+                                        },
+                                        Type::I64,
+                                    )),
+                                    right: Box::new(Expr::new(
+                                        ExprKind::Literal(Literal::Int {
+                                            value: 1,
+                                            ty: Type::I64,
+                                        }),
+                                        Type::I64,
+                                    )),
+                                },
+                                Type::I64,
+                            ),
+                        }],
+                        expr: None,
+                    },
+                    Type::Unit,
+                ),
+                is_public: true,
+                span: SourceSpan::default(),
+            }],
+            span: SourceSpan::default(),
+        }));
+
+        let mut gen = SwiftGenerator::new();
+        let (code, _) = gen.generate_module(&module);
+        assert!(code.contains("import Observation"));
+        assert!(code.contains("@Observable\npublic final class ItemState: Identifiable {"));
+        assert!(code.contains("public func increment() {"));
+        assert!(!code.contains("public mutating func increment()"));
     }
 }
