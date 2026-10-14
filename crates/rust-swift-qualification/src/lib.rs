@@ -5,3 +5,4 @@ pub mod differential;
 pub mod evals;
 pub mod mutation;
 pub mod proof;
+pub mod sync;
