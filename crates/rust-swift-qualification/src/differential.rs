@@ -2594,6 +2594,142 @@ struct FuzzRunner {
         })
     }
 
+    /// SPM Package Generation, Manifest Emission, and Test Scaffold execution
+    pub fn test_spm_package_build(
+        &self,
+        output_dir: &Path,
+    ) -> Result<QualificationReport, Box<dyn std::error::Error>> {
+        let (rustc_ver, swift_ver) = Self::toolchain_versions();
+        let pkg_out_dir = output_dir.join("spm_package_qualification");
+        let _ = fs::remove_dir_all(&pkg_out_dir);
+        fs::create_dir_all(&pkg_out_dir)?;
+
+        let source = r#"pub struct ComputeEngine {
+    pub factor: i32,
+}
+
+impl ComputeEngine {
+    pub fn new(factor: i32) -> Self {
+        Self { factor }
+    }
+
+    pub fn scale(&self, val: i32) -> i32 {
+        self.factor.wrapping_mul(val)
+    }
+}
+"#;
+        let source_hash = Self::compute_sha256(source);
+
+        let mut frontend = Frontend::new("ComputeEngine.rs");
+        let module = frontend
+            .parse_and_lower(source)
+            .map_err(|diags| format!("Frontend parsing failed with {} diagnostics", diags.len()))?;
+
+        let mut gen = SwiftGenerator::new();
+        let manifest = gen.emit_package(&module, &pkg_out_dir, "ComputeEngine")?;
+
+        let total = 4;
+        let mut cases_passed = 0;
+        let mut details = Vec::new();
+
+        // Case 1: Manifest and directory structure
+        let package_swift_path = pkg_out_dir.join("Package.swift");
+        let manifest_json_path = pkg_out_dir.join("manifest.json");
+        let lib_src_path = pkg_out_dir.join("Sources/ComputeEngine/ComputeEngine.swift");
+        let test_src_path = pkg_out_dir.join("Tests/ComputeEngineTests/ComputeEngineTests.swift");
+
+        if package_swift_path.exists()
+            && manifest_json_path.exists()
+            && lib_src_path.exists()
+            && test_src_path.exists()
+            && manifest.package_name == "ComputeEngine"
+            && manifest.test_target_generated
+        {
+            cases_passed += 1;
+            details.push(
+                "Case #1: PASS (SPM package directory structure and manifest.json verified)".into(),
+            );
+        } else {
+            details
+                .push("Case #1: FAIL (SPM package directory structure or manifest missing)".into());
+        }
+
+        // Case 2: Package.swift content validation
+        let package_swift_content = fs::read_to_string(&package_swift_path)?;
+        if package_swift_content.contains("swift-tools-version: 5.9")
+            && package_swift_content.contains(".macOS(.v14)")
+            && package_swift_content.contains(".iOS(.v17)")
+            && package_swift_content.contains(".testTarget(")
+            && package_swift_content.contains("name: \"ComputeEngineTests\"")
+        {
+            cases_passed += 1;
+            details.push(
+                "Case #2: PASS (Package.swift declares modern platform baselines and test target)"
+                    .into(),
+            );
+        } else {
+            details.push("Case #2: FAIL (Package.swift content invalid)".into());
+        }
+
+        // Case 3: swift build
+        let build_output = Command::new("swift")
+            .arg("build")
+            .arg("--package-path")
+            .arg(&pkg_out_dir)
+            .output()?;
+
+        if build_output.status.success() {
+            cases_passed += 1;
+            details
+                .push("Case #3: PASS (swift build compiles package library target cleanly)".into());
+        } else {
+            details.push(format!(
+                "Case #3: FAIL (swift build failed: {})",
+                String::from_utf8_lossy(&build_output.stderr)
+            ));
+        }
+
+        // Case 4: swift test
+        let test_output = Command::new("swift")
+            .arg("test")
+            .arg("--package-path")
+            .arg(&pkg_out_dir)
+            .output()?;
+
+        let test_stdout = String::from_utf8_lossy(&test_output.stdout);
+        if test_output.status.success()
+            && (test_stdout.contains("passed") || test_stdout.contains("0 failures"))
+        {
+            cases_passed += 1;
+            details.push("Case #4: PASS (swift test executes test target successfully)".into());
+        } else {
+            details.push(format!(
+                "Case #4: FAIL (swift test failed: stdout={}, stderr={})",
+                test_stdout,
+                String::from_utf8_lossy(&test_output.stderr)
+            ));
+        }
+
+        let status = if cases_passed == total {
+            "PASSED"
+        } else {
+            "FAILED"
+        };
+
+        Ok(QualificationReport {
+            fixture_name: "spm_package_manifest_and_build".into(),
+            source_hash,
+            rustc_version: rustc_ver,
+            swift_version: swift_ver,
+            cases_tested: total,
+            cases_passed,
+            cases_failed: total - cases_passed,
+            status: status.into(),
+            timestamp: "2026-10-14T13:30:00Z".into(),
+            details,
+        })
+    }
+
     /// Run negative rejection tests asserting exact stable diagnostic codes
     pub fn test_negative_rejections(
         &self,
@@ -3020,6 +3156,19 @@ mod tests {
             .expect("Property fuzzing differential test should pass");
         assert_eq!(report.status, "PASSED");
         assert_eq!(report.cases_passed, 10_000);
+        assert_eq!(report.cases_failed, 0);
+    }
+
+    #[test]
+    fn test_spm_package_build_differential_passes() {
+        let runner = DifferentialRunner::new(".");
+        let temp_dir = std::env::temp_dir().join("spm_package_diff_test");
+        let _ = fs::create_dir_all(&temp_dir);
+        let report = runner
+            .test_spm_package_build(&temp_dir)
+            .expect("SPM package build and test should pass");
+        assert_eq!(report.status, "PASSED");
+        assert_eq!(report.cases_passed, 4);
         assert_eq!(report.cases_failed, 0);
     }
 }
