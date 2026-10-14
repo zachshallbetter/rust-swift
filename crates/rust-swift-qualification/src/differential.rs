@@ -2730,6 +2730,219 @@ impl ComputeEngine {
         })
     }
 
+    /// Swift Codable Synthesis and Serde JSON Interoperability qualification
+    pub fn test_codable_json_serialization(
+        &self,
+        output_dir: &Path,
+    ) -> Result<QualificationReport, Box<dyn std::error::Error>> {
+        let (rustc_ver, swift_ver) = Self::toolchain_versions();
+        let codable_dir = output_dir.join("codable_qualification");
+        let _ = fs::remove_dir_all(&codable_dir);
+        fs::create_dir_all(&codable_dir)?;
+
+        let source = r#"#[derive(Serialize, Deserialize)]
+pub struct ConfigRecord {
+    pub id: i64,
+    pub title: String,
+    pub count: i32,
+    pub enabled: bool,
+}
+
+#[derive(Serialize, Deserialize)]
+pub enum PriorityLevel {
+    Low,
+    Medium,
+    High,
+}
+"#;
+        let source_hash = Self::compute_sha256(source);
+
+        let mut frontend = Frontend::new("ConfigRecord.rs");
+        let module = frontend
+            .parse_and_lower(source)
+            .map_err(|diags| format!("Frontend parsing failed with {} diagnostics", diags.len()))?;
+
+        let mut gen = SwiftGenerator::new();
+        let (swift_code, _) = gen.generate_module(&module);
+        let swift_src_path = codable_dir.join("ConfigRecord.swift");
+        fs::write(&swift_src_path, &swift_code)?;
+
+        #[derive(Serialize, Deserialize, Debug, PartialEq)]
+        struct RustConfigRecord {
+            count: i32,
+            enabled: bool,
+            id: i64,
+            title: String,
+        }
+
+        #[derive(Serialize, Deserialize, Debug, PartialEq)]
+        enum RustPriorityLevel {
+            Low,
+            Medium,
+            High,
+        }
+
+        let rust_rec = RustConfigRecord {
+            id: 42,
+            title: "AudioConfig".into(),
+            count: 8,
+            enabled: true,
+        };
+        let rust_rec_json = serde_json::to_string(&rust_rec)?;
+        let rust_prio = RustPriorityLevel::High;
+        let rust_prio_json = serde_json::to_string(&rust_prio)?;
+
+        let swift_runner_src = format!(
+            r##"import Foundation
+
+@main
+struct CodableRunner {{
+    static func main() throws {{
+        let jsonRecStr = #"""
+{rec_json}
+"""#
+        let jsonPrioStr = #"""
+{prio_json}
+"""#
+
+        let decoder = JSONDecoder()
+        let rec = try decoder.decode(ConfigRecord.self, from: jsonRecStr.data(using: .utf8)!)
+        let prio = try decoder.decode(PriorityLevel.self, from: jsonPrioStr.data(using: .utf8)!)
+
+        print("field_id:\(rec.id)")
+        print("field_title:\(rec.title)")
+        print("field_count:\(rec.count)")
+        print("field_enabled:\(rec.enabled)")
+        print("field_prio:\(prio.rawValue)")
+
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let reRec = try encoder.encode(rec)
+        let rePrio = try encoder.encode(prio)
+        print("swift_rec_json:\(String(data: reRec, encoding: .utf8)!)")
+        print("swift_prio_json:\(String(data: rePrio, encoding: .utf8)!)")
+    }}
+}}
+"##,
+            rec_json = rust_rec_json,
+            prio_json = rust_prio_json
+        );
+
+        let swift_runner_file = codable_dir.join("main.swift");
+        fs::write(&swift_runner_file, swift_runner_src)?;
+
+        let total = 4;
+        let mut cases_passed = 0;
+        let mut details = Vec::new();
+
+        // Case 1: Swift Codable compilation
+        let swift_bin = codable_dir.join("codable_runner");
+        let swiftc_status = Command::new("swiftc")
+            .arg("-parse-as-library")
+            .arg(&swift_src_path)
+            .arg(&swift_runner_file)
+            .arg("-o")
+            .arg(&swift_bin)
+            .status()?;
+
+        if swiftc_status.success() {
+            cases_passed += 1;
+            details
+                .push("Case #1: PASS (Swift Codable struct and enum compilation succeeded)".into());
+        } else {
+            details.push("Case #1: FAIL (Failed to compile Swift Codable runner)".into());
+            return Ok(QualificationReport {
+                fixture_name: "codable_json_serialization".into(),
+                source_hash,
+                rustc_version: rustc_ver,
+                swift_version: swift_ver,
+                cases_tested: total,
+                cases_passed,
+                cases_failed: total - cases_passed,
+                status: "FAILED".into(),
+                timestamp: "2026-10-14T13:45:00Z".into(),
+                details,
+            });
+        }
+
+        // Execute Swift runner
+        let swift_out = Command::new(&swift_bin).output()?;
+        let swift_stdout = String::from_utf8(swift_out.stdout)?;
+
+        // Case 2: Field parity in Swift after decoding Rust Serde JSON
+        if swift_stdout.contains("field_id:42")
+            && swift_stdout.contains("field_title:AudioConfig")
+            && swift_stdout.contains("field_count:8")
+            && swift_stdout.contains("field_enabled:true")
+            && swift_stdout.contains("field_prio:High")
+        {
+            cases_passed += 1;
+            details.push(
+                "Case #2: PASS (Rust Serde JSON decoded in Swift with full field parity)".into(),
+            );
+        } else {
+            details.push("Case #2: FAIL (Swift field values mismatch decoded Rust JSON)".into());
+        }
+
+        // Case 3: Swift encoded JSON matches Rust Serde JSON output
+        let swift_rec_json = swift_stdout
+            .lines()
+            .find(|l| l.starts_with("swift_rec_json:"))
+            .map(|l| l.trim_start_matches("swift_rec_json:").trim())
+            .unwrap_or_default();
+        let swift_prio_json = swift_stdout
+            .lines()
+            .find(|l| l.starts_with("swift_prio_json:"))
+            .map(|l| l.trim_start_matches("swift_prio_json:").trim())
+            .unwrap_or_default();
+
+        if swift_rec_json == rust_rec_json && swift_prio_json == rust_prio_json {
+            cases_passed += 1;
+            details.push(
+                "Case #3: PASS (Swift-encoded JSON matches Rust Serde output bit-for-bit)".into(),
+            );
+        } else {
+            details.push(format!(
+                "Case #3: FAIL (JSON output mismatch: swift='{}', rust='{}')",
+                swift_rec_json, rust_rec_json
+            ));
+        }
+
+        // Case 4: Swift JSON successfully round-trips into Rust native deserializer
+        let rust_decoded_rec: Result<RustConfigRecord, _> = serde_json::from_str(swift_rec_json);
+        let rust_decoded_prio: Result<RustPriorityLevel, _> = serde_json::from_str(swift_prio_json);
+
+        if let (Ok(dec_rec), Ok(dec_prio)) = (rust_decoded_rec, rust_decoded_prio) {
+            if dec_rec == rust_rec && dec_prio == rust_prio {
+                cases_passed += 1;
+                details.push("Case #4: PASS (Swift JSON deserializes back into Rust structs/enums with equality)".into());
+            } else {
+                details.push("Case #4: FAIL (Round-trip equality failed)".into());
+            }
+        } else {
+            details.push("Case #4: FAIL (Failed to parse Swift JSON with serde_json)".into());
+        }
+
+        let status = if cases_passed == total {
+            "PASSED"
+        } else {
+            "FAILED"
+        };
+
+        Ok(QualificationReport {
+            fixture_name: "codable_json_serialization".into(),
+            source_hash,
+            rustc_version: rustc_ver,
+            swift_version: swift_ver,
+            cases_tested: total,
+            cases_passed,
+            cases_failed: total - cases_passed,
+            status: status.into(),
+            timestamp: "2026-10-14T13:45:00Z".into(),
+            details,
+        })
+    }
+
     /// Run negative rejection tests asserting exact stable diagnostic codes
     pub fn test_negative_rejections(
         &self,
@@ -3167,6 +3380,19 @@ mod tests {
         let report = runner
             .test_spm_package_build(&temp_dir)
             .expect("SPM package build and test should pass");
+        assert_eq!(report.status, "PASSED");
+        assert_eq!(report.cases_passed, 4);
+        assert_eq!(report.cases_failed, 0);
+    }
+
+    #[test]
+    fn test_codable_json_serialization_differential_passes() {
+        let runner = DifferentialRunner::new(".");
+        let temp_dir = std::env::temp_dir().join("codable_diff_test");
+        let _ = fs::create_dir_all(&temp_dir);
+        let report = runner
+            .test_codable_json_serialization(&temp_dir)
+            .expect("Codable JSON serialization differential test should pass");
         assert_eq!(report.status, "PASSED");
         assert_eq!(report.cases_passed, 4);
         assert_eq!(report.cases_failed, 0);

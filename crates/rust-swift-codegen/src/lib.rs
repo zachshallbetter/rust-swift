@@ -217,10 +217,12 @@ impl SwiftGenerator {
         let vis = if enm.is_public { "public " } else { "" };
 
         if enm.is_fieldless() {
-            out.push_str(&format!(
-                "{}enum {}: String, CaseIterable, Equatable, Hashable, Sendable, Error {{\n",
-                vis, enm.name
-            ));
+            let conformances = if enm.is_codable {
+                "String, CaseIterable, Equatable, Hashable, Codable, Sendable, Error"
+            } else {
+                "String, CaseIterable, Equatable, Hashable, Sendable, Error"
+            };
+            out.push_str(&format!("{}enum {}: {} {{\n", vis, enm.name, conformances));
             self.indent_level += 1;
             for variant in &enm.variants {
                 out.push_str(&format!(
@@ -233,10 +235,12 @@ impl SwiftGenerator {
             self.indent_level -= 1;
             out.push_str(&format!("{}}}", self.indent()));
         } else {
-            out.push_str(&format!(
-                "{}enum {}: Equatable, Hashable, Sendable, Error {{\n",
-                vis, enm.name
-            ));
+            let conformances = if enm.is_codable {
+                "Equatable, Hashable, Codable, Sendable, Error"
+            } else {
+                "Equatable, Hashable, Sendable, Error"
+            };
+            out.push_str(&format!("{}enum {}: {} {{\n", vis, enm.name, conformances));
             self.indent_level += 1;
             for variant in &enm.variants {
                 match &variant.payload {
@@ -297,9 +301,14 @@ impl SwiftGenerator {
             ));
         }
         let vis = if strct.is_public { "public " } else { "" };
+        let conformances = if strct.is_codable {
+            "Equatable, Hashable, Codable, Sendable"
+        } else {
+            "Equatable, Hashable, Sendable"
+        };
         out.push_str(&format!(
-            "{}struct {}: Equatable, Hashable, Sendable {{\n",
-            vis, strct.name
+            "{}struct {}: {} {{\n",
+            vis, strct.name, conformances
         ));
         self.indent_level += 1;
 
@@ -1518,6 +1527,7 @@ mod tests {
             name: "State".into(),
             variants: vec!["Idle".into(), "Active".into()],
             is_public: true,
+            is_codable: false,
             span: SourceSpan {
                 file: "sm.rs".into(),
                 start_line: 1,
@@ -1666,6 +1676,7 @@ mod tests {
                 is_public: true,
             }],
             is_public: true,
+            is_codable: false,
             span: SourceSpan {
                 file: "types.rs".into(),
                 start_line: 1,
@@ -1752,6 +1763,7 @@ mod tests {
                 },
             ],
             is_public: true,
+            is_codable: false,
             span: SourceSpan {
                 file: "types.rs".into(),
                 start_line: 9,
@@ -2160,5 +2172,44 @@ mod tests {
         let test_content = fs::read_to_string(&test_file).unwrap();
         assert!(test_content.contains("import XCTest"));
         assert!(test_content.contains("@testable import CoreLogic"));
+    }
+
+    #[test]
+    fn test_codegen_codable_struct_and_enum() {
+        let mut module = Module::new("CodableTest");
+        module.items.push(Item::Struct(StructDef {
+            name: "Payload".into(),
+            fields: vec![FieldDef {
+                name: "data".into(),
+                ty: Type::String,
+                is_public: true,
+            }],
+            is_public: true,
+            is_codable: true,
+            span: SourceSpan::default(),
+        }));
+        module.items.push(Item::Enum(EnumDef {
+            name: "Command".into(),
+            variants: vec![
+                EnumVariant {
+                    name: "Halt".into(),
+                    payload: VariantPayload::Unit,
+                },
+                EnumVariant {
+                    name: "Send".into(),
+                    payload: VariantPayload::Tuple(vec![Type::String]),
+                },
+            ],
+            is_public: true,
+            is_codable: true,
+            span: SourceSpan::default(),
+        }));
+
+        let mut gen = SwiftGenerator::new();
+        let (code, _) = gen.generate_module(&module);
+        assert!(code.contains("public struct Payload: Equatable, Hashable, Codable, Sendable {"));
+        assert!(
+            code.contains("public enum Command: Equatable, Hashable, Codable, Sendable, Error {")
+        );
     }
 }
