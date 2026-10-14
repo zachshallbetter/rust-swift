@@ -18,13 +18,23 @@ A native macOS SwiftUI application powered directly by Rust models and logic fro
 
 ## Building & Running
 
-1. Build the generated Swift package:
+1. Compile the Rust domain logic into the `PeelCoreKit` Swift package:
 ```bash
-cd ../PeelCoreKit
-swift build
+cargo run -p rust-swift-cli -- compile examples/peel_core.rs \
+  --output-dir examples/PeelCoreKit \
+  --package-name PeelCoreKit \
+  --spm \
+  --codable
 ```
 
-2. Compile the SwiftUI app:
+2. Build the generated Swift package:
+```bash
+cd examples/PeelCoreKit
+swift build
+cd ../PeelInspectorApp
+```
+
+3. Compile the SwiftUI app:
 ```bash
 swiftc -parse-as-library App.swift \
   -I ../PeelCoreKit/.build/out/Products/Debug \
@@ -33,7 +43,7 @@ swiftc -parse-as-library App.swift \
   -o PeelInspectorApp
 ```
 
-3. Launch the native app:
+4. Launch the native app:
 ```bash
 ./PeelInspectorApp
 ```

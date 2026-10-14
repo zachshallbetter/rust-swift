@@ -109,16 +109,15 @@ Constructs outside the verified boundary are rejected at parse time with stable,
 
 ## Workspace Structure
 
-The project is organized as a Cargo workspace containing five modular crates:
+The project is organized as a Cargo workspace containing five modular crates and comprehensive examples:
 
-```text
-crates/
-├── rust-swift-ir/             # Target-neutral semantic IR and CSG bridge
-├── rust-swift-frontend/       # Syn AST parser, lowering pass, and diagnostic engine
-├── rust-swift-codegen/        # Swift AST lowerer, Package.swift emitter, and shims
-├── rust-swift-qualification/  # Differential qualification suite, benchmarks, and evals
-└── rust-swift-cli/            # Command-line interface (`rust-swift`)
-```
+- **[`crates/rust-swift-frontend/`](crates/rust-swift-frontend/)**: Syn AST parser, language admission checks, and diagnostic engine (`E0001`..`E0012`).
+- **[`crates/rust-swift-ir/`](crates/rust-swift-ir/)**: Target-neutral semantic IR and Compiler Semantic Graph (CSG) projection.
+- **[`crates/rust-swift-codegen/`](crates/rust-swift-codegen/)**: Swift AST lowerer, SwiftUI view tree synthesizer, and `Package.swift` emitter.
+- **[`crates/rust-swift-qualification/`](crates/rust-swift-qualification/)**: 16-suite differential qualification harness, failure injection, benchmarks, sync engine, and proof verifier.
+- **[`crates/rust-swift-cli/`](crates/rust-swift-cli/)**: Unified command-line interface (`rust-swift`).
+- **[`examples/`](examples/)**: Working example applications, including [`PlayerApp`](examples/PlayerApp/), [`PeelInspectorApp`](examples/PeelInspectorApp/), and [`PluginDemoApp`](examples/PluginDemoApp/).
+- **[`Plugins/RustSwiftPlugin/`](Plugins/RustSwiftPlugin/)**: Native Swift Package Manager Build Tool Plugin.
 
 ---
 

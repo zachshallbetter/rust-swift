@@ -10,13 +10,22 @@ A native macOS SwiftUI application demonstrating reactive state management power
 
 ## Building & Running
 
-1. Build the generated Swift package:
+1. Compile the Rust source into a standalone Swift package:
 ```bash
-cd ../GeneratedFSM
-swift build
+cargo run -p rust-swift-cli -- compile examples/fsm_example.rs \
+  --output-dir examples/GeneratedFSM \
+  --package-name GeneratedFSM \
+  --spm
 ```
 
-2. Compile the SwiftUI app:
+2. Build the generated Swift package:
+```bash
+cd examples/GeneratedFSM
+swift build
+cd ../PlayerApp
+```
+
+3. Compile the SwiftUI app:
 ```bash
 swiftc -parse-as-library App.swift \
   -I ../GeneratedFSM/.build/out/Products/Debug \
@@ -25,7 +34,7 @@ swiftc -parse-as-library App.swift \
   -o PlayerApp
 ```
 
-3. Launch the native app:
+4. Launch the native app:
 ```bash
 ./PlayerApp
 ```
