@@ -1,0 +1,102 @@
+{
+  "package_name": "PeelCoreKit",
+  "swift_tools_version": "5.9",
+  "generated_files": [
+    "Sources/PeelCoreKit/peel_core.swift",
+    "Sources/PeelCoreKit/RustCompat.swift",
+    "Package.swift"
+  ],
+  "symbols": [
+    {
+      "rust_name": "Support",
+      "swift_name": "Support",
+      "kind": "enum",
+      "rust_file": "examples/peel_core.rs",
+      "rust_line": 4
+    },
+    {
+      "rust_name": "Format",
+      "swift_name": "Format",
+      "kind": "enum",
+      "rust_file": "examples/peel_core.rs",
+      "rust_line": 12
+    },
+    {
+      "rust_name": "ZipKind",
+      "swift_name": "ZipKind",
+      "kind": "enum",
+      "rust_file": "examples/peel_core.rs",
+      "rust_line": 32
+    },
+    {
+      "rust_name": "Collision",
+      "swift_name": "Collision",
+      "kind": "enum",
+      "rust_file": "examples/peel_core.rs",
+      "rust_line": 45
+    },
+    {
+      "rust_name": "EnclosingDirectory",
+      "swift_name": "EnclosingDirectory",
+      "kind": "enum",
+      "rust_file": "examples/peel_core.rs",
+      "rust_line": 53
+    },
+    {
+      "rust_name": "FormatCapabilities",
+      "swift_name": "FormatCapabilities",
+      "kind": "struct",
+      "rust_file": "examples/peel_core.rs",
+      "rust_line": 60
+    },
+    {
+      "rust_name": "archive_tar_like",
+      "swift_name": "archive_tar_like",
+      "kind": "function",
+      "rust_file": "examples/peel_core.rs",
+      "rust_line": 73
+    },
+    {
+      "rust_name": "stream_single",
+      "swift_name": "stream_single",
+      "kind": "function",
+      "rust_file": "examples/peel_core.rs",
+      "rust_line": 88
+    },
+    {
+      "rust_name": "zip_package",
+      "swift_name": "zip_package",
+      "kind": "function",
+      "rust_file": "examples/peel_core.rs",
+      "rust_line": 103
+    },
+    {
+      "rust_name": "capabilities_for",
+      "swift_name": "capabilities_for",
+      "kind": "function",
+      "rust_file": "examples/peel_core.rs",
+      "rust_line": 118
+    },
+    {
+      "rust_name": "capabilities_for_zip_kind",
+      "swift_name": "capabilities_for_zip_kind",
+      "kind": "function",
+      "rust_file": "examples/peel_core.rs",
+      "rust_line": 216
+    },
+    {
+      "rust_name": "zip_kind_label",
+      "swift_name": "zip_kind_label",
+      "kind": "function",
+      "rust_file": "examples/peel_core.rs",
+      "rust_line": 230
+    },
+    {
+      "rust_name": "detect_zip_kind_from_extension",
+      "swift_name": "detect_zip_kind_from_extension",
+      "kind": "function",
+      "rust_file": "examples/peel_core.rs",
+      "rust_line": 244
+    }
+  ]
+}
