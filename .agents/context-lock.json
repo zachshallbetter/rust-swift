@@ -6,7 +6,7 @@
   "selectedPaths": [],
   "sourceSelection": {
     "includedCount": 161,
-    "includedBytes": 2352659,
+    "includedBytes": 2354329,
     "excludedCounts": {
       "excluded-directory": 41295,
       "excluded-path": 1,
@@ -20,14 +20,14 @@
     "repositories": [
       {
         "path": ".",
-        "commit": "9eef621530073cf019c8d766ef5fef0386bc9213",
+        "commit": "4c7e98372b19c9fc617415ec9d57bf80096de1da",
         "branch": "main",
         "dirty": true,
         "remote": "https://github.com/zachshallbetter/rust-swift.git"
       }
     ]
   },
-  "aggregateSourceDigest": "f9f2bba467d912333f3ff6325d3f5f7231baa56c379b45c6cb0ed629d812a381",
+  "aggregateSourceDigest": "b61357ff9c7ea2cba83dcff72c8153a7db7de0b531e9b7b6bc6052bd83d9e43e",
   "sources": [
     {
       "path": ".agents/rules/ci.md",
@@ -106,8 +106,8 @@
     },
     {
       "path": "Cargo.toml",
-      "bytes": 1002,
-      "sha256": "44d5b5e6183e284b1a1df989aa8be067e791890afa173dac8e767fd110a6d73f"
+      "bytes": 1064,
+      "sha256": "a67c8385d3f07872966bce05b568c6b7edf1f060b813d2b6eef1985172a24b63"
     },
     {
       "path": "FORMAL_RESOURCE_MANIFEST.json",
@@ -131,8 +131,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 14771,
-      "sha256": "5d69d51f61398a3aa20e6716ba0a9f69c11d2d86095315231830503c542afead"
+      "bytes": 15736,
+      "sha256": "9cf756fcecf6dad1223374e018c6464423b7e185ee1c0dc370e5e8c2dfaba38e"
     },
     {
       "path": "VERSION",
@@ -196,8 +196,8 @@
     },
     {
       "path": "crates/rust-swift-cli/src/main.rs",
-      "bytes": 26466,
-      "sha256": "652a10846040e9a1387ef83080c3f2b9ef557b68fa4b936cb1d333c8769468c0"
+      "bytes": 26736,
+      "sha256": "3556ac988c58e3922554a921c7f09c3c236860059ef7462ed159d96d1e4379f1"
     },
     {
       "path": "crates/rust-swift-codegen/Cargo.toml",
@@ -266,8 +266,8 @@
     },
     {
       "path": "docs/01-product-definition.md",
-      "bytes": 929,
-      "sha256": "4c00e4d7bf0131aa6955b78a045ce94d159b0e01010d583dc19e8e923b4c67d0"
+      "bytes": 1302,
+      "sha256": "e2ae82b746c506cc7231bf46ba57f436905122c407063408f130c09031d5f26f"
     },
     {
       "path": "docs/02-architecture.md",

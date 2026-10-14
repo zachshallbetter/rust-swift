@@ -17,5 +17,10 @@ Arbitrary Rust translation, full standard-library parity, async runtimes, unsafe
 Compatibility mode is authoritative. Idiomatic Swift mode is optional and must discharge the same semantic obligations.
 
 ## Acceptance
-
+ 
 A reproducible CLI builds a Swift package, emits a manifest, and runs differential tests on the initial finite-state and arithmetic fixtures.
+
+## Authorship & Architectural Lineage
+
+- **Architect & Author**: [Zach Shallbetter](https://github.com/zachshallbetter)
+- **Foundational Doctrine**: Part of the [Reflective Rust](https://github.com/zachshallbetter/reflective-rust) high-assurance ecosystem, integrating Compiler Semantic Graph (`reflective-rust-csg`) provenance models and semantic interaction protocols.

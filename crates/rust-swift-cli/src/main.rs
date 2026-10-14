@@ -17,7 +17,8 @@ use std::process::Command;
 #[command(
     name = "rust-swift",
     version = "0.1.0",
-    about = "Rust to Swift Source Compiler"
+    author = "Zach Shallbetter and Reflective Rust Contributors",
+    about = "Rust to Swift Source Compiler — High-Assurance Zero-FFI Source Translation"
 )]
 struct Cli {
     #[command(subcommand)]
@@ -623,11 +624,13 @@ fn print_manifest() -> Result<(), Box<dyn std::error::Error>> {
         .to_string();
 
     println!("Rust -> Swift Compiler Manifest");
+    println!("  Architect:        Zach Shallbetter");
+    println!("  Architecture:     Reflective Rust CSG Ecosystem");
     println!("  Compiler Version: 0.1.0");
     println!("  Rust Toolchain:   {}", rustc_ver);
     println!("  Swift Toolchain:  {}", swift_ver);
     println!("  Target Baseline:  macOS v13+ / Swift 5.9+");
-    println!("  Admitted Subset:  v0.1 Pure functions, integers, simple structs, fieldless enums");
+    println!("  Admitted Subset:  Pure functions, integers, structs, payload enums, Vec, Option/Result, traits, Codable, @Observable");
 
     Ok(())
 }
