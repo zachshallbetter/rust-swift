@@ -6,8 +6,8 @@
 
 use rust_swift_ir::{
     BinaryOp, CmpOp, EnumDef, Expr, ExprKind, Function, ImplBlock, IntegerMode, IntegerOp, Item,
-    Literal, LogicalOp, MatchArm, Method, Module, Pattern, ReceiverKind, Stmt, StructDef, Type,
-    UnaryOp, VariantPayload,
+    Literal, LogicalOp, MatchArm, Method, Module, Pattern, ReceiverKind, Stmt, StructDef, TraitDef,
+    TraitImpl, TraitMethod, Type, UnaryOp, VariantPayload,
 };
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -82,6 +82,18 @@ impl SwiftGenerator {
                         self.fn_inouts.insert(method.name.clone(), inouts);
                     }
                 }
+                Item::Trait(trt) => {
+                    for method in &trt.methods {
+                        let inouts = method.params.iter().map(|p| p.is_exclusive_ref()).collect();
+                        self.fn_inouts.insert(method.name.clone(), inouts);
+                    }
+                }
+                Item::TraitImpl(timpl) => {
+                    for method in &timpl.methods {
+                        let inouts = method.params.iter().map(|p| p.is_exclusive_ref()).collect();
+                        self.fn_inouts.insert(method.name.clone(), inouts);
+                    }
+                }
                 _ => {}
             }
         }
@@ -108,6 +120,14 @@ impl SwiftGenerator {
                 }
                 Item::Impl(imp) => {
                     out.push_str(&self.generate_impl(imp));
+                    out.push_str("\n\n");
+                }
+                Item::Trait(trt) => {
+                    out.push_str(&self.generate_trait(trt));
+                    out.push_str("\n\n");
+                }
+                Item::TraitImpl(timpl) => {
+                    out.push_str(&self.generate_trait_impl(timpl));
                     out.push_str("\n\n");
                 }
                 Item::Function(func) => {
@@ -335,7 +355,7 @@ impl SwiftGenerator {
             if i > 0 {
                 out.push_str("\n\n");
             }
-            out.push_str(&self.generate_method(&imp.target_type, method));
+            out.push_str(&self.generate_method(&imp.target_type, method, false));
         }
         out.push('\n');
         self.indent_level -= 1;
@@ -343,7 +363,193 @@ impl SwiftGenerator {
         out
     }
 
-    fn generate_method(&mut self, target_type: &str, method: &Method) -> String {
+    fn generate_trait(&mut self, trt: &TraitDef) -> String {
+        self.symbols.push(SymbolMapping {
+            rust_name: trt.name.clone(),
+            swift_name: trt.name.clone(),
+            kind: "trait".into(),
+            rust_file: trt.span.file.clone(),
+            rust_line: trt.span.start_line,
+        });
+
+        let mut out = String::new();
+        if self.emit_source_locations && trt.span.start_line > 0 && !trt.span.file.is_empty() {
+            let escaped = trt.span.file.replace('\\', "\\\\").replace('"', "\\\"");
+            out.push_str(&format!(
+                "{}#sourceLocation(file: \"{}\", line: {})\n",
+                self.indent(),
+                escaped,
+                trt.span.start_line
+            ));
+        }
+        let vis = if trt.is_public { "public " } else { "" };
+        out.push_str(&format!(
+            "{}{}protocol {} {{\n",
+            self.indent(),
+            vis,
+            trt.name
+        ));
+        self.indent_level += 1;
+        for method in &trt.methods {
+            let mutating_kw = if matches!(method.receiver, Some(ReceiverKind::MutRef)) {
+                "mutating "
+            } else {
+                ""
+            };
+            let params_str = method
+                .params
+                .iter()
+                .map(|p| {
+                    if p.is_exclusive_ref() {
+                        let inner_ty = match &p.ty {
+                            Type::Ref { inner, .. } => self.map_type(inner),
+                            other => self.map_type(other),
+                        };
+                        format!("_ {}: inout {}", p.name, inner_ty)
+                    } else {
+                        format!("_ {}: {}", p.name, self.map_type(&p.ty))
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
+
+            let ret_str = if method.return_type == Type::Unit {
+                String::new()
+            } else {
+                format!(" -> {}", self.map_type(&method.return_type))
+            };
+
+            out.push_str(&format!(
+                "{}{}func {}({}){}\n",
+                self.indent(),
+                mutating_kw,
+                method.name,
+                params_str,
+                ret_str
+            ));
+        }
+        self.indent_level -= 1;
+        out.push_str(&format!("{}}}", self.indent()));
+
+        // Default protocol implementations in extension
+        let default_methods: Vec<&TraitMethod> = trt
+            .methods
+            .iter()
+            .filter(|m| m.default_body.is_some())
+            .collect();
+
+        if !default_methods.is_empty() {
+            out.push_str(&format!(
+                "\n\n{}{}extension {} {{\n",
+                self.indent(),
+                vis,
+                trt.name
+            ));
+            self.indent_level += 1;
+            for (i, method) in default_methods.iter().enumerate() {
+                if i > 0 {
+                    out.push_str("\n\n");
+                }
+                let body = method.default_body.as_ref().unwrap();
+                let mutating_kw = if matches!(method.receiver, Some(ReceiverKind::MutRef)) {
+                    "mutating "
+                } else {
+                    ""
+                };
+                let params_str = method
+                    .params
+                    .iter()
+                    .map(|p| {
+                        if p.is_exclusive_ref() {
+                            let inner_ty = match &p.ty {
+                                Type::Ref { inner, .. } => self.map_type(inner),
+                                other => self.map_type(other),
+                            };
+                            format!("_ {}: inout {}", p.name, inner_ty)
+                        } else {
+                            format!("_ {}: {}", p.name, self.map_type(&p.ty))
+                        }
+                    })
+                    .collect::<Vec<_>>()
+                    .join(", ");
+
+                let ret_str = if method.return_type == Type::Unit {
+                    String::new()
+                } else {
+                    format!(" -> {}", self.map_type(&method.return_type))
+                };
+
+                out.push_str(&format!(
+                    "{}{}func {}({}){} {{\n",
+                    self.indent(),
+                    mutating_kw,
+                    method.name,
+                    params_str,
+                    ret_str
+                ));
+                self.indent_level += 1;
+                for p in &method.params {
+                    if p.is_mutable_binding() {
+                        out.push_str(&format!("{}var {} = {}\n", self.indent(), p.name, p.name));
+                    }
+                }
+
+                let body_str = self.generate_expr(body);
+                if method.return_type != Type::Unit {
+                    if body_str.starts_with("if ") || body_str.starts_with("switch ") {
+                        out.push_str(&format!("{}{}\n", self.indent(), body_str));
+                    } else {
+                        out.push_str(&format!("{}return {}\n", self.indent(), body_str));
+                    }
+                } else {
+                    out.push_str(&format!("{}{}\n", self.indent(), body_str));
+                }
+                self.indent_level -= 1;
+                out.push_str(&format!("{}}}", self.indent()));
+            }
+            self.indent_level -= 1;
+            out.push_str(&format!("\n{}}}", self.indent()));
+        }
+
+        out
+    }
+
+    fn generate_trait_impl(&mut self, timpl: &TraitImpl) -> String {
+        let mut out = String::new();
+        if self.emit_source_locations && timpl.span.start_line > 0 && !timpl.span.file.is_empty() {
+            let escaped = timpl.span.file.replace('\\', "\\\\").replace('"', "\\\"");
+            out.push_str(&format!(
+                "{}#sourceLocation(file: \"{}\", line: {})\n",
+                self.indent(),
+                escaped,
+                timpl.span.start_line
+            ));
+        }
+        out.push_str(&format!(
+            "{}extension {}: {} {{\n",
+            self.indent(),
+            timpl.target_type,
+            timpl.trait_name
+        ));
+        self.indent_level += 1;
+        for (i, method) in timpl.methods.iter().enumerate() {
+            if i > 0 {
+                out.push_str("\n\n");
+            }
+            out.push_str(&self.generate_method(&timpl.target_type, method, true));
+        }
+        out.push('\n');
+        self.indent_level -= 1;
+        out.push_str(&format!("{}}}", self.indent()));
+        out
+    }
+
+    fn generate_method(
+        &mut self,
+        target_type: &str,
+        method: &Method,
+        is_protocol_conformance: bool,
+    ) -> String {
         self.symbols.push(SymbolMapping {
             rust_name: format!("{}::{}", target_type, method.name),
             swift_name: format!("{}.{}", target_type, method.name),
@@ -363,7 +569,11 @@ impl SwiftGenerator {
                 method.span.start_line
             ));
         }
-        let vis = if method.is_public { "public " } else { "" };
+        let vis = if is_protocol_conformance || method.is_public {
+            "public "
+        } else {
+            ""
+        };
         let modifier = match method.receiver {
             None => "static ",
             Some(ReceiverKind::MutRef) => "mutating ",
@@ -939,6 +1149,9 @@ impl SwiftGenerator {
                 args,
             } => {
                 let r_str = self.generate_expr(receiver);
+                if method == "clone" && args.is_empty() {
+                    return r_str;
+                }
                 let swift_method = match method.as_str() {
                     "push" => "append",
                     "pop" => "popLast",
@@ -1792,5 +2005,90 @@ mod tests {
         assert!(code_mapped.contains("#sourceLocation(file: \"math/calc.rs\", line: 77)"));
         assert!(code_mapped.contains("public func calculate() -> Int32"));
         assert!(code_mapped.ends_with("#sourceLocation()\n"));
+    }
+
+    #[test]
+    fn test_codegen_traits_and_protocol_extensions() {
+        let mut module = Module::new("TraitsDemo");
+        module.items.push(Item::Trait(TraitDef {
+            name: "Describable".into(),
+            methods: vec![
+                TraitMethod {
+                    name: "describe".into(),
+                    receiver: Some(ReceiverKind::Ref),
+                    params: vec![],
+                    return_type: Type::String,
+                    default_body: None,
+                    span: SourceSpan {
+                        file: "traits.rs".into(),
+                        start_line: 2,
+                        end_line: 4,
+                    },
+                },
+                TraitMethod {
+                    name: "default_tag".into(),
+                    receiver: Some(ReceiverKind::Ref),
+                    params: vec![],
+                    return_type: Type::I32,
+                    default_body: Some(Expr::new(
+                        ExprKind::Literal(Literal::Int {
+                            value: 42,
+                            ty: Type::I32,
+                        }),
+                        Type::I32,
+                    )),
+                    span: SourceSpan {
+                        file: "traits.rs".into(),
+                        start_line: 5,
+                        end_line: 7,
+                    },
+                },
+            ],
+            is_public: true,
+            span: SourceSpan {
+                file: "traits.rs".into(),
+                start_line: 1,
+                end_line: 8,
+            },
+        }));
+
+        module.items.push(Item::TraitImpl(TraitImpl {
+            trait_name: "Describable".into(),
+            target_type: "Track".into(),
+            methods: vec![Method {
+                name: "describe".into(),
+                receiver: Some(ReceiverKind::Ref),
+                params: vec![],
+                return_type: Type::String,
+                body: Expr::new(
+                    ExprKind::Literal(Literal::String("AudioTrack".into())),
+                    Type::String,
+                ),
+                is_public: true,
+                span: SourceSpan {
+                    file: "traits.rs".into(),
+                    start_line: 10,
+                    end_line: 14,
+                },
+            }],
+            span: SourceSpan {
+                file: "traits.rs".into(),
+                start_line: 9,
+                end_line: 15,
+            },
+        }));
+
+        let mut gen = SwiftGenerator::new();
+        let (code, symbols) = gen.generate_module(&module);
+        assert!(code.contains("public protocol Describable {"));
+        assert!(code.contains("func describe() -> String"));
+        assert!(code.contains("func default_tag() -> Int32"));
+        assert!(code.contains("public extension Describable {"));
+        assert!(code.contains("return 42"));
+        assert!(code.contains("extension Track: Describable {"));
+        assert!(code.contains("return \"AudioTrack\""));
+        assert!(symbols
+            .iter()
+            .any(|s| s.swift_name == "Describable" && s.kind == "trait"));
     }
 }
