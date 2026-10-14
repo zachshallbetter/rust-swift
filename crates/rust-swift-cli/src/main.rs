@@ -92,6 +92,15 @@ enum Commands {
         #[arg(short, long, default_value = "target/benchmarks")]
         output_dir: PathBuf,
     },
+    /// Generate formal invariant certification dossier and proof receipt
+    Proof {
+        /// Input Rust source file
+        input: PathBuf,
+
+        /// Output path for proof receipt JSON (defaults to proof-receipt.json)
+        #[arg(short, long, default_value = "proof-receipt.json")]
+        output: PathBuf,
+    },
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -136,6 +145,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         Commands::Bench { output_dir } => {
             bench_command(&output_dir)?;
+        }
+        Commands::Proof { input, output } => {
+            proof_command(&input, &output)?;
         }
     }
 
@@ -773,6 +785,51 @@ fn bench_command(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
         report.benchmarks_run
     );
     println!("Appended benchmark telemetry to records/benchmarks.jsonl");
+
+    Ok(())
+}
+
+fn proof_command(input: &Path, output: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    let source = fs::read_to_string(input)?;
+    let file_name = input
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("input.rs");
+    let mut frontend = Frontend::new(file_name);
+    let module = match frontend.parse_and_lower(&source) {
+        Ok(m) => m,
+        Err(diags) => {
+            eprintln!("Frontend error: {} diagnostics emitted", diags.len());
+            for d in &diags {
+                eprintln!("  [{}] {}", d.code.as_str(), d.message);
+            }
+            std::process::exit(1);
+        }
+    };
+
+    let receipt = rust_swift_qualification::proof::ProofVerifier::verify(&module, &source);
+    let json = serde_json::to_string_pretty(&receipt)?;
+    fs::write(output, &json)?;
+
+    println!(
+        "Epistemic Proof Dossier generated for module '{}':",
+        receipt.module_name
+    );
+    println!("  Invariants Evaluated: {}", receipt.invariants_evaluated);
+    println!("  Invariants Proven:    {}", receipt.invariants_proven);
+    println!(
+        "  Certified:            {}",
+        if receipt.is_certified { "YES" } else { "NO" }
+    );
+    println!(
+        "  Signature:            {}",
+        receipt.cryptographic_signature
+    );
+    println!("  Receipt written to:   {}", output.display());
+
+    if !receipt.is_certified {
+        std::process::exit(1);
+    }
 
     Ok(())
 }
