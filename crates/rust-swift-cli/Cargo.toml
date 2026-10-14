@@ -16,6 +16,7 @@ rust-swift-ir = { path = "../rust-swift-ir" }
 rust-swift-frontend = { path = "../rust-swift-frontend" }
 rust-swift-codegen = { path = "../rust-swift-codegen" }
 rust-swift-qualification = { path = "../rust-swift-qualification" }
+rust-swift-mcp = { path = "../rust-swift-mcp" }
 clap = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

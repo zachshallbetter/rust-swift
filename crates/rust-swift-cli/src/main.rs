@@ -7,6 +7,7 @@ use rust_swift_qualification::benchmark::BenchmarkRunner;
 use rust_swift_qualification::differential::DifferentialRunner;
 use rust_swift_qualification::evals::AdversarialRunner;
 use rust_swift_qualification::mutation::MutationRunner;
+use serde_json::json;
 use sha2::{Digest, Sha256};
 use std::fs::{self, OpenOptions};
 use std::io::Write;
@@ -27,6 +28,23 @@ struct Cli {
 
 #[derive(Subcommand, Debug)]
 enum Commands {
+    /// Inspect whether a Rust source file satisfies the Language Matrix boundary without generating Swift
+    Check {
+        /// Input Rust source file
+        input: PathBuf,
+
+        /// Output format: text or json (machine-readable diagnostics for agents)
+        #[arg(long, default_value = "text")]
+        format: String,
+
+        /// Force synthesis of Swift Codable conformance across all structs and enums
+        #[arg(long)]
+        codable: bool,
+
+        /// Enable SwiftUI @Observable macro synthesis for state models
+        #[arg(long)]
+        observable: bool,
+    },
     /// Compile a Rust file into a standalone Swift Package
     Compile {
         /// Input Rust source file
@@ -39,6 +57,10 @@ enum Commands {
         /// Swift package name (defaults to input file stem)
         #[arg(short, long)]
         package_name: Option<String>,
+
+        /// Output format: text or json (machine-readable report for agents)
+        #[arg(long, default_value = "text")]
+        format: String,
 
         /// Emit Compiler Semantic Graph (CSG) JSON
         #[arg(long)]
@@ -100,6 +122,10 @@ enum Commands {
         /// Output path for proof receipt JSON (defaults to proof-receipt.json)
         #[arg(short, long, default_value = "proof-receipt.json")]
         output: PathBuf,
+
+        /// Output format: text or json (defaults to text)
+        #[arg(long, default_value = "text")]
+        format: String,
     },
     /// Continuous bi-directional delta synchronization and CSG file watcher daemon
     Sync {
@@ -119,16 +145,27 @@ enum Commands {
         #[arg(long, default_value_t = 500)]
         interval_ms: u64,
     },
+    /// Run the Model Context Protocol (MCP) server over stdio for Claude, Codex, Cursor, and agent integrations
+    Mcp,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
 
     match cli.command {
+        Commands::Check {
+            input,
+            format,
+            codable,
+            observable,
+        } => {
+            check_command(&input, &format, codable, observable)?;
+        }
         Commands::Compile {
             input,
             output_dir,
             package_name,
+            format,
             emit_csg,
             emit_ir,
             source_locations,
@@ -140,6 +177,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 input: &input,
                 output_dir: &output_dir,
                 package_name: package_name.as_deref(),
+                format: &format,
                 emit_csg,
                 emit_ir,
                 source_locations,
@@ -164,8 +202,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Commands::Bench { output_dir } => {
             bench_command(&output_dir)?;
         }
-        Commands::Proof { input, output } => {
-            proof_command(&input, &output)?;
+        Commands::Proof {
+            input,
+            output,
+            format,
+        } => {
+            proof_command(&input, &output, &format)?;
         }
         Commands::Sync {
             input_dir,
@@ -174,6 +216,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             interval_ms,
         } => {
             sync_command(&input_dir, &output_dir, watch, interval_ms)?;
+        }
+        Commands::Mcp => {
+            mcp_command()?;
         }
     }
 
@@ -184,6 +229,7 @@ struct CompileOptions<'a> {
     input: &'a Path,
     output_dir: &'a Path,
     package_name: Option<&'a str>,
+    format: &'a str,
     emit_csg: bool,
     emit_ir: bool,
     source_locations: bool,
@@ -192,10 +238,117 @@ struct CompileOptions<'a> {
     observable: bool,
 }
 
+fn check_command(
+    input: &Path,
+    format: &str,
+    codable: bool,
+    observable: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    if !input.exists() {
+        if format == "json" {
+            println!(
+                "{}",
+                json!({
+                    "status": "error",
+                    "file": input.display().to_string(),
+                    "message": format!("Input file does not exist: {}", input.display())
+                })
+            );
+        } else {
+            eprintln!("Error: Input file does not exist: {}", input.display());
+        }
+        std::process::exit(1);
+    }
+
+    let source = fs::read_to_string(input)?;
+    let mut frontend = Frontend::new(input.to_string_lossy().to_string())
+        .with_default_codable(codable)
+        .with_default_observable(observable);
+
+    match frontend.parse_and_lower(&source) {
+        Ok(module) => {
+            let type_count = module
+                .items
+                .iter()
+                .filter(|i| {
+                    matches!(
+                        i,
+                        rust_swift_ir::Item::Struct(_) | rust_swift_ir::Item::Enum(_)
+                    )
+                })
+                .count();
+            let function_count = module
+                .items
+                .iter()
+                .filter(|i| matches!(i, rust_swift_ir::Item::Function(_)))
+                .count();
+
+            if format == "json" {
+                println!(
+                    "{}",
+                    json!({
+                        "status": "admitted",
+                        "file": input.display().to_string(),
+                        "module_name": module.name,
+                        "type_count": type_count,
+                        "function_count": function_count,
+                        "diagnostics": []
+                    })
+                );
+            } else {
+                println!(
+                    "[OK] Input '{}' satisfies the Language Matrix boundary.",
+                    input.display()
+                );
+                println!("  Module:    {}", module.name);
+                println!("  Types:     {}", type_count);
+                println!("  Functions: {}", function_count);
+            }
+            Ok(())
+        }
+        Err(diags) => {
+            if format == "json" {
+                let diag_json: Vec<_> = diags
+                    .iter()
+                    .map(|d| {
+                        json!({
+                            "code": d.code.as_str(),
+                            "message": d.message,
+                            "file": d.span.file,
+                            "start_line": d.span.start_line,
+                            "end_line": d.span.end_line,
+                            "suggested_remedy": d.suggested_alternative,
+                        })
+                    })
+                    .collect();
+                println!(
+                    "{}",
+                    json!({
+                        "status": "rejected",
+                        "file": input.display().to_string(),
+                        "diagnostics": diag_json,
+                    })
+                );
+            } else {
+                eprintln!(
+                    "[REJECTED] Input '{}' violates the Language Matrix boundary with {} diagnostics:",
+                    input.display(),
+                    diags.len()
+                );
+                for d in &diags {
+                    eprintln!("  {}", d);
+                }
+            }
+            std::process::exit(1);
+        }
+    }
+}
+
 fn compile_command(opts: CompileOptions<'_>) -> Result<(), Box<dyn std::error::Error>> {
     let input = opts.input;
     let output_dir = opts.output_dir;
     let package_name = opts.package_name;
+    let format = opts.format;
     let emit_csg = opts.emit_csg;
     let emit_ir = opts.emit_ir;
     let source_locations = opts.source_locations;
@@ -204,7 +357,18 @@ fn compile_command(opts: CompileOptions<'_>) -> Result<(), Box<dyn std::error::E
     let observable = opts.observable;
 
     if !input.exists() {
-        eprintln!("Error: Input file does not exist: {}", input.display());
+        if format == "json" {
+            println!(
+                "{}",
+                json!({
+                    "status": "error",
+                    "file": input.display().to_string(),
+                    "message": format!("Input file does not exist: {}", input.display())
+                })
+            );
+        } else {
+            eprintln!("Error: Input file does not exist: {}", input.display());
+        }
         std::process::exit(1);
     }
 
@@ -225,9 +389,33 @@ fn compile_command(opts: CompileOptions<'_>) -> Result<(), Box<dyn std::error::E
     let module = match frontend.parse_and_lower(&source) {
         Ok(m) => m,
         Err(diags) => {
-            eprintln!("Compilation failed with {} diagnostics:", diags.len());
-            for d in &diags {
-                eprintln!("  {}", d);
+            if format == "json" {
+                let diag_json: Vec<_> = diags
+                    .iter()
+                    .map(|d| {
+                        json!({
+                            "code": d.code.as_str(),
+                            "message": d.message,
+                            "file": d.span.file,
+                            "start_line": d.span.start_line,
+                            "end_line": d.span.end_line,
+                            "suggested_remedy": d.suggested_alternative,
+                        })
+                    })
+                    .collect();
+                println!(
+                    "{}",
+                    json!({
+                        "status": "rejected",
+                        "file": input.display().to_string(),
+                        "diagnostics": diag_json,
+                    })
+                );
+            } else {
+                eprintln!("Compilation failed with {} diagnostics:", diags.len());
+                for d in &diags {
+                    eprintln!("  {}", d);
+                }
             }
             std::process::exit(1);
         }
@@ -268,14 +456,29 @@ fn compile_command(opts: CompileOptions<'_>) -> Result<(), Box<dyn std::error::E
         fs::write(output_dir.join("csg.json"), csg_json)?;
     }
 
-    println!(
-        "Successfully compiled {} to Swift package at {}",
-        input.display(),
-        output_dir.display()
-    );
-    println!("  Package name: {}", manifest.package_name);
-    println!("  Generated files: {}", manifest.generated_files.join(", "));
-    println!("  Source hash: sha256:{}", source_hash);
+    if format == "json" {
+        println!(
+            "{}",
+            json!({
+                "status": "success",
+                "file": input.display().to_string(),
+                "package_name": manifest.package_name,
+                "output_dir": output_dir.display().to_string(),
+                "generated_files": manifest.generated_files,
+                "source_hash": format!("sha256:{}", source_hash),
+                "symbols_count": manifest.symbols.len()
+            })
+        );
+    } else {
+        println!(
+            "Successfully compiled {} to Swift package at {}",
+            input.display(),
+            output_dir.display()
+        );
+        println!("  Package name: {}", manifest.package_name);
+        println!("  Generated files: {}", manifest.generated_files.join(", "));
+        println!("  Source hash: sha256:{}", source_hash);
+    }
 
     Ok(())
 }
@@ -815,7 +1018,11 @@ fn bench_command(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn proof_command(input: &Path, output: &Path) -> Result<(), Box<dyn std::error::Error>> {
+fn proof_command(
+    input: &Path,
+    output: &Path,
+    format: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
     let source = fs::read_to_string(input)?;
     let file_name = input
         .file_name()
@@ -825,9 +1032,32 @@ fn proof_command(input: &Path, output: &Path) -> Result<(), Box<dyn std::error::
     let module = match frontend.parse_and_lower(&source) {
         Ok(m) => m,
         Err(diags) => {
-            eprintln!("Frontend error: {} diagnostics emitted", diags.len());
-            for d in &diags {
-                eprintln!("  [{}] {}", d.code.as_str(), d.message);
+            if format == "json" {
+                let diag_json: Vec<_> = diags
+                    .iter()
+                    .map(|d| {
+                        json!({
+                            "code": d.code.as_str(),
+                            "message": d.message,
+                            "file": d.span.file,
+                            "start_line": d.span.start_line,
+                            "end_line": d.span.end_line,
+                            "suggested_remedy": d.suggested_alternative,
+                        })
+                    })
+                    .collect();
+                println!(
+                    "{}",
+                    json!({
+                        "status": "error",
+                        "diagnostics": diag_json,
+                    })
+                );
+            } else {
+                eprintln!("Frontend error: {} diagnostics emitted", diags.len());
+                for d in &diags {
+                    eprintln!("  [{}] {}", d.code.as_str(), d.message);
+                }
             }
             std::process::exit(1);
         }
@@ -837,21 +1067,25 @@ fn proof_command(input: &Path, output: &Path) -> Result<(), Box<dyn std::error::
     let json = serde_json::to_string_pretty(&receipt)?;
     fs::write(output, &json)?;
 
-    println!(
-        "Epistemic Proof Dossier generated for module '{}':",
-        receipt.module_name
-    );
-    println!("  Invariants Evaluated: {}", receipt.invariants_evaluated);
-    println!("  Invariants Proven:    {}", receipt.invariants_proven);
-    println!(
-        "  Certified:            {}",
-        if receipt.is_certified { "YES" } else { "NO" }
-    );
-    println!(
-        "  Signature:            {}",
-        receipt.cryptographic_signature
-    );
-    println!("  Receipt written to:   {}", output.display());
+    if format == "json" {
+        println!("{}", json);
+    } else {
+        println!(
+            "Epistemic Proof Dossier generated for module '{}':",
+            receipt.module_name
+        );
+        println!("  Invariants Evaluated: {}", receipt.invariants_evaluated);
+        println!("  Invariants Proven:    {}", receipt.invariants_proven);
+        println!(
+            "  Certified:            {}",
+            if receipt.is_certified { "YES" } else { "NO" }
+        );
+        println!(
+            "  Signature:            {}",
+            receipt.cryptographic_signature
+        );
+        println!("  Receipt written to:   {}", output.display());
+    }
 
     if !receipt.is_certified {
         std::process::exit(1);
@@ -907,4 +1141,8 @@ fn sync_command(
     }
 
     Ok(())
+}
+
+fn mcp_command() -> Result<(), Box<dyn std::error::Error>> {
+    rust_swift_mcp::McpServer::run_stdio()
 }
