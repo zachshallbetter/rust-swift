@@ -28,12 +28,15 @@ pub struct PackageManifest {
     pub swift_tools_version: String,
     pub generated_files: Vec<String>,
     pub symbols: Vec<SymbolMapping>,
+    #[serde(default)]
+    pub source_locations_enabled: bool,
 }
 
 pub struct SwiftGenerator {
     indent_level: usize,
     symbols: Vec<SymbolMapping>,
     fn_inouts: std::collections::HashMap<String, Vec<bool>>,
+    emit_source_locations: bool,
 }
 
 impl Default for SwiftGenerator {
@@ -48,7 +51,17 @@ impl SwiftGenerator {
             indent_level: 0,
             symbols: Vec::new(),
             fn_inouts: std::collections::HashMap::new(),
+            emit_source_locations: false,
         }
+    }
+
+    pub fn with_source_locations(mut self, enabled: bool) -> Self {
+        self.emit_source_locations = enabled;
+        self
+    }
+
+    pub fn set_source_locations(&mut self, enabled: bool) {
+        self.emit_source_locations = enabled;
     }
 
     fn indent(&self) -> String {
@@ -102,6 +115,10 @@ impl SwiftGenerator {
                     out.push_str("\n\n");
                 }
             }
+        }
+
+        if self.emit_source_locations {
+            out.push_str("#sourceLocation()\n");
         }
 
         (out, self.symbols.clone())
@@ -164,6 +181,15 @@ impl SwiftGenerator {
         });
 
         let mut out = String::new();
+        if self.emit_source_locations && enm.span.start_line > 0 && !enm.span.file.is_empty() {
+            let escaped = enm.span.file.replace('\\', "\\\\").replace('"', "\\\"");
+            out.push_str(&format!(
+                "{}#sourceLocation(file: \"{}\", line: {})\n",
+                self.indent(),
+                escaped,
+                enm.span.start_line
+            ));
+        }
         let vis = if enm.is_public { "public " } else { "" };
 
         if enm.is_fieldless() {
@@ -237,6 +263,15 @@ impl SwiftGenerator {
         });
 
         let mut out = String::new();
+        if self.emit_source_locations && strct.span.start_line > 0 && !strct.span.file.is_empty() {
+            let escaped = strct.span.file.replace('\\', "\\\\").replace('"', "\\\"");
+            out.push_str(&format!(
+                "{}#sourceLocation(file: \"{}\", line: {})\n",
+                self.indent(),
+                escaped,
+                strct.span.start_line
+            ));
+        }
         let vis = if strct.is_public { "public " } else { "" };
         out.push_str(&format!(
             "{}struct {}: Equatable, Hashable, Sendable {{\n",
@@ -285,6 +320,15 @@ impl SwiftGenerator {
 
     fn generate_impl(&mut self, imp: &ImplBlock) -> String {
         let mut out = String::new();
+        if self.emit_source_locations && imp.span.start_line > 0 && !imp.span.file.is_empty() {
+            let escaped = imp.span.file.replace('\\', "\\\\").replace('"', "\\\"");
+            out.push_str(&format!(
+                "{}#sourceLocation(file: \"{}\", line: {})\n",
+                self.indent(),
+                escaped,
+                imp.span.start_line
+            ));
+        }
         out.push_str(&format!("extension {} {{\n", imp.target_type));
         self.indent_level += 1;
         for (i, method) in imp.methods.iter().enumerate() {
@@ -309,6 +353,15 @@ impl SwiftGenerator {
         });
 
         let mut out = String::new();
+        if self.emit_source_locations && method.span.start_line > 0 && !method.span.file.is_empty() {
+            let escaped = method.span.file.replace('\\', "\\\\").replace('"', "\\\"");
+            out.push_str(&format!(
+                "{}#sourceLocation(file: \"{}\", line: {})\n",
+                self.indent(),
+                escaped,
+                method.span.start_line
+            ));
+        }
         let vis = if method.is_public { "public " } else { "" };
         let modifier = match method.receiver {
             None => "static ",
@@ -372,6 +425,15 @@ impl SwiftGenerator {
         });
 
         let mut out = String::new();
+        if self.emit_source_locations && func.span.start_line > 0 && !func.span.file.is_empty() {
+            let escaped = func.span.file.replace('\\', "\\\\").replace('"', "\\\"");
+            out.push_str(&format!(
+                "{}#sourceLocation(file: \"{}\", line: {})\n",
+                self.indent(),
+                escaped,
+                func.span.start_line
+            ));
+        }
         let vis = if func.is_public { "public " } else { "" };
         let params_str = func
             .params
@@ -1169,6 +1231,7 @@ extension Result {
                 "Package.swift".into(),
             ],
             symbols,
+            source_locations_enabled: self.emit_source_locations,
         };
 
         let manifest_json = serde_json::to_string_pretty(&manifest).unwrap();
@@ -1679,4 +1742,46 @@ mod tests {
         assert!(code.contains("total = (total &+ x)"));
         assert!(code.contains("return total"));
     }
+
+    #[test]
+    fn test_codegen_source_locations_directive() {
+        let mut module = Module::new("SourceMapped");
+        module.items.push(Item::Function(Function {
+            name: "calculate".into(),
+            params: vec![],
+            return_type: Type::I32,
+            body: Expr::new(
+                ExprKind::Block {
+                    stmts: vec![],
+                    expr: Some(Box::new(Expr::new(
+                        ExprKind::Literal(Literal::Int {
+                            value: 42,
+                            ty: Type::I32,
+                        }),
+                        Type::I32,
+                    ))),
+                },
+                Type::I32,
+            ),
+            is_public: true,
+            span: SourceSpan {
+                file: "math/calc.rs".into(),
+                start_line: 77,
+                end_line: 85,
+            },
+        }));
+
+        // Default: no source locations
+        let mut gen_default = SwiftGenerator::new();
+        let (code_default, _) = gen_default.generate_module(&module);
+        assert!(!code_default.contains("#sourceLocation"));
+
+        // With source locations enabled
+        let mut gen_mapped = SwiftGenerator::new().with_source_locations(true);
+        let (code_mapped, _) = gen_mapped.generate_module(&module);
+        assert!(code_mapped.contains("#sourceLocation(file: \"math/calc.rs\", line: 77)"));
+        assert!(code_mapped.contains("public func calculate() -> Int32"));
+        assert!(code_mapped.ends_with("#sourceLocation()\n"));
+    }
 }
+

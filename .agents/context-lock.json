@@ -6,9 +6,9 @@
   "selectedPaths": [],
   "sourceSelection": {
     "includedCount": 155,
-    "includedBytes": 2157555,
+    "includedBytes": 2169283,
     "excludedCounts": {
-      "excluded-directory": 24593,
+      "excluded-directory": 26204,
       "excluded-path": 1,
       "extension": 4557,
       "symlink": 2
@@ -20,14 +20,14 @@
     "repositories": [
       {
         "path": ".",
-        "commit": "d1dbb9e4c2c0a0b94d919b518da904ee4b02fbaa",
-        "branch": "feat/collections-and-loops",
+        "commit": "364977e7e8251130acdaef46fb6ac511bd077fab",
+        "branch": "feat/source-mapping",
         "dirty": true,
         "remote": "https://github.com/zachshallbetter/rust-swift.git"
       }
     ]
   },
-  "aggregateSourceDigest": "445984b7e288a44bd146a1c6b2e1bb2243ba427f024294db4b27327779f14b92",
+  "aggregateSourceDigest": "1cc0f6524a44e89a83623caef56be70bc4215f7de120c56aa9359adcc9aed47b",
   "sources": [
     {
       "path": ".agents/rules/ci.md",
@@ -191,8 +191,8 @@
     },
     {
       "path": "crates/rust-swift-cli/src/main.rs",
-      "bytes": 13886,
-      "sha256": "bde5acb2a2cdc7993617dbf1061f19b0b0293941e90e2d75ef80a3ae9520ba51"
+      "bytes": 14802,
+      "sha256": "95f6d1666ba99eb8acac8e43caa12505ea0fe571f69783a2af1efced2bd20b4d"
     },
     {
       "path": "crates/rust-swift-codegen/Cargo.toml",
@@ -201,8 +201,8 @@
     },
     {
       "path": "crates/rust-swift-codegen/src/lib.rs",
-      "bytes": 60283,
-      "sha256": "0c8c87e098beff635eebbe8d3b4057c52b00ec28221a80caba4f9fde1e810a0e"
+      "bytes": 64392,
+      "sha256": "a2403795980524d0fd3ee3faeec7699f102f5bcc9fe83666e454205b3f4f5910"
     },
     {
       "path": "crates/rust-swift-frontend/Cargo.toml",
@@ -236,8 +236,8 @@
     },
     {
       "path": "crates/rust-swift-qualification/src/differential.rs",
-      "bytes": 78106,
-      "sha256": "adb88b5593b15d624e702da8e77b2d642fd36602ea3ce99acafc11a1d3923233"
+      "bytes": 84809,
+      "sha256": "cf1f702a570e02f3ed88756e3244d4a1778e58e14beb2a88b26255f46b9d5ebe"
     },
     {
       "path": "crates/rust-swift-qualification/src/lib.rs",

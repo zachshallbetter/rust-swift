@@ -1902,6 +1902,173 @@ struct LoopRunner {
         })
     }
 
+    /// Differential & line mapping qualification test for source mapping and #sourceLocation
+    pub fn test_source_mapping(
+        &self,
+        output_dir: &Path,
+    ) -> Result<QualificationReport, Box<dyn std::error::Error>> {
+        let out_dir = output_dir.join("source_mapping");
+        fs::create_dir_all(&out_dir)?;
+
+        let source = r#"pub struct Worker {
+    pub id: i32,
+}
+
+impl Worker {
+    pub fn process(&self, val: i32) -> i32 {
+        val + 10
+    }
+
+    pub fn validate_positive(&self, val: i32) -> bool {
+        assert!(val > 0, "val must be strictly positive");
+        true
+    }
+}
+"#;
+
+        let source_hash = Self::compute_sha256(source);
+        let (rustc_ver, swift_ver) = Self::toolchain_versions();
+
+        // 1. Lower to IR with source filename
+        let mut frontend = Frontend::new("source_mapping_test.rs");
+        let module = frontend
+            .parse_and_lower(source)
+            .map_err(|diags| format!("Frontend rejected source mapping fixture: {:?}", diags))?;
+
+        // 2. Generate Swift package with source locations enabled
+        let pkg_dir = out_dir.join("mapped_pkg");
+        let mut generator = SwiftGenerator::new().with_source_locations(true);
+        let manifest = generator.emit_package(&module, &pkg_dir, "MappedModule")?;
+
+        let sources_dir = pkg_dir.join("Sources").join("MappedModule");
+        let swift_source_path = sources_dir.join("source_mapping_test.swift");
+        let swift_source = fs::read_to_string(&swift_source_path)?;
+
+        let mut cases_passed = 0;
+        let total = 3;
+        let mut details = Vec::new();
+
+        // Check 1: Directive presence in generated Swift code
+        let has_struct_loc = swift_source.contains("#sourceLocation(file: \"source_mapping_test.rs\", line: 1)");
+        let has_method_loc = swift_source.contains("#sourceLocation(file: \"source_mapping_test.rs\", line: 6)");
+        let has_reset_loc = swift_source.ends_with("#sourceLocation()\n");
+        if has_struct_loc && has_method_loc && has_reset_loc && manifest.source_locations_enabled {
+            cases_passed += 1;
+            details.push("Step #1: PASS (#sourceLocation directives and manifest flag present)".into());
+        } else {
+            details.push(format!(
+                "Step #1: FAIL (struct_loc={}, method_loc={}, reset_loc={}, manifest={})",
+                has_struct_loc, has_method_loc, has_reset_loc, manifest.source_locations_enabled
+            ));
+        }
+
+        // 3. Create Swift test runner for valid execution
+        let runner_swift = r#"
+import Foundation
+
+@main
+struct MappedRunner {
+    static func main() {
+        let w = Worker(id: 42)
+        let res = w.process(15)
+        let valid = w.validate_positive(5)
+        print("res:\(res)")
+        print("valid:\(valid)")
+    }
+}
+"#;
+        let main_swift_path = sources_dir.join("main.swift");
+        fs::write(&main_swift_path, runner_swift)?;
+
+        let rust_compat = sources_dir.join("RustCompat.swift");
+        let swiftc_out = Command::new("swiftc")
+            .arg("-parse-as-library")
+            .arg("-emit-executable")
+            .arg(&swift_source_path)
+            .arg(&rust_compat)
+            .arg(&main_swift_path)
+            .arg("-o")
+            .arg(pkg_dir.join("mapped_runner"))
+            .output()?;
+
+        if !swiftc_out.status.success() {
+            return Err(format!(
+                "Failed to compile Swift Mapped runner: {}",
+                String::from_utf8_lossy(&swiftc_out.stderr)
+            )
+            .into());
+        }
+
+        let exec_out = Command::new(pkg_dir.join("mapped_runner")).output()?;
+        let stdout = String::from_utf8_lossy(&exec_out.stdout);
+        if stdout.contains("res:25") && stdout.contains("valid:true") {
+            cases_passed += 1;
+            details.push("Step #2: PASS (Valid execution with source locations matches semantics)".into());
+        } else {
+            details.push(format!("Step #2: FAIL (Unexpected stdout: {})", stdout));
+        }
+
+        // Check 3: Precondition trap maps stack trace back to Rust source file and line 11
+        let trap_runner_swift = r#"
+import Foundation
+
+@main
+struct TrapRunner {
+    static func main() {
+        let w = Worker(id: 42)
+        _ = w.validate_positive(-1)
+    }
+}
+"#;
+        let trap_main_swift_path = sources_dir.join("trap_main.swift");
+        fs::write(&trap_main_swift_path, trap_runner_swift)?;
+
+        let swiftc_trap_out = Command::new("swiftc")
+            .arg("-parse-as-library")
+            .arg("-emit-executable")
+            .arg(&swift_source_path)
+            .arg(&rust_compat)
+            .arg(&trap_main_swift_path)
+            .arg("-o")
+            .arg(pkg_dir.join("trap_runner"))
+            .output()?;
+
+        if !swiftc_trap_out.status.success() {
+            return Err(format!(
+                "Failed to compile Swift Trap runner: {}",
+                String::from_utf8_lossy(&swiftc_trap_out.stderr)
+            )
+            .into());
+        }
+
+        let trap_exec_out = Command::new(pkg_dir.join("trap_runner")).output()?;
+        let stderr = String::from_utf8_lossy(&trap_exec_out.stderr);
+        let line_mapped = stderr.contains("source_mapping_test.rs:11")
+            && stderr.contains("Precondition failed: val must be strictly positive");
+
+        if line_mapped {
+            cases_passed += 1;
+            details.push("Step #3: PASS (Precondition failure correctly reports source_mapping_test.rs:11 in stack trace)".into());
+        } else {
+            details.push(format!("Step #3: FAIL (Expected source_mapping_test.rs:11 in stderr, got: {})", stderr));
+        }
+
+        let status = if cases_passed == total { "PASSED" } else { "FAILED" };
+
+        Ok(QualificationReport {
+            fixture_name: "source_mapping_and_traceability".into(),
+            source_hash,
+            rustc_version: rustc_ver,
+            swift_version: swift_ver,
+            cases_tested: total,
+            cases_passed,
+            cases_failed: total - cases_passed,
+            status: status.into(),
+            timestamp: "2026-10-13T20:55:00Z".into(),
+            details,
+        })
+    }
+
     /// Run negative rejection tests asserting exact stable diagnostic codes
     pub fn test_negative_rejections(
         &self,
@@ -2291,4 +2458,18 @@ mod tests {
         assert_eq!(report.cases_passed, 6);
         assert_eq!(report.cases_failed, 0);
     }
+
+    #[test]
+    fn test_source_mapping_differential_passes() {
+        let runner = DifferentialRunner::new(".");
+        let temp_dir = std::env::temp_dir().join("source_mapping_diff_test");
+        let _ = fs::create_dir_all(&temp_dir);
+        let report = runner
+            .test_source_mapping(&temp_dir)
+            .expect("Source mapping differential test should pass");
+        assert_eq!(report.status, "PASSED");
+        assert_eq!(report.cases_passed, 3);
+        assert_eq!(report.cases_failed, 0);
+    }
 }
+
