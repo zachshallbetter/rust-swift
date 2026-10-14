@@ -3439,6 +3439,218 @@ struct UIRunner {
         })
     }
 
+    /// Bitflags & Mask Types to Swift OptionSet Lowering qualification
+    pub fn test_bitflags_optionset(
+        &self,
+        output_dir: &Path,
+    ) -> Result<QualificationReport, Box<dyn std::error::Error>> {
+        let (rustc_ver, swift_ver) = Self::toolchain_versions();
+        let bf_dir = output_dir.join("bitflags_qualification");
+        let _ = fs::remove_dir_all(&bf_dir);
+        fs::create_dir_all(&bf_dir)?;
+
+        let source = r#"#[bitflags]
+pub struct FilePermissions {
+    pub raw_value: u32,
+}
+
+impl FilePermissions {
+    pub const READ: FilePermissions = FilePermissions { raw_value: 1 };
+    pub const WRITE: FilePermissions = FilePermissions { raw_value: 2 };
+    pub const EXECUTE: FilePermissions = FilePermissions { raw_value: 4 };
+
+    pub fn can_read(&self) -> bool {
+        self.raw_value & 1 != 0
+    }
+
+    pub fn can_write(&self) -> bool {
+        self.raw_value & 2 != 0
+    }
+}
+"#;
+        let source_hash = Self::compute_sha256(source);
+
+        let mut frontend = Frontend::new("FilePermissions.rs");
+        let module = frontend
+            .parse_and_lower(source)
+            .map_err(|diags| format!("Frontend parsing failed with {} diagnostics", diags.len()))?;
+
+        let mut gen = SwiftGenerator::new();
+        let (swift_code, _) = gen.generate_module(&module);
+        let swift_src_path = bf_dir.join("FilePermissions.swift");
+        fs::write(&swift_src_path, &swift_code)?;
+
+        let runner_src = r#"import Foundation
+
+@main
+struct BitflagsRunner {
+    static func main() {
+        let read = FilePermissions.READ
+        let write = FilePermissions.WRITE
+        let exec = FilePermissions.EXECUTE
+
+        // 1. Bitwise union operator |
+        let rw = read | write
+        print("union_raw:\(rw.rawValue)")
+
+        // 2. Bitwise intersection operator &
+        let extracted_read = rw & read
+        print("intersect_raw:\(extracted_read.rawValue)")
+
+        // 3. OptionSet SetAlgebra .contains()
+        let has_read = rw.contains(read)
+        let has_exec = rw.contains(exec)
+        print("has_read:\(has_read)")
+        print("has_exec:\(has_exec)")
+
+        // 4. Inherent methods
+        print("can_read:\(rw.can_read())")
+        print("can_write:\(rw.can_write())")
+
+        // 5. OptionSet array literal initialization
+        let custom: FilePermissions = [.READ, .EXECUTE]
+        print("custom_raw:\(custom.rawValue)")
+    }
+}
+"#;
+        let runner_path = bf_dir.join("BitflagsRunner.swift");
+        fs::write(&runner_path, runner_src)?;
+
+        let mut details = Vec::new();
+        let total = 5;
+        let mut cases_passed = 0;
+
+        // Case 1: IR lowering validation
+        if let Some(rust_swift_ir::Item::Struct(s)) = module
+            .items
+            .iter()
+            .find(|i| matches!(i, rust_swift_ir::Item::Struct(_)))
+        {
+            if s.is_bitflags && s.name == "FilePermissions" {
+                cases_passed += 1;
+                details.push(
+                    "Case #1: PASS (#[bitflags] lowered to is_bitflags = true in Semantic IR)"
+                        .into(),
+                );
+            } else {
+                details.push("Case #1: FAIL (is_bitflags flag not set on struct)".into());
+            }
+        } else {
+            details.push("Case #1: FAIL (Struct not found in IR)".into());
+        }
+
+        // Case 2: Compilation with swiftc
+        let swift_bin = bf_dir.join("bitflags_runner");
+        let compile_status = Command::new("swiftc")
+            .arg("-parse-as-library")
+            .arg(&swift_src_path)
+            .arg(&runner_path)
+            .arg("-o")
+            .arg(&swift_bin)
+            .status();
+
+        if let Ok(st) = compile_status {
+            if st.success() {
+                cases_passed += 1;
+                details.push(
+                    "Case #2: PASS (swiftc cleanly compiled Swift OptionSet into executable)"
+                        .into(),
+                );
+            } else {
+                details.push("Case #2: FAIL (swiftc compilation failed)".into());
+                return Ok(QualificationReport {
+                    fixture_name: "bitflags_optionset".into(),
+                    source_hash,
+                    rustc_version: rustc_ver,
+                    swift_version: swift_ver,
+                    cases_tested: total,
+                    cases_passed,
+                    cases_failed: total - cases_passed,
+                    status: "FAILED".into(),
+                    timestamp: "2026-10-14T16:30:00Z".into(),
+                    details,
+                });
+            }
+        } else {
+            details.push("Case #2: FAIL (swiftc not executable)".into());
+            return Ok(QualificationReport {
+                fixture_name: "bitflags_optionset".into(),
+                source_hash,
+                rustc_version: rustc_ver,
+                swift_version: swift_ver,
+                cases_tested: total,
+                cases_passed,
+                cases_failed: total - cases_passed,
+                status: "FAILED".into(),
+                timestamp: "2026-10-14T16:30:00Z".into(),
+                details,
+            });
+        }
+
+        // Execute runner
+        let exec_out = Command::new(&swift_bin).output()?;
+        let stdout = String::from_utf8(exec_out.stdout)?;
+
+        // Case 3: Bitwise operators (| and &)
+        if stdout.contains("union_raw:3") && stdout.contains("intersect_raw:1") {
+            cases_passed += 1;
+            details.push(
+                "Case #3: PASS (Bitwise union | and intersection & produced exact rawValues)"
+                    .into(),
+            );
+        } else {
+            details.push(format!(
+                "Case #3: FAIL (Unexpected bitwise operator output: {})",
+                stdout
+            ));
+        }
+
+        // Case 4: OptionSet SetAlgebra contains
+        if stdout.contains("has_read:true") && stdout.contains("has_exec:false") {
+            cases_passed += 1;
+            details.push(
+                "Case #4: PASS (OptionSet contains query verified membership correctly)".into(),
+            );
+        } else {
+            details.push(format!(
+                "Case #4: FAIL (Unexpected contains output: {})",
+                stdout
+            ));
+        }
+
+        // Case 5: Inherent method & array literal initialization
+        if stdout.contains("can_read:true")
+            && stdout.contains("can_write:true")
+            && stdout.contains("custom_raw:5")
+        {
+            cases_passed += 1;
+            details.push("Case #5: PASS (Inherent methods executed and array literal initialization [.READ, .EXECUTE] matched rawValue 5)".into());
+        } else {
+            details.push(format!(
+                "Case #5: FAIL (Unexpected method/array literal output: {})",
+                stdout
+            ));
+        }
+
+        let all_passed = cases_passed == total;
+        Ok(QualificationReport {
+            fixture_name: "bitflags_optionset".into(),
+            source_hash,
+            rustc_version: rustc_ver,
+            swift_version: swift_ver,
+            cases_tested: total,
+            cases_passed,
+            cases_failed: total - cases_passed,
+            status: if all_passed {
+                "PASSED".into()
+            } else {
+                "FAILED".into()
+            },
+            timestamp: "2026-10-14T16:30:00Z".into(),
+            details,
+        })
+    }
+
     /// Run negative rejection tests asserting exact stable diagnostic codes
     pub fn test_negative_rejections(
         &self,
@@ -3994,5 +4206,30 @@ mod tests {
         let r2 = engine.sync_once().unwrap();
         assert_eq!(r2.len(), 1);
         assert_eq!(r2[0].action, crate::sync::SyncAction::SkippedInvariant);
+    }
+
+    #[test]
+    fn test_bitflags_optionset_differential_passes() {
+        let runner = DifferentialRunner::new(
+            std::env::var("CARGO_MANIFEST_DIR")
+                .map(|p| {
+                    PathBuf::from(p)
+                        .parent()
+                        .unwrap()
+                        .parent()
+                        .unwrap()
+                        .to_path_buf()
+                })
+                .unwrap_or_else(|_| PathBuf::from(".")),
+        );
+        let temp_dir = std::env::temp_dir().join("bitflags_diff_test");
+        let _ = fs::create_dir_all(&temp_dir);
+        let report = runner
+            .test_bitflags_optionset(&temp_dir)
+            .expect("Bitflags OptionSet differential test should pass");
+        eprintln!("Details: {:?}", report.details);
+        assert_eq!(report.status, "PASSED");
+        assert_eq!(report.cases_passed, 5);
+        assert_eq!(report.cases_failed, 0);
     }
 }

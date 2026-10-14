@@ -7,11 +7,11 @@ pub mod diagnostic;
 
 use diagnostic::{Diagnostic, DiagnosticCode};
 use rust_swift_ir::{
-    AssociatedTypeDef, BinaryOp, CmpOp, EnumDef, EnumVariant, Expr, ExprKind, FieldDef, Function,
-    ImplBlock, IntegerMode, IntegerOp, Item as IrItem, Literal, LogicalOp, MatchArm, Method,
-    Module, Param, Pattern, PropertyBindingKind, ReceiverKind, SourceSpan, Stmt, StructDef,
-    TraitDef, TraitImpl, TraitMethod, Type, TypeAlias, UnaryOp, VariantPayload, ViewDef, ViewKind,
-    ViewModifier, ViewNode, ViewProperty,
+    AssociatedTypeDef, BinaryOp, CmpOp, ConstantDef, EnumDef, EnumVariant, Expr, ExprKind,
+    FieldDef, Function, ImplBlock, IntegerMode, IntegerOp, Item as IrItem, Literal, LogicalOp,
+    MatchArm, Method, Module, Param, Pattern, PropertyBindingKind, ReceiverKind, SourceSpan, Stmt,
+    StructDef, TraitDef, TraitImpl, TraitMethod, Type, TypeAlias, UnaryOp, VariantPayload, ViewDef,
+    ViewKind, ViewModifier, ViewNode, ViewProperty,
 };
 use syn::spanned::Spanned;
 
@@ -210,17 +210,27 @@ impl Frontend {
                     };
 
                     let mut methods = Vec::new();
+                    let mut constants = Vec::new();
                     for item in &imp.items {
-                        if let syn::ImplItem::Fn(method) = item {
-                            if let Some(m) = self.lower_method(method) {
-                                methods.push(m);
+                        match item {
+                            syn::ImplItem::Fn(method) => {
+                                if let Some(m) = self.lower_method(method) {
+                                    methods.push(m);
+                                }
                             }
+                            syn::ImplItem::Const(c) => {
+                                if let Some(constant) = self.lower_impl_const(c) {
+                                    constants.push(constant);
+                                }
+                            }
+                            _ => {}
                         }
                     }
 
                     Some(IrItem::Impl(ImplBlock {
                         target_type,
                         methods,
+                        constants,
                         span: self.make_span(imp),
                     }))
                 }
@@ -380,6 +390,20 @@ impl Frontend {
             body,
             is_public,
             span: self.make_span(method),
+        })
+    }
+
+    fn lower_impl_const(&mut self, item_const: &syn::ImplItemConst) -> Option<ConstantDef> {
+        let name = item_const.ident.to_string();
+        let ty = self.lower_type(&item_const.ty);
+        let value = self.lower_expr(&item_const.expr);
+        let is_public = matches!(item_const.vis, syn::Visibility::Public(_));
+        Some(ConstantDef {
+            name,
+            ty,
+            value,
+            is_public,
+            span: self.make_span(item_const),
         })
     }
 
@@ -556,6 +580,26 @@ impl Frontend {
                 let mut found = false;
                 let _ = attr.parse_nested_meta(|meta| {
                     if meta.path.is_ident("Observable") {
+                        found = true;
+                    }
+                    Ok(())
+                });
+                found
+            } else {
+                false
+            }
+        })
+    }
+
+    fn has_bitflags_attr(attrs: &[syn::Attribute]) -> bool {
+        attrs.iter().any(|attr| {
+            if attr.path().is_ident("bitflags") {
+                return true;
+            }
+            if attr.path().is_ident("derive") {
+                let mut found = false;
+                let _ = attr.parse_nested_meta(|meta| {
+                    if meta.path.is_ident("BitFlags") || meta.path.is_ident("OptionSet") {
                         found = true;
                     }
                     Ok(())
@@ -1072,6 +1116,7 @@ impl Frontend {
         let is_codable = self.default_codable || Self::has_codable_derive(&item_struct.attrs);
         let is_observable =
             self.default_observable || Self::has_observable_attr(&item_struct.attrs);
+        let is_bitflags = Self::has_bitflags_attr(&item_struct.attrs);
 
         Some(StructDef {
             name,
@@ -1079,6 +1124,7 @@ impl Frontend {
             is_public,
             is_codable,
             is_observable,
+            is_bitflags,
             span: self.make_span(item_struct),
         })
     }
@@ -2709,6 +2755,42 @@ mod tests {
             assert_eq!(v.root.children[1].children.len(), 4);
         } else {
             panic!("Expected Item::View");
+        }
+    }
+
+    #[test]
+    fn test_bitflags_and_associated_constants_lowering() {
+        let src = r#"
+            #[bitflags]
+            pub struct Permissions {
+                pub raw_value: u32,
+            }
+
+            impl Permissions {
+                pub const READ: Permissions = Permissions { raw_value: 1 };
+                pub const WRITE: Permissions = Permissions { raw_value: 2 };
+            }
+        "#;
+        let mut fe = Frontend::new("test.rs");
+        let module = fe.parse_and_lower(src).expect("lowering failed");
+
+        assert_eq!(module.items.len(), 2);
+        if let IrItem::Struct(s) = &module.items[0] {
+            assert_eq!(s.name, "Permissions");
+            assert!(s.is_bitflags);
+            assert_eq!(s.fields.len(), 1);
+            assert_eq!(s.fields[0].name, "raw_value");
+        } else {
+            panic!("Expected Item::Struct");
+        }
+
+        if let IrItem::Impl(imp) = &module.items[1] {
+            assert_eq!(imp.target_type, "Permissions");
+            assert_eq!(imp.constants.len(), 2);
+            assert_eq!(imp.constants[0].name, "READ");
+            assert_eq!(imp.constants[1].name, "WRITE");
+        } else {
+            panic!("Expected Item::Impl");
         }
     }
 }
