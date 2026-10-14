@@ -116,7 +116,7 @@ The project is organized as a Cargo workspace containing five modular crates and
 - **[`crates/rust-swift-codegen/`](crates/rust-swift-codegen/)**: Swift AST lowerer, SwiftUI view tree synthesizer, and `Package.swift` emitter.
 - **[`crates/rust-swift-qualification/`](crates/rust-swift-qualification/)**: 16-suite differential qualification harness, failure injection, benchmarks, sync engine, and proof verifier.
 - **[`crates/rust-swift-cli/`](crates/rust-swift-cli/)**: Unified command-line interface (`rust-swift`).
-- **[`examples/`](examples/)**: Working example applications, including [`PlayerApp`](examples/PlayerApp/), [`PeelInspectorApp`](examples/PeelInspectorApp/), and [`PluginDemoApp`](examples/PluginDemoApp/).
+- **[`examples/`](examples/)**: Working example applications, including [`PlayerApp`](examples/PlayerApp/), [`PeelInspectorApp`](examples/PeelInspectorApp/), [`PluginDemoApp`](examples/PluginDemoApp/), and [`SwiftUIDemoApp`](examples/SwiftUIDemoApp/).
 - **[`Plugins/RustSwiftPlugin/`](Plugins/RustSwiftPlugin/)**: Native Swift Package Manager Build Tool Plugin.
 
 ---

@@ -11,6 +11,7 @@ This directory provides working demonstration projects, source files, and consum
 | **[`peel_core.rs`](peel_core.rs)** | Rust Source | Audio processing and track inspection models illustrating payload enums (`TrackFormat`), structs, `Vec<T>`, inherent methods, and `#[derive(Codable)]`. |
 | **[`PeelInspectorApp/`](PeelInspectorApp/)** | macOS SwiftUI App | Native macOS inspection application demonstrating pure value types, associated value extraction, and zero C bridging vs. traditional C-FFI wrappers. |
 | **[`PluginDemoApp/`](PluginDemoApp/)** | SPM Package Target | Demonstrates the **`RustSwiftPlugin`** Swift Package Manager Build Tool Plugin. Automatically discovers and compiles `.rs` files during `swift build` without manual intervention. |
+| **[`SwiftUIDemoApp/`](SwiftUIDemoApp/)** | macOS SwiftUI App | End-to-end native macOS SwiftUI application demonstrating `#[observable]` and `#[view]` component synthesis compiled automatically via `RustSwiftPlugin`. |
 | **[`GeneratedFSM/`](GeneratedFSM/)** | Swift Package | Generated Swift package layout emitted from `fsm_example.rs` by `rust-swift compile`. |
 | **[`PeelCoreKit/`](PeelCoreKit/)** | Swift Package | Generated Swift package layout emitted from `peel_core.rs` by `rust-swift compile`. |
 
