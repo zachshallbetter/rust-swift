@@ -1148,6 +1148,10 @@ extension String {
     public func is_empty() -> Bool {
         return self.isEmpty
     }
+
+    public func to_string() -> String {
+        return self
+    }
 }
 
 extension Array {
