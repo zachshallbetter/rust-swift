@@ -1462,6 +1462,211 @@ struct DataRunner {
         })
     }
 
+    /// Run ownership and region classification differential tests (&mut and inout exclusivity)
+    pub fn test_ownership_regions(
+        &self,
+        out_dir: &Path,
+    ) -> Result<QualificationReport, Box<dyn std::error::Error>> {
+        let own_source = r#"
+pub struct BankAccount {
+    pub balance: i64,
+}
+
+pub fn deposit(account: &mut BankAccount, amount: i64) {
+    account.balance += amount;
+}
+
+pub fn withdraw(account: &mut BankAccount, amount: i64) -> bool {
+    if account.balance >= amount {
+        account.balance -= amount;
+        true
+    } else {
+        false
+    }
+}
+
+pub fn transfer(from: &mut BankAccount, to: &mut BankAccount, amount: i64) -> bool {
+    if withdraw(from, amount) {
+        deposit(to, amount);
+        true
+    } else {
+        false
+    }
+}
+"#;
+
+        let source_hash = Self::compute_sha256(own_source);
+        let (rustc_ver, swift_ver) = Self::toolchain_versions();
+
+        // 1. Lower to IR
+        let mut frontend = Frontend::new("ownership_regions.rs");
+        let module = frontend
+            .parse_and_lower(own_source)
+            .map_err(|diags| format!("Frontend rejected ownership fixture: {:?}", diags))?;
+
+        // 2. Generate Swift package
+        let pkg_dir = out_dir.join("own_pkg");
+        let mut generator = SwiftGenerator::new();
+        generator.emit_package(&module, &pkg_dir, "OwnershipModule")?;
+
+        // 3. Create Swift test runner
+        let runner_swift = r#"
+import Foundation
+
+@main
+struct OwnershipRunner {
+    static func main() {
+        var acc1 = BankAccount(balance: 100)
+        var acc2 = BankAccount(balance: 50)
+
+        deposit(&acc1, 50)
+        print("step1:\(acc1.balance)")
+
+        let w1 = withdraw(&acc1, 30)
+        print("step2:\(w1):\(acc1.balance)")
+
+        let w2 = withdraw(&acc1, 200)
+        print("step3:\(w2):\(acc1.balance)")
+
+        let t1 = transfer(&acc1, &acc2, 70)
+        print("step4:\(t1):\(acc1.balance):\(acc2.balance)")
+
+        let t2 = transfer(&acc1, &acc2, 100)
+        print("step5:\(t2):\(acc1.balance):\(acc2.balance)")
+    }
+}
+"#;
+        let sources_dir = pkg_dir.join("Sources").join("OwnershipModule");
+        let main_swift_path = sources_dir.join("main.swift");
+        fs::write(&main_swift_path, runner_swift)?;
+
+        // 4. Compile and execute Swift code
+        let swift_source = sources_dir.join("ownership_regions.swift");
+        let rust_compat = sources_dir.join("RustCompat.swift");
+        let swiftc_out = Command::new("swiftc")
+            .arg("-parse-as-library")
+            .arg("-emit-executable")
+            .arg(&swift_source)
+            .arg(&rust_compat)
+            .arg(&main_swift_path)
+            .arg("-o")
+            .arg(pkg_dir.join("own_runner"))
+            .output()?;
+
+        if !swiftc_out.status.success() {
+            return Err(format!(
+                "Failed to compile Swift Ownership runner: {}",
+                String::from_utf8_lossy(&swiftc_out.stderr)
+            )
+            .into());
+        }
+
+        let exec_out = Command::new(pkg_dir.join("own_runner")).output()?;
+        let swift_results = String::from_utf8(exec_out.stdout)?;
+
+        // 5. Compute expected results using Rust implementation
+        struct RustAccount {
+            balance: i64,
+        }
+        fn rust_deposit(account: &mut RustAccount, amount: i64) {
+            account.balance += amount;
+        }
+        fn rust_withdraw(account: &mut RustAccount, amount: i64) -> bool {
+            if account.balance >= amount {
+                account.balance -= amount;
+                true
+            } else {
+                false
+            }
+        }
+        fn rust_transfer(from: &mut RustAccount, to: &mut RustAccount, amount: i64) -> bool {
+            if rust_withdraw(from, amount) {
+                rust_deposit(to, amount);
+                true
+            } else {
+                false
+            }
+        }
+
+        let mut acc1 = RustAccount { balance: 100 };
+        let mut acc2 = RustAccount { balance: 50 };
+        let mut rust_lines = Vec::new();
+
+        rust_deposit(&mut acc1, 50);
+        rust_lines.push(format!("step1:{}", acc1.balance));
+
+        let w1 = rust_withdraw(&mut acc1, 30);
+        rust_lines.push(format!("step2:{}:{}", w1, acc1.balance));
+
+        let w2 = rust_withdraw(&mut acc1, 200);
+        rust_lines.push(format!("step3:{}:{}", w2, acc1.balance));
+
+        let t1 = rust_transfer(&mut acc1, &mut acc2, 70);
+        rust_lines.push(format!("step4:{}:{}:{}", t1, acc1.balance, acc2.balance));
+
+        let t2 = rust_transfer(&mut acc1, &mut acc2, 100);
+        rust_lines.push(format!("step5:{}:{}:{}", t2, acc1.balance, acc2.balance));
+
+        let swift_lines: Vec<&str> = swift_results
+            .lines()
+            .map(|l| l.trim())
+            .filter(|l| !l.is_empty())
+            .collect();
+
+        let total = rust_lines.len();
+        let mut cases_passed = 0;
+        let mut details = Vec::new();
+
+        for (idx, expected) in rust_lines.iter().enumerate() {
+            if idx < swift_lines.len() && expected == swift_lines[idx] {
+                cases_passed += 1;
+                details.push(format!("Step #{}: PASS ({})", idx + 1, expected));
+            } else {
+                let actual = if idx < swift_lines.len() {
+                    swift_lines[idx]
+                } else {
+                    "<missing>"
+                };
+                details.push(format!(
+                    "Step #{}: FAIL (Expected: {}, Got: {})",
+                    idx + 1,
+                    expected,
+                    actual
+                ));
+            }
+        }
+
+        let rust_full = rust_lines.join("\n");
+        let swift_full = swift_lines.join("\n");
+        let rust_digest = Self::compute_sha256(&rust_full);
+        let swift_digest = Self::compute_sha256(&swift_full);
+
+        let digests_match = rust_digest == swift_digest;
+        details.push(format!(
+            "Ownership trace digest verification: Rust={}, Swift={}, Equal={}",
+            rust_digest, swift_digest, digests_match
+        ));
+
+        let status = if cases_passed == total && digests_match {
+            "PASSED"
+        } else {
+            "FAILED"
+        };
+
+        Ok(QualificationReport {
+            fixture_name: "ownership_regions_and_inout_mutation".into(),
+            source_hash,
+            rustc_version: rustc_ver,
+            swift_version: swift_ver,
+            cases_tested: total,
+            cases_passed,
+            cases_failed: total - cases_passed,
+            status: status.into(),
+            timestamp: "2026-10-13T20:00:00Z".into(),
+            details,
+        })
+    }
+
     /// Run negative rejection tests asserting exact stable diagnostic codes
     pub fn test_negative_rejections(
         &self,
@@ -1611,8 +1816,8 @@ struct DataRunner {
         reports.push(QualificationReport {
             fixture_name: "rejected_generics".into(),
             source_hash: Self::compute_sha256(gen_src),
-            rustc_version: rustc_ver,
-            swift_version: swift_ver,
+            rustc_version: rustc_ver.clone(),
+            swift_version: swift_ver.clone(),
             cases_tested: 1,
             cases_passed: if p6 { 1 } else { 0 },
             cases_failed: if p6 { 0 } else { 1 },
@@ -1623,6 +1828,84 @@ struct DataRunner {
             },
             timestamp: "2026-10-13T20:00:00Z".into(),
             details: vec!["Verified E0011_UNSPECIALIZABLE_GENERIC_REJECTED emitted".into()],
+        });
+
+        // 7. Custom Drop rejection
+        let drop_src = "pub struct Resource; impl Drop for Resource { fn drop(&mut self) {} }";
+        let mut f7 = Frontend::new("drop.rs");
+        let res7 = f7.parse_and_lower(drop_src);
+        let p7 = res7.is_err()
+            && res7
+                .unwrap_err()
+                .iter()
+                .any(|d| d.code == DiagnosticCode::CustomDropRejected);
+        reports.push(QualificationReport {
+            fixture_name: "rejected_custom_drop".into(),
+            source_hash: Self::compute_sha256(drop_src),
+            rustc_version: rustc_ver.clone(),
+            swift_version: swift_ver.clone(),
+            cases_tested: 1,
+            cases_passed: if p7 { 1 } else { 0 },
+            cases_failed: if p7 { 0 } else { 1 },
+            status: if p7 {
+                "REJECTED_AS_EXPECTED".into()
+            } else {
+                "FAILED".into()
+            },
+            timestamp: "2026-10-13T20:00:00Z".into(),
+            details: vec!["Verified E0007_CUSTOM_DROP_REJECTED emitted".into()],
+        });
+
+        // 8. Interior mutability rejection
+        let cell_src = "pub fn use_cell(c: RefCell<i32>) {}";
+        let mut f8 = Frontend::new("cell.rs");
+        let res8 = f8.parse_and_lower(cell_src);
+        let p8 = res8.is_err()
+            && res8
+                .unwrap_err()
+                .iter()
+                .any(|d| d.code == DiagnosticCode::InteriorMutabilityRejected);
+        reports.push(QualificationReport {
+            fixture_name: "rejected_interior_mutability".into(),
+            source_hash: Self::compute_sha256(cell_src),
+            rustc_version: rustc_ver.clone(),
+            swift_version: swift_ver.clone(),
+            cases_tested: 1,
+            cases_passed: if p8 { 1 } else { 0 },
+            cases_failed: if p8 { 0 } else { 1 },
+            status: if p8 {
+                "REJECTED_AS_EXPECTED".into()
+            } else {
+                "FAILED".into()
+            },
+            timestamp: "2026-10-13T20:00:00Z".into(),
+            details: vec!["Verified E0012_INTERIOR_MUTABILITY_REJECTED emitted".into()],
+        });
+
+        // 9. Aliased mutation rejection
+        let alias_src = "pub fn mutate_two(a: &mut i32, b: &mut i32) {} pub fn test_alias() { let mut x = 10; mutate_two(&mut x, &mut x); }";
+        let mut f9 = Frontend::new("alias.rs");
+        let res9 = f9.parse_and_lower(alias_src);
+        let p9 = res9.is_err()
+            && res9
+                .unwrap_err()
+                .iter()
+                .any(|d| d.code == DiagnosticCode::AliasedMutationRejected);
+        reports.push(QualificationReport {
+            fixture_name: "rejected_aliased_mutation".into(),
+            source_hash: Self::compute_sha256(alias_src),
+            rustc_version: rustc_ver,
+            swift_version: swift_ver,
+            cases_tested: 1,
+            cases_passed: if p9 { 1 } else { 0 },
+            cases_failed: if p9 { 0 } else { 1 },
+            status: if p9 {
+                "REJECTED_AS_EXPECTED".into()
+            } else {
+                "FAILED".into()
+            },
+            timestamp: "2026-10-13T20:00:00Z".into(),
+            details: vec!["Verified E0006_ALIASED_MUTATION_REJECTED emitted".into()],
         });
 
         Ok(reports)
@@ -1664,7 +1947,7 @@ mod tests {
         let reports = runner
             .test_negative_rejections()
             .expect("Negative rejections should pass");
-        assert_eq!(reports.len(), 6);
+        assert_eq!(reports.len(), 9);
         for r in reports {
             assert_eq!(r.status, "REJECTED_AS_EXPECTED");
         }
@@ -1719,6 +2002,19 @@ mod tests {
             .expect("Data semantics differential test should pass");
         assert_eq!(report.status, "PASSED");
         assert_eq!(report.cases_passed, 7);
+        assert_eq!(report.cases_failed, 0);
+    }
+
+    #[test]
+    fn test_ownership_regions_differential_passes() {
+        let runner = DifferentialRunner::new(".");
+        let temp_dir = std::env::temp_dir().join("ownership_diff_test");
+        let _ = fs::create_dir_all(&temp_dir);
+        let report = runner
+            .test_ownership_regions(&temp_dir)
+            .expect("Ownership differential test should pass");
+        assert_eq!(report.status, "PASSED");
+        assert_eq!(report.cases_passed, 5);
         assert_eq!(report.cases_failed, 0);
     }
 }

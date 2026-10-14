@@ -17,6 +17,10 @@ pub enum DiagnosticCode {
     UnsupportedTypeRejected,
     SyntaxError,
     UnspecializableGenericRejected,
+    CustomDropRejected,
+    InteriorMutabilityRejected,
+    SharedReferenceRejected,
+    AliasedMutationRejected,
 }
 
 impl DiagnosticCode {
@@ -32,6 +36,10 @@ impl DiagnosticCode {
             Self::UnsupportedTypeRejected => "E0008_UNSUPPORTED_TYPE_REJECTED",
             Self::SyntaxError => "E0009_SYNTAX_ERROR",
             Self::UnspecializableGenericRejected => "E0011_UNSPECIALIZABLE_GENERIC_REJECTED",
+            Self::CustomDropRejected => "E0007_CUSTOM_DROP_REJECTED",
+            Self::InteriorMutabilityRejected => "E0012_INTERIOR_MUTABILITY_REJECTED",
+            Self::SharedReferenceRejected => "E0013_SHARED_REFERENCE_REJECTED",
+            Self::AliasedMutationRejected => "E0006_ALIASED_MUTATION_REJECTED",
         }
     }
 }
