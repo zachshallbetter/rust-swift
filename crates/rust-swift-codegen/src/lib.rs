@@ -33,6 +33,7 @@ pub struct PackageManifest {
 pub struct SwiftGenerator {
     indent_level: usize,
     symbols: Vec<SymbolMapping>,
+    fn_inouts: std::collections::HashMap<String, Vec<bool>>,
 }
 
 impl Default for SwiftGenerator {
@@ -46,6 +47,7 @@ impl SwiftGenerator {
         Self {
             indent_level: 0,
             symbols: Vec::new(),
+            fn_inouts: std::collections::HashMap::new(),
         }
     }
 
@@ -54,6 +56,31 @@ impl SwiftGenerator {
     }
 
     pub fn generate_module(&mut self, module: &Module) -> (String, Vec<SymbolMapping>) {
+        // Index function and method parameter inout mutabilities
+        for item in &module.items {
+            match item {
+                Item::Function(func) => {
+                    let inouts = func
+                        .params
+                        .iter()
+                        .map(|p| p.mutable || matches!(&p.ty, Type::Ref { mutable: true, .. }))
+                        .collect();
+                    self.fn_inouts.insert(func.name.clone(), inouts);
+                }
+                Item::Impl(imp) => {
+                    for method in &imp.methods {
+                        let inouts = method
+                            .params
+                            .iter()
+                            .map(|p| p.mutable || matches!(&p.ty, Type::Ref { mutable: true, .. }))
+                            .collect();
+                        self.fn_inouts.insert(method.name.clone(), inouts);
+                    }
+                }
+                _ => {}
+            }
+        }
+
         let mut out = String::new();
         out.push_str("//\n");
         out.push_str(&format!(
@@ -298,7 +325,7 @@ impl SwiftGenerator {
             .iter()
             .map(|p| {
                 let ty_str = self.map_type(&p.ty);
-                if p.mutable {
+                if p.mutable && !ty_str.starts_with("inout ") {
                     format!("_ {}: inout {}", p.name, ty_str)
                 } else {
                     format!("_ {}: {}", p.name, ty_str)
@@ -347,7 +374,7 @@ impl SwiftGenerator {
             .iter()
             .map(|p| {
                 let ty_str = self.map_type(&p.ty);
-                if p.mutable {
+                if p.mutable && !ty_str.starts_with("inout ") {
                     format!("_ {}: inout {}", p.name, ty_str)
                 } else {
                     format!("_ {}: {}", p.name, ty_str)
@@ -549,6 +576,7 @@ impl SwiftGenerator {
                 out.push_str(&format!("{}}}\n", self.indent()));
                 out
             }
+            ExprKind::Block { .. } => self.generate_function_body(expr, true),
             ExprKind::If {
                 cond,
                 then_branch,
@@ -561,12 +589,12 @@ impl SwiftGenerator {
                     self.generate_expr(cond)
                 ));
                 self.indent_level += 1;
-                out.push_str(&self.generate_return_expr(then_branch));
+                out.push_str(&self.generate_function_body(then_branch, true));
                 self.indent_level -= 1;
                 if let Some(eb) = else_branch {
                     out.push_str(&format!("{}}} else {{\n", self.indent()));
                     self.indent_level += 1;
-                    out.push_str(&self.generate_return_expr(eb));
+                    out.push_str(&self.generate_function_body(eb, true));
                     self.indent_level -= 1;
                 }
                 out.push_str(&format!("{}}}\n", self.indent()));
@@ -754,9 +782,22 @@ impl SwiftGenerator {
                     "Err" => ".failure",
                     other => other,
                 };
+                let param_inouts = self.fn_inouts.get(func).cloned();
                 let args_str = args
                     .iter()
-                    .map(|a| self.generate_expr(a))
+                    .enumerate()
+                    .map(|(i, a)| {
+                        let mut gen = self.generate_expr(a);
+                        let expects_inout = param_inouts
+                            .as_ref()
+                            .and_then(|p| p.get(i))
+                            .copied()
+                            .unwrap_or(false);
+                        if expects_inout && !gen.starts_with('&') {
+                            gen = format!("&{}", gen);
+                        }
+                        gen
+                    })
                     .collect::<Vec<_>>()
                     .join(", ");
                 format!("{}({})", swift_func, args_str)
@@ -850,6 +891,14 @@ impl SwiftGenerator {
                     .map(|e| format!("Int({})", self.generate_expr(e)))
                     .unwrap_or_else(|| format!("{}.utf8.count", e_str));
                 format!("{}.byteSlice({}, {})", e_str, start_str, end_str)
+            }
+            ExprKind::Borrow { expr, mutable } => {
+                let e_str = self.generate_expr(expr);
+                if *mutable {
+                    format!("&{}", e_str)
+                } else {
+                    e_str
+                }
             }
             ExprKind::Block {
                 stmts: _,
@@ -1369,5 +1418,56 @@ mod tests {
         assert!(code.contains("res: Result<String, ErrType>"));
         assert!(code.contains("s: String"));
         assert!(code.contains("s.byteSlice(Int(0), Int(5))"));
+    }
+
+    #[test]
+    fn test_codegen_inout_and_borrow_call() {
+        let mut module = Module::new("Ownership");
+        module.items.push(Item::Function(Function {
+            name: "add_amount".into(),
+            params: vec![
+                Param {
+                    name: "val".into(),
+                    ty: Type::Ref {
+                        inner: Box::new(Type::I64),
+                        mutable: true,
+                    },
+                    mutable: true,
+                },
+                Param {
+                    name: "delta".into(),
+                    ty: Type::I64,
+                    mutable: false,
+                },
+            ],
+            return_type: Type::Unit,
+            body: Expr::new(
+                ExprKind::Call {
+                    func: "helper".into(),
+                    args: vec![Expr::new(
+                        ExprKind::Borrow {
+                            expr: Box::new(Expr::new(ExprKind::Variable("val".into()), Type::I64)),
+                            mutable: true,
+                        },
+                        Type::Ref {
+                            inner: Box::new(Type::I64),
+                            mutable: true,
+                        },
+                    )],
+                },
+                Type::Unit,
+            ),
+            is_public: true,
+            span: SourceSpan {
+                file: "own.rs".into(),
+                start_line: 1,
+                end_line: 5,
+            },
+        }));
+
+        let mut gen = SwiftGenerator::new();
+        let (code, _) = gen.generate_module(&module);
+        assert!(code.contains("public func add_amount(_ val: inout Int64, _ delta: Int64)"));
+        assert!(code.contains("helper(&val)"));
     }
 }

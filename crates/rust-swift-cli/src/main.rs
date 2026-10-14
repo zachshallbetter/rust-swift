@@ -159,7 +159,7 @@ fn diff_test_command(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>
     let mut reports = Vec::new();
 
     // 1. Finite State Machine
-    println!("\n[1/7] Running Finite State Machine differential test...");
+    println!("\n[1/8] Running Finite State Machine differential test...");
     match runner.test_fsm(output_dir) {
         Ok(report) => {
             println!(
@@ -174,7 +174,7 @@ fn diff_test_command(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>
     }
 
     // 2. Wrapping Arithmetic
-    println!("\n[2/7] Running Wrapping Arithmetic differential test...");
+    println!("\n[2/8] Running Wrapping Arithmetic differential test...");
     match runner.test_wrapping_arithmetic(output_dir) {
         Ok(report) => {
             println!(
@@ -189,7 +189,7 @@ fn diff_test_command(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>
     }
 
     // 3. Contract System & Invariant Traps
-    println!("\n[3/7] Running Contract & Invariant Trap differential test...");
+    println!("\n[3/8] Running Contract & Invariant Trap differential test...");
     match runner.test_contracts(output_dir) {
         Ok(report) => {
             println!(
@@ -204,7 +204,7 @@ fn diff_test_command(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>
     }
 
     // 4. Type System & Enums
-    println!("\n[4/7] Running Type System (Methods, Payload Enums, Tuples) differential test...");
+    println!("\n[4/8] Running Type System (Methods, Payload Enums, Tuples) differential test...");
     match runner.test_types(output_dir) {
         Ok(report) => {
             println!(
@@ -219,7 +219,7 @@ fn diff_test_command(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>
     }
 
     // 5. Event Dispatch & Trace Model
-    println!("\n[5/7] Running Event Dispatch & Trace Model (50-Step History) differential test...");
+    println!("\n[5/8] Running Event Dispatch & Trace Model (50-Step History) differential test...");
     match runner.test_event_trace(output_dir) {
         Ok(report) => {
             println!(
@@ -234,7 +234,7 @@ fn diff_test_command(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>
     }
 
     // 6. Data Semantics (Option, Result, UTF-8 Strings)
-    println!("\n[6/7] Running Data Semantics (Option, Result, UTF-8 Strings) differential test...");
+    println!("\n[6/8] Running Data Semantics (Option, Result, UTF-8 Strings) differential test...");
     match runner.test_data_semantics(output_dir) {
         Ok(report) => {
             println!(
@@ -248,8 +248,23 @@ fn diff_test_command(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>
         }
     }
 
-    // 7. Negative rejections
-    println!("\n[7/7] Running Negative Rejection policy test...");
+    // 7. Ownership & Region Classification (&mut and inout exclusivity)
+    println!("\n[7/8] Running Ownership & Region Classification differential test...");
+    match runner.test_ownership_regions(output_dir) {
+        Ok(report) => {
+            println!(
+                "  Status: {} ({} of {} cases passed)",
+                report.status, report.cases_passed, report.cases_tested
+            );
+            reports.push(report);
+        }
+        Err(e) => {
+            eprintln!("  Error in Ownership differential test: {}", e);
+        }
+    }
+
+    // 8. Negative rejections
+    println!("\n[8/8] Running Negative Rejection policy test...");
     match runner.test_negative_rejections() {
         Ok(neg_reports) => {
             for r in neg_reports {
