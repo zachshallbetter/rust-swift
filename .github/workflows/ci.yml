@@ -31,6 +31,9 @@ jobs:
       - name: Run Differential Qualification Suite
         run: cargo run -p rust-swift-cli -- diff-test
 
+      - name: Run Failure Injection & Mutation Qualification Suite
+        run: cargo run -p rust-swift-cli -- eval
+
       - name: Validate Formal Bootstrap
         run: python3 scripts/validate-bootstrap.py
 
