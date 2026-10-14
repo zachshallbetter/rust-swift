@@ -5,12 +5,12 @@
   "validityBasis": "aggregate-source-digest",
   "selectedPaths": [],
   "sourceSelection": {
-    "includedCount": 204,
-    "includedBytes": 3393797,
+    "includedCount": 205,
+    "includedBytes": 3397189,
     "excludedCounts": {
       "excluded-directory": 49419,
       "excluded-path": 1,
-      "extension": 8226,
+      "extension": 8227,
       "symlink": 5
     }
   },
@@ -20,14 +20,14 @@
     "repositories": [
       {
         "path": ".",
-        "commit": "00c626fd8369e9755df61d94bb0581a80e2eb7a0",
-        "branch": "feature/bitflags-optionset",
+        "commit": "ef44eef3a1e51b4022a35e5e664692f2e5a9571f",
+        "branch": "feature/packaging-homebrew",
         "dirty": true,
         "remote": "https://github.com/zachshallbetter/rust-swift.git"
       }
     ]
   },
-  "aggregateSourceDigest": "7ee9ecc9d18de606e3efb773e6575430b165da0de36f6c4a56851c1a44bc6070",
+  "aggregateSourceDigest": "0a990a396c94fd6d859f75d9925a23045e062f1c74226bcc2056b0632e175fee",
   "sources": [
     {
       "path": ".agents/rules/ci.md",
@@ -90,6 +90,11 @@
       "sha256": "130429c4a5adf870fc3f27e51f7ddb398c742dd4a4f2b79d93ad454cc2a4d26a"
     },
     {
+      "path": ".github/workflows/release.yml",
+      "bytes": 2616,
+      "sha256": "ae6969dabfd7a23627a4aba6797240474228a4f1ee707f5e5bba02c227b31012"
+    },
+    {
       "path": "AGENTS.md",
       "bytes": 10611,
       "sha256": "9ccb7c144fbb9d26ccd74c0b5cb015b90de9cbe404fef95d20a2d941005a2469"
@@ -131,8 +136,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 21044,
-      "sha256": "f1e8c955183883d753b038b1892ffdd131a47f7ff62cb0a16ae3d99a652b81c5"
+      "bytes": 21820,
+      "sha256": "b413e1ccddd3768f2a4e3071b8d989016c3c5fa00fe81f39def28e922a6369cd"
     },
     {
       "path": "VERSION",

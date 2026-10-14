@@ -84,6 +84,7 @@ The compiler operates under a strict, formally specified admission boundary. Adm
 | `Vec::new()`, `vec.push(x)` | `[]`, `vec.append(x)` | Dynamic collection lifecycle |
 | `Option<T>`, `Result<T, E>` | `Optional<T>`, `Result<T, E>` | Monadic unwrapping and error propagation ([`contracts/data-semantics.yaml`](contracts/data-semantics.yaml)) |
 | `#[derive(Codable)]` | `: Codable` | Swift standard library JSON encoding/decoding |
+| `#[bitflags] struct Flags` | `struct Flags: OptionSet, Sendable` | Bitmask sets and bitwise operator overloads (`\|`, `&`, `.contains()`) |
 | `#[observable] struct Model` | `@Observable public final class Model` | Swift Observation framework model class |
 | `&mut param` | `inout param` | Region ownership exclusivity ([`contracts/ownership-regions.yaml`](contracts/ownership-regions.yaml)) |
 | `assert!`, `debug_assert!` | `precondition`, `assert` | Runtime contract verification |
@@ -131,15 +132,34 @@ The project is organized as a Cargo workspace containing five modular crates and
 
 ### Installation
 
-Clone the repository and build the CLI tool:
+#### Homebrew (macOS & Linux)
+
+Install the compiler directly via Homebrew:
+
+```bash
+brew install zachshallbetter/tap/rust-swift
+```
+
+#### Prebuilt Binary Releases
+
+Download precompiled, notarized binaries for Apple Silicon (`aarch64-apple-darwin`), Intel macOS (`x86_64-apple-darwin`), or Linux from the [GitHub Releases](https://github.com/zachshallbetter/rust-swift/releases) page:
+
+```bash
+# Example for Apple Silicon macOS
+curl -LO https://github.com/zachshallbetter/rust-swift/releases/latest/download/rust-swift-aarch64-apple-darwin.tar.gz
+tar -xzf rust-swift-aarch64-apple-darwin.tar.gz
+sudo mv rust-swift-aarch64-apple-darwin/rust-swift /usr/local/bin/
+```
+
+#### Build From Source
+
+Build the CLI tool using Cargo:
 
 ```bash
 git clone https://github.com/zachshallbetter/rust-swift.git
 cd rust-swift
-cargo build --release
+cargo install --path crates/rust-swift-cli
 ```
-
-The compiler binary is located at `target/release/rust-swift`.
 
 ---
 
