@@ -17,6 +17,7 @@ use syn::spanned::Spanned;
 pub struct Frontend {
     file_name: String,
     diagnostics: Vec<Diagnostic>,
+    default_codable: bool,
 }
 
 impl Frontend {
@@ -24,7 +25,13 @@ impl Frontend {
         Self {
             file_name: file_name.into(),
             diagnostics: Vec::new(),
+            default_codable: false,
         }
+    }
+
+    pub fn with_default_codable(mut self, enabled: bool) -> Self {
+        self.default_codable = enabled;
+        self
     }
 
     fn make_span<S: Spanned>(&self, item: &S) -> SourceSpan {
@@ -451,6 +458,23 @@ impl Frontend {
         })
     }
 
+    fn has_codable_derive(attrs: &[syn::Attribute]) -> bool {
+        attrs.iter().any(|attr| {
+            if attr.path().is_ident("derive") {
+                let mut found = false;
+                let _ = attr.parse_nested_meta(|meta| {
+                    if meta.path.is_ident("Serialize") || meta.path.is_ident("Deserialize") {
+                        found = true;
+                    }
+                    Ok(())
+                });
+                found
+            } else {
+                false
+            }
+        })
+    }
+
     fn lower_struct(&mut self, item_struct: &syn::ItemStruct) -> Option<StructDef> {
         let name = item_struct.ident.to_string();
         let is_public = matches!(item_struct.vis, syn::Visibility::Public(_));
@@ -480,10 +504,13 @@ impl Frontend {
             syn::Fields::Unit => {}
         }
 
+        let is_codable = self.default_codable || Self::has_codable_derive(&item_struct.attrs);
+
         Some(StructDef {
             name,
             fields,
             is_public,
+            is_codable,
             span: self.make_span(item_struct),
         })
     }
@@ -529,10 +556,13 @@ impl Frontend {
             });
         }
 
+        let is_codable = self.default_codable || Self::has_codable_derive(&item_enum.attrs);
+
         Some(EnumDef {
             name,
             variants,
             is_public,
+            is_codable,
             span: self.make_span(item_enum),
         })
     }
@@ -1976,6 +2006,43 @@ mod tests {
             }
         } else {
             panic!("Expected Item::Function");
+        }
+    }
+
+    #[test]
+    fn test_codable_derive_lowering() {
+        let src = r#"
+            #[derive(Serialize, Deserialize)]
+            pub struct UserProfile {
+                pub id: u64,
+                pub username: String,
+            }
+
+            #[derive(Serialize, Deserialize)]
+            pub enum AccessLevel {
+                Admin,
+                Guest,
+                Custom(String),
+            }
+        "#;
+        let mut frontend = Frontend::new("codable_test.rs");
+        let module = frontend
+            .parse_and_lower(src)
+            .expect("Should parse and lower struct and enum with serde derives");
+
+        assert_eq!(module.items.len(), 2);
+        if let IrItem::Struct(s) = &module.items[0] {
+            assert_eq!(s.name, "UserProfile");
+            assert!(s.is_codable);
+        } else {
+            panic!("Expected struct item");
+        }
+
+        if let IrItem::Enum(e) = &module.items[1] {
+            assert_eq!(e.name, "AccessLevel");
+            assert!(e.is_codable);
+        } else {
+            panic!("Expected enum item");
         }
     }
 }

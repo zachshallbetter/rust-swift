@@ -51,6 +51,10 @@ enum Commands {
         /// Emit full Swift Package Manager (SPM) manifest and test scaffold
         #[arg(long, alias = "package", default_value_t = true)]
         spm: bool,
+
+        /// Force synthesis of Swift Codable conformance across all structs and enums
+        #[arg(long)]
+        codable: bool,
     },
     /// Run differential qualification test suite across Rust reference and Swift outputs
     DiffTest {
@@ -74,16 +78,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             emit_ir,
             source_locations,
             spm,
+            codable,
         } => {
-            compile_command(
-                &input,
-                &output_dir,
-                package_name.as_deref(),
+            compile_command(CompileOptions {
+                input: &input,
+                output_dir: &output_dir,
+                package_name: package_name.as_deref(),
                 emit_csg,
                 emit_ir,
                 source_locations,
                 spm,
-            )?;
+                codable,
+            })?;
         }
         Commands::DiffTest { output_dir } => {
             diff_test_command(&output_dir)?;
@@ -96,15 +102,27 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn compile_command(
-    input: &Path,
-    output_dir: &Path,
-    package_name: Option<&str>,
+struct CompileOptions<'a> {
+    input: &'a Path,
+    output_dir: &'a Path,
+    package_name: Option<&'a str>,
     emit_csg: bool,
     emit_ir: bool,
     source_locations: bool,
     spm: bool,
-) -> Result<(), Box<dyn std::error::Error>> {
+    codable: bool,
+}
+
+fn compile_command(opts: CompileOptions<'_>) -> Result<(), Box<dyn std::error::Error>> {
+    let input = opts.input;
+    let output_dir = opts.output_dir;
+    let package_name = opts.package_name;
+    let emit_csg = opts.emit_csg;
+    let emit_ir = opts.emit_ir;
+    let source_locations = opts.source_locations;
+    let spm = opts.spm;
+    let codable = opts.codable;
+
     if !input.exists() {
         eprintln!("Error: Input file does not exist: {}", input.display());
         std::process::exit(1);
@@ -121,7 +139,8 @@ fn compile_command(
         .unwrap_or("Module");
     let pkg_name = package_name.unwrap_or(file_stem);
 
-    let mut frontend = Frontend::new(input.to_string_lossy().to_string());
+    let mut frontend =
+        Frontend::new(input.to_string_lossy().to_string()).with_default_codable(codable);
     let module = match frontend.parse_and_lower(&source) {
         Ok(m) => m,
         Err(diags) => {
@@ -187,7 +206,7 @@ fn diff_test_command(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>
     println!("============================================================");
 
     const EXPECTED_NEGATIVE_FIXTURES: usize = 10;
-    const EXPECTED_TOTAL_REPORTS: usize = 12 + EXPECTED_NEGATIVE_FIXTURES;
+    const EXPECTED_TOTAL_REPORTS: usize = 13 + EXPECTED_NEGATIVE_FIXTURES;
 
     let mut reports = Vec::new();
     let mut execution_failed = false;
@@ -390,7 +409,7 @@ fn diff_test_command(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>
     }
 
     // 12. SPM Package Manifest Emission and Test Scaffold
-    println!("\n[12/13] Running SPM Package Manifest Emission and Test Scaffold qualification...");
+    println!("\n[12/14] Running SPM Package Manifest Emission and Test Scaffold qualification...");
     match runner.test_spm_package_build(output_dir) {
         Ok(report) => {
             println!(
@@ -408,8 +427,24 @@ fn diff_test_command(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>
         }
     }
 
-    // 13. Negative rejections
-    println!("\n[13/13] Running Negative Rejection policy test...");
+    // 13. Swift Codable Synthesis and Serde JSON Interoperability
+    println!("\n[13/14] Running Swift Codable Synthesis and Serde JSON Interoperability qualification...");
+    match runner.test_codable_json_serialization(output_dir) {
+        Ok(report) => {
+            println!(
+                "  Status: {} ({} of {} cases passed)",
+                report.status, report.cases_passed, report.cases_tested
+            );
+            reports.push(report);
+        }
+        Err(e) => {
+            execution_failed = true;
+            eprintln!("  FAILED execution in Swift Codable qualification: {}", e);
+        }
+    }
+
+    // 14. Negative rejections
+    println!("\n[14/14] Running Negative Rejection policy test...");
     match runner.test_negative_rejections() {
         Ok(neg_reports) => {
             if neg_reports.len() != EXPECTED_NEGATIVE_FIXTURES {
