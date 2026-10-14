@@ -1678,6 +1678,230 @@ struct OwnershipRunner {
         })
     }
 
+    /// Run iteration and dynamic collections differential tests (for loops, Vec lifecycle)
+    pub fn test_iteration_collections(
+        &self,
+        out_dir: &Path,
+    ) -> Result<QualificationReport, Box<dyn std::error::Error>> {
+        let loop_source = r#"
+pub fn build_list() -> Vec<i32> {
+    let mut v: Vec<i32> = Vec::new();
+    v.push(10);
+    v.push(20);
+    v.push(30);
+    v
+}
+
+pub fn sum_list(items: Vec<i32>) -> i32 {
+    let mut total: i32 = 0;
+    for x in items {
+        total = total.wrapping_add(x);
+    }
+    total
+}
+
+pub fn stack_pop_first(items: Vec<i32>) -> i32 {
+    let mut v = items;
+    match v.pop() {
+        Some(val) => val,
+        None => 0,
+    }
+}
+
+pub fn filter_evens_and_double(items: Vec<i32>) -> Vec<i32> {
+    let mut evens: Vec<i32> = Vec::new();
+    for x in items {
+        if x % 2 == 0 {
+            evens.push(x * 2);
+        }
+    }
+    evens
+}
+"#;
+
+        let source_hash = Self::compute_sha256(loop_source);
+        let (rustc_ver, swift_ver) = Self::toolchain_versions();
+
+        // 1. Lower to IR
+        let mut frontend = Frontend::new("iteration_collections.rs");
+        let module = frontend
+            .parse_and_lower(loop_source)
+            .map_err(|diags| format!("Frontend rejected iteration fixture: {:?}", diags))?;
+
+        // 2. Generate Swift package
+        let pkg_dir = out_dir.join("loop_pkg");
+        let mut generator = SwiftGenerator::new();
+        generator.emit_package(&module, &pkg_dir, "LoopModule")?;
+
+        // 3. Create Swift test runner
+        let runner_swift = r#"
+import Foundation
+
+@main
+struct LoopRunner {
+    static func main() {
+        let v = build_list()
+        print("step1:\(v.len())")
+
+        let s1 = sum_list(v)
+        print("step2:\(s1)")
+
+        let p1 = stack_pop_first(v)
+        print("step3:\(p1)")
+
+        let p2 = stack_pop_first([])
+        print("step4:\(p2)")
+
+        let filtered = filter_evens_and_double([1, 2, 3, 4, 5, 6])
+        print("step5:\(filtered.len())")
+
+        let sum_evens = sum_list(filtered)
+        print("step6:\(sum_evens)")
+    }
+}
+"#;
+        let sources_dir = pkg_dir.join("Sources").join("LoopModule");
+        let main_swift_path = sources_dir.join("main.swift");
+        fs::write(&main_swift_path, runner_swift)?;
+
+        // 4. Compile and execute Swift code
+        let swift_source = sources_dir.join("iteration_collections.swift");
+        let rust_compat = sources_dir.join("RustCompat.swift");
+        let swiftc_out = Command::new("swiftc")
+            .arg("-parse-as-library")
+            .arg("-emit-executable")
+            .arg(&swift_source)
+            .arg(&rust_compat)
+            .arg(&main_swift_path)
+            .arg("-o")
+            .arg(pkg_dir.join("loop_runner"))
+            .output()?;
+
+        if !swiftc_out.status.success() {
+            return Err(format!(
+                "Failed to compile Swift Loop runner: {}",
+                String::from_utf8_lossy(&swiftc_out.stderr)
+            )
+            .into());
+        }
+
+        let exec_out = Command::new(pkg_dir.join("loop_runner")).output()?;
+        let swift_results = String::from_utf8(exec_out.stdout)?;
+
+        // 5. Compute expected results using Rust reference
+        fn rust_build_list() -> Vec<i32> {
+            let mut v = Vec::new();
+            v.push(10);
+            v.push(20);
+            v.push(30);
+            v
+        }
+
+        fn rust_sum_list(items: Vec<i32>) -> i32 {
+            let mut total = 0;
+            for x in items {
+                total += x;
+            }
+            total
+        }
+
+        fn rust_stack_pop_first(items: Vec<i32>) -> i32 {
+            let mut v = items;
+            match v.pop() {
+                Some(val) => val,
+                None => 0,
+            }
+        }
+
+        fn rust_filter_evens_and_double(items: Vec<i32>) -> Vec<i32> {
+            let mut evens = Vec::new();
+            for x in items {
+                if x % 2 == 0 {
+                    evens.push(x * 2);
+                }
+            }
+            evens
+        }
+
+        let mut rust_lines = Vec::new();
+        let v = rust_build_list();
+        rust_lines.push(format!("step1:{}", v.len()));
+
+        let s1 = rust_sum_list(v.clone());
+        rust_lines.push(format!("step2:{}", s1));
+
+        let p1 = rust_stack_pop_first(v);
+        rust_lines.push(format!("step3:{}", p1));
+
+        let p2 = rust_stack_pop_first(Vec::new());
+        rust_lines.push(format!("step4:{}", p2));
+
+        let filtered = rust_filter_evens_and_double(vec![1, 2, 3, 4, 5, 6]);
+        rust_lines.push(format!("step5:{}", filtered.len()));
+
+        let sum_evens = rust_sum_list(filtered);
+        rust_lines.push(format!("step6:{}", sum_evens));
+
+        let swift_lines: Vec<&str> = swift_results
+            .lines()
+            .map(|l| l.trim())
+            .filter(|l| !l.is_empty())
+            .collect();
+
+        let total = rust_lines.len();
+        let mut cases_passed = 0;
+        let mut details = Vec::new();
+
+        for (idx, expected) in rust_lines.iter().enumerate() {
+            if idx < swift_lines.len() && expected == swift_lines[idx] {
+                cases_passed += 1;
+                details.push(format!("Step #{}: PASS ({})", idx + 1, expected));
+            } else {
+                let actual = if idx < swift_lines.len() {
+                    swift_lines[idx]
+                } else {
+                    "<missing>"
+                };
+                details.push(format!(
+                    "Step #{}: FAIL (Expected: {}, Got: {})",
+                    idx + 1,
+                    expected,
+                    actual
+                ));
+            }
+        }
+
+        let rust_full = rust_lines.join("\n");
+        let swift_full = swift_lines.join("\n");
+        let rust_digest = Self::compute_sha256(&rust_full);
+        let swift_digest = Self::compute_sha256(&swift_full);
+
+        let digests_match = rust_digest == swift_digest;
+        details.push(format!(
+            "Iteration digest verification: Rust={}, Swift={}, Equal={}",
+            rust_digest, swift_digest, digests_match
+        ));
+
+        let status = if cases_passed == total && digests_match {
+            "PASSED"
+        } else {
+            "FAILED"
+        };
+
+        Ok(QualificationReport {
+            fixture_name: "iteration_collections_and_for_loops".into(),
+            source_hash,
+            rustc_version: rustc_ver,
+            swift_version: swift_ver,
+            cases_tested: total,
+            cases_passed,
+            cases_failed: total - cases_passed,
+            status: status.into(),
+            timestamp: "2026-10-13T20:45:00Z".into(),
+            details,
+        })
+    }
+
     /// Run negative rejection tests asserting exact stable diagnostic codes
     pub fn test_negative_rejections(
         &self,
@@ -2052,6 +2276,19 @@ mod tests {
             .expect("Ownership differential test should pass");
         assert_eq!(report.status, "PASSED");
         assert_eq!(report.cases_passed, 5);
+        assert_eq!(report.cases_failed, 0);
+    }
+
+    #[test]
+    fn test_iteration_collections_differential_passes() {
+        let runner = DifferentialRunner::new(".");
+        let temp_dir = std::env::temp_dir().join("iteration_diff_test");
+        let _ = fs::create_dir_all(&temp_dir);
+        let report = runner
+            .test_iteration_collections(&temp_dir)
+            .expect("Iteration differential test should pass");
+        assert_eq!(report.status, "PASSED");
+        assert_eq!(report.cases_passed, 6);
         assert_eq!(report.cases_failed, 0);
     }
 }
