@@ -3226,6 +3226,177 @@ struct ObservableRunner {
         })
     }
 
+    /// SwiftUI Component & View Tree Synthesis qualification
+    pub fn test_swiftui_component_synthesis(
+        &self,
+        output_dir: &Path,
+    ) -> Result<QualificationReport, Box<dyn std::error::Error>> {
+        let (rustc_ver, swift_ver) = Self::toolchain_versions();
+        let ui_dir = output_dir.join("swiftui_qualification");
+        let _ = fs::remove_dir_all(&ui_dir);
+        fs::create_dir_all(&ui_dir)?;
+
+        let source = r#"#[observable]
+pub struct CounterViewModel {
+    pub count: i64,
+    pub title: String,
+}
+
+impl CounterViewModel {
+    pub fn increment(&mut self) {
+        self.count = self.count + 1;
+    }
+}
+
+#[view]
+pub struct CounterView {
+    pub model: CounterViewModel,
+}
+
+impl CounterView {
+    pub fn body(&self) {
+        VStack(vec![
+            Text("Counter App").font("headline").padding(),
+            HStack(vec![
+                Text("Count"),
+                Button("+", "model.increment()"),
+            ]),
+            Spacer(),
+        ])
+    }
+}
+"#;
+        let source_hash = Self::compute_sha256(source);
+
+        let mut frontend = Frontend::new("CounterUI.rs");
+        let module = frontend
+            .parse_and_lower(source)
+            .map_err(|diags| format!("Frontend parsing failed with {} diagnostics", diags.len()))?;
+
+        let mut gen = SwiftGenerator::new();
+        let (swift_code, _) = gen.generate_module(&module);
+        let swift_src_path = ui_dir.join("CounterUI.swift");
+        fs::write(&swift_src_path, &swift_code)?;
+
+        let runner_src = r#"import Foundation
+import SwiftUI
+import Observation
+
+@main
+struct UIRunner {
+    static func main() {
+        let vm = CounterViewModel(count: 5, title: "SwiftUI Test")
+        let view = CounterView(model: vm)
+
+        print("view_model_title:\(view.model.title)")
+        print("view_model_initial_count:\(view.model.count)")
+
+        // Execute action on bound observable model
+        view.model.increment()
+        print("view_model_after_inc:\(view.model.count)")
+
+        // Access SwiftUI body to ensure view tree constructs cleanly
+        let _ = view.body
+        print("view_body_instantiated:true")
+    }
+}
+"#;
+        let runner_path = ui_dir.join("main.swift");
+        fs::write(&runner_path, runner_src)?;
+
+        let total = 4;
+        let mut cases_passed = 0;
+        let mut details = Vec::new();
+
+        // Case 1: Swift AST & SwiftUI view syntax validation
+        if swift_code.contains("import SwiftUI")
+            && swift_code.contains("struct CounterView: View")
+            && swift_code.contains("@Bindable public var model: CounterViewModel")
+            && swift_code.contains("var body: some View")
+        {
+            cases_passed += 1;
+            details.push("Case #1: PASS (Emitted Swift code contains valid SwiftUI struct conforming to View with @Bindable model)".into());
+        } else {
+            details.push(
+                "Case #1: FAIL (Emitted Swift code missing SwiftUI conformance or @Bindable)"
+                    .into(),
+            );
+        }
+
+        // Case 2: Compilation with swiftc
+        let swift_bin = ui_dir.join("ui_runner");
+        let swiftc_status = Command::new("swiftc")
+            .arg("-parse-as-library")
+            .arg(&swift_src_path)
+            .arg(&runner_path)
+            .arg("-o")
+            .arg(&swift_bin)
+            .status()?;
+
+        if swiftc_status.success() {
+            cases_passed += 1;
+            details.push("Case #2: PASS (swiftc cleanly compiled SwiftUI View and @Observable model into executable)".into());
+        } else {
+            details.push("Case #2: FAIL (swiftc compilation of SwiftUI view failed)".into());
+            return Ok(QualificationReport {
+                fixture_name: "swiftui_component_synthesis".into(),
+                source_hash,
+                rustc_version: rustc_ver,
+                swift_version: swift_ver,
+                cases_tested: total,
+                cases_passed,
+                cases_failed: total - cases_passed,
+                status: "FAILED".into(),
+                timestamp: "2026-10-14T15:35:00Z".into(),
+                details,
+            });
+        }
+
+        // Execute runner
+        let exec_out = Command::new(&swift_bin).output()?;
+        let stdout = String::from_utf8(exec_out.stdout)?;
+
+        // Case 3: Model binding and state mutation
+        if stdout.contains("view_model_title:SwiftUI Test")
+            && stdout.contains("view_model_initial_count:5")
+            && stdout.contains("view_model_after_inc:6")
+        {
+            cases_passed += 1;
+            details.push(
+                "Case #3: PASS (Bound @Observable state passed to SwiftUI View mutated correctly)"
+                    .into(),
+            );
+        } else {
+            details.push(format!("Case #3: FAIL (Unexpected output: {})", stdout));
+        }
+
+        // Case 4: View tree body instantiation
+        if stdout.contains("view_body_instantiated:true") {
+            cases_passed += 1;
+            details.push("Case #4: PASS (SwiftUI view body instantiated view tree nodes without runtime fault)".into());
+        } else {
+            details.push("Case #4: FAIL (View body instantiation failed)".into());
+        }
+
+        let all_passed = cases_passed == total;
+        Ok(QualificationReport {
+            fixture_name: "swiftui_component_synthesis".into(),
+            source_hash,
+            rustc_version: rustc_ver,
+            swift_version: swift_ver,
+            cases_tested: total,
+            cases_passed,
+            cases_failed: total - cases_passed,
+            status: if all_passed {
+                "PASSED".into()
+            } else {
+                "FAILED".into()
+            },
+            timestamp: "2026-10-14T15:35:00Z".into(),
+            details,
+        })
+    }
+
     /// Run negative rejection tests asserting exact stable diagnostic codes
     pub fn test_negative_rejections(
         &self,
@@ -3714,6 +3885,31 @@ mod tests {
         eprintln!("Details: {:?}", report.details);
         assert_eq!(report.status, "PASSED");
         assert_eq!(report.cases_passed, 3);
+        assert_eq!(report.cases_failed, 0);
+    }
+
+    #[test]
+    fn test_swiftui_component_synthesis_differential_passes() {
+        let runner = DifferentialRunner::new(
+            std::env::var("CARGO_MANIFEST_DIR")
+                .map(|p| {
+                    PathBuf::from(p)
+                        .parent()
+                        .unwrap()
+                        .parent()
+                        .unwrap()
+                        .to_path_buf()
+                })
+                .unwrap_or_else(|_| PathBuf::from(".")),
+        );
+        let temp_dir = std::env::temp_dir().join("swiftui_diff_test");
+        let _ = fs::create_dir_all(&temp_dir);
+        let report = runner
+            .test_swiftui_component_synthesis(&temp_dir)
+            .expect("SwiftUI component synthesis differential test should pass");
+        eprintln!("Details: {:?}", report.details);
+        assert_eq!(report.status, "PASSED");
+        assert_eq!(report.cases_passed, 4);
         assert_eq!(report.cases_failed, 0);
     }
 }

@@ -6,8 +6,9 @@
 
 use rust_swift_ir::{
     BinaryOp, CmpOp, EnumDef, Expr, ExprKind, Function, ImplBlock, IntegerMode, IntegerOp, Item,
-    Literal, LogicalOp, MatchArm, Method, Module, Pattern, ReceiverKind, Stmt, StructDef, TraitDef,
-    TraitImpl, TraitMethod, Type, UnaryOp, VariantPayload,
+    Literal, LogicalOp, MatchArm, Method, Module, Pattern, PropertyBindingKind, ReceiverKind, Stmt,
+    StructDef, TraitDef, TraitImpl, TraitMethod, Type, UnaryOp, VariantPayload, ViewDef, ViewKind,
+    ViewModifier, ViewNode,
 };
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -123,7 +124,8 @@ impl SwiftGenerator {
                 }
             }
         }
-        let has_observable = !self.observable_types.is_empty();
+        let has_view = module.items.iter().any(|i| matches!(i, Item::View(_)));
+        let has_observable = !self.observable_types.is_empty() || has_view;
 
         let mut out = String::new();
         out.push_str("//\n");
@@ -134,6 +136,9 @@ impl SwiftGenerator {
         out.push_str("// Strict semantic preservation - do not edit directly.\n");
         out.push_str("//\n\n");
         out.push_str("import Foundation\n");
+        if has_view {
+            out.push_str("import SwiftUI\n");
+        }
         if has_observable {
             out.push_str("import Observation\n");
         }
@@ -147,6 +152,10 @@ impl SwiftGenerator {
                 }
                 Item::Struct(strct) => {
                     out.push_str(&self.generate_struct(strct));
+                    out.push_str("\n\n");
+                }
+                Item::View(view) => {
+                    out.push_str(&self.generate_view(view));
                     out.push_str("\n\n");
                 }
                 Item::Impl(imp) => {
@@ -391,6 +400,300 @@ impl SwiftGenerator {
         self.indent_level -= 1;
         out.push_str(&format!("{}}}", self.indent()));
         out
+    }
+
+    pub fn generate_view(&mut self, view: &ViewDef) -> String {
+        self.symbols.push(SymbolMapping {
+            rust_name: view.name.clone(),
+            swift_name: view.name.clone(),
+            kind: "view".into(),
+            rust_file: view.span.file.clone(),
+            rust_line: view.span.start_line,
+        });
+
+        let mut out = String::new();
+        if self.emit_source_locations && view.span.start_line > 0 && !view.span.file.is_empty() {
+            let escaped = view.span.file.replace('\\', "\\\\").replace('"', "\\\"");
+            out.push_str(&format!(
+                "{}#sourceLocation(file: \"{}\", line: {})\n",
+                self.indent(),
+                escaped,
+                view.span.start_line
+            ));
+        }
+
+        let vis = if view.is_public { "public " } else { "" };
+        out.push_str(&format!("{}struct {}: View {{\n", vis, view.name));
+        self.indent_level += 1;
+
+        // Properties
+        for prop in &view.properties {
+            let p_vis = if prop.is_public { "public " } else { "" };
+            let swift_ty = self.map_type(&prop.ty);
+            match prop.kind {
+                PropertyBindingKind::State => {
+                    out.push_str(&format!(
+                        "{}@State private var {}: {}\n",
+                        self.indent(),
+                        prop.name,
+                        swift_ty
+                    ));
+                }
+                PropertyBindingKind::Binding => {
+                    out.push_str(&format!(
+                        "{}@Binding {}var {}: {}\n",
+                        self.indent(),
+                        p_vis,
+                        prop.name,
+                        swift_ty
+                    ));
+                }
+                PropertyBindingKind::Observable => {
+                    out.push_str(&format!(
+                        "{}@Bindable {}var {}: {}\n",
+                        self.indent(),
+                        p_vis,
+                        prop.name,
+                        swift_ty
+                    ));
+                }
+                PropertyBindingKind::Plain => {
+                    out.push_str(&format!(
+                        "{}{}var {}: {}\n",
+                        self.indent(),
+                        p_vis,
+                        prop.name,
+                        swift_ty
+                    ));
+                }
+            }
+        }
+
+        // Initializer
+        if !view.properties.is_empty() {
+            out.push('\n');
+            let init_params = view
+                .properties
+                .iter()
+                .filter(|p| !matches!(p.kind, PropertyBindingKind::State))
+                .map(|p| {
+                    if matches!(p.kind, PropertyBindingKind::Binding) {
+                        format!("{}: Binding<{}>", p.name, self.map_type(&p.ty))
+                    } else {
+                        format!("{}: {}", p.name, self.map_type(&p.ty))
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
+
+            out.push_str(&format!(
+                "{}{}init({}) {{\n",
+                self.indent(),
+                vis,
+                init_params
+            ));
+            self.indent_level += 1;
+            for prop in &view.properties {
+                match prop.kind {
+                    PropertyBindingKind::State => {}
+                    PropertyBindingKind::Binding => {
+                        out.push_str(&format!(
+                            "{}self._{} = {}\n",
+                            self.indent(),
+                            prop.name,
+                            prop.name
+                        ));
+                    }
+                    _ => {
+                        out.push_str(&format!(
+                            "{}self.{} = {}\n",
+                            self.indent(),
+                            prop.name,
+                            prop.name
+                        ));
+                    }
+                }
+            }
+            self.indent_level -= 1;
+            out.push_str(&format!("{}}}\n", self.indent()));
+        }
+
+        // Body
+        out.push('\n');
+        out.push_str(&format!("{}{}var body: some View {{\n", self.indent(), vis));
+        self.indent_level += 1;
+        self.emit_view_node(&view.root, &mut out);
+        self.indent_level -= 1;
+        out.push_str(&format!("{}}}\n", self.indent()));
+
+        self.indent_level -= 1;
+        out.push_str(&format!("{}}}", self.indent()));
+        out
+    }
+
+    fn emit_view_node(&mut self, node: &ViewNode, out: &mut String) {
+        match &node.kind {
+            ViewKind::VStack { spacing } => {
+                if let Some(s) = spacing {
+                    out.push_str(&format!("{}VStack(spacing: {}) {{\n", self.indent(), s));
+                } else {
+                    out.push_str(&format!("{}VStack {{\n", self.indent()));
+                }
+                self.indent_level += 1;
+                for child in &node.children {
+                    self.emit_view_node(child, out);
+                }
+                self.indent_level -= 1;
+                out.push_str(&format!("{}}}", self.indent()));
+            }
+            ViewKind::HStack { spacing } => {
+                if let Some(s) = spacing {
+                    out.push_str(&format!("{}HStack(spacing: {}) {{\n", self.indent(), s));
+                } else {
+                    out.push_str(&format!("{}HStack {{\n", self.indent()));
+                }
+                self.indent_level += 1;
+                for child in &node.children {
+                    self.emit_view_node(child, out);
+                }
+                self.indent_level -= 1;
+                out.push_str(&format!("{}}}", self.indent()));
+            }
+            ViewKind::ZStack => {
+                out.push_str(&format!("{}ZStack {{\n", self.indent()));
+                self.indent_level += 1;
+                for child in &node.children {
+                    self.emit_view_node(child, out);
+                }
+                self.indent_level -= 1;
+                out.push_str(&format!("{}}}", self.indent()));
+            }
+            ViewKind::Text(val) => {
+                let clean = val.trim_matches('"');
+                if clean.starts_with('$') || clean.contains('.') && !clean.contains(' ') {
+                    out.push_str(&format!("{}Text({})", self.indent(), clean));
+                } else {
+                    out.push_str(&format!("{}Text(\"{}\")", self.indent(), clean));
+                }
+            }
+            ViewKind::Button { label, action } => {
+                let clean_label = label.trim_matches('"');
+                let clean_action = action.trim_matches('"');
+                out.push_str(&format!(
+                    "{}Button(\"{}\") {{\n",
+                    self.indent(),
+                    clean_label
+                ));
+                self.indent_level += 1;
+                out.push_str(&format!("{}{}\n", self.indent(), clean_action));
+                self.indent_level -= 1;
+                out.push_str(&format!("{}}}", self.indent()));
+            }
+            ViewKind::Toggle { label, binding } => {
+                let clean_label = label.trim_matches('"');
+                let clean_binding = binding.trim_matches('"');
+                let bound = if clean_binding.starts_with('$') {
+                    clean_binding.to_string()
+                } else {
+                    format!("${}", clean_binding)
+                };
+                out.push_str(&format!(
+                    "{}Toggle(\"{}\", isOn: {})",
+                    self.indent(),
+                    clean_label,
+                    bound
+                ));
+            }
+            ViewKind::List => {
+                out.push_str(&format!("{}List {{\n", self.indent()));
+                self.indent_level += 1;
+                for child in &node.children {
+                    self.emit_view_node(child, out);
+                }
+                self.indent_level -= 1;
+                out.push_str(&format!("{}}}", self.indent()));
+            }
+            ViewKind::Spacer => {
+                out.push_str(&format!("{}Spacer()", self.indent()));
+            }
+            ViewKind::Divider => {
+                out.push_str(&format!("{}Divider()", self.indent()));
+            }
+            ViewKind::ForEach { items, id } => {
+                let clean_items = items.trim_matches('"');
+                if let Some(id_prop) = id {
+                    let clean_id = id_prop.trim_matches('"');
+                    out.push_str(&format!(
+                        "{}ForEach({}, id: \\.{}) {{ item in\n",
+                        self.indent(),
+                        clean_items,
+                        clean_id
+                    ));
+                } else {
+                    out.push_str(&format!(
+                        "{}ForEach({}) {{ item in\n",
+                        self.indent(),
+                        clean_items
+                    ));
+                }
+                self.indent_level += 1;
+                for child in &node.children {
+                    self.emit_view_node(child, out);
+                }
+                self.indent_level -= 1;
+                out.push_str(&format!("{}}}", self.indent()));
+            }
+            ViewKind::Custom(name) => {
+                let clean_name = name.trim_matches('"');
+                out.push_str(&format!("{}{}()", self.indent(), clean_name));
+            }
+        }
+
+        // Apply modifiers
+        for modifier in &node.modifiers {
+            let ind = self.indent();
+            match modifier {
+                ViewModifier::Padding(None) => out.push_str(&format!("\n{}.padding()", ind)),
+                ViewModifier::Padding(Some(p)) => {
+                    out.push_str(&format!("\n{}.padding({})", ind, p))
+                }
+                ViewModifier::Font(f) => {
+                    let clean = f.trim_matches('"');
+                    if clean.starts_with('.') {
+                        out.push_str(&format!("\n{}.font({})", ind, clean));
+                    } else {
+                        out.push_str(&format!("\n{}.font(.{})", ind, clean));
+                    }
+                }
+                ViewModifier::ForegroundColor(c) => {
+                    let clean = c.trim_matches('"');
+                    if clean.starts_with('.') {
+                        out.push_str(&format!("\n{}.foregroundColor({})", ind, clean));
+                    } else {
+                        out.push_str(&format!("\n{}.foregroundColor(.{})", ind, clean));
+                    }
+                }
+                ViewModifier::Frame { width, height } => {
+                    let mut parts = Vec::new();
+                    if let Some(w) = width {
+                        parts.push(format!("width: {}", w));
+                    }
+                    if let Some(h) = height {
+                        parts.push(format!("height: {}", h));
+                    }
+                    out.push_str(&format!("\n{}.frame({})", ind, parts.join(", ")));
+                }
+                ViewModifier::Disabled(cond) => {
+                    let clean = cond.trim_matches('"');
+                    out.push_str(&format!("\n{}.disabled({})", ind, clean));
+                }
+                ViewModifier::Background(bg) => {
+                    let clean = bg.trim_matches('"');
+                    out.push_str(&format!("\n{}.background({})", ind, clean));
+                }
+            }
+        }
+        out.push('\n');
     }
 
     fn generate_impl(&mut self, imp: &ImplBlock) -> String {
@@ -2365,5 +2668,95 @@ mod tests {
         assert!(code.contains("@Observable\npublic final class ItemState: Identifiable {"));
         assert!(code.contains("public func increment() {"));
         assert!(!code.contains("public mutating func increment()"));
+    }
+
+    #[test]
+    fn test_codegen_swiftui_view() {
+        let mut module = Module::new("ui_test");
+        let view = ViewDef {
+            name: "CounterView".into(),
+            properties: vec![
+                rust_swift_ir::ViewProperty {
+                    name: "model".into(),
+                    ty: Type::Named("CounterViewModel".into()),
+                    kind: PropertyBindingKind::Observable,
+                    is_public: true,
+                },
+                rust_swift_ir::ViewProperty {
+                    name: "title".into(),
+                    ty: Type::String,
+                    kind: PropertyBindingKind::Plain,
+                    is_public: true,
+                },
+            ],
+            root: ViewNode {
+                kind: ViewKind::VStack { spacing: Some(8) },
+                children: vec![
+                    ViewNode {
+                        kind: ViewKind::Text("title".into()),
+                        children: Vec::new(),
+                        modifiers: vec![
+                            ViewModifier::Font("headline".into()),
+                            ViewModifier::Padding(None),
+                        ],
+                        span: SourceSpan::default(),
+                    },
+                    ViewNode {
+                        kind: ViewKind::HStack { spacing: None },
+                        children: vec![
+                            ViewNode {
+                                kind: ViewKind::Button {
+                                    label: "Decrement".into(),
+                                    action: "model.decrement()".into(),
+                                },
+                                children: Vec::new(),
+                                modifiers: Vec::new(),
+                                span: SourceSpan::default(),
+                            },
+                            ViewNode {
+                                kind: ViewKind::Spacer,
+                                children: Vec::new(),
+                                modifiers: Vec::new(),
+                                span: SourceSpan::default(),
+                            },
+                            ViewNode {
+                                kind: ViewKind::Button {
+                                    label: "Increment".into(),
+                                    action: "model.increment()".into(),
+                                },
+                                children: Vec::new(),
+                                modifiers: Vec::new(),
+                                span: SourceSpan::default(),
+                            },
+                        ],
+                        modifiers: Vec::new(),
+                        span: SourceSpan::default(),
+                    },
+                ],
+                modifiers: vec![ViewModifier::Padding(Some(16))],
+                span: SourceSpan::default(),
+            },
+            is_public: true,
+            span: SourceSpan::default(),
+        };
+
+        module.items.push(Item::View(view));
+
+        let mut gen = SwiftGenerator::new();
+        let (code, _) = gen.generate_module(&module);
+        assert!(code.contains("import SwiftUI"));
+        assert!(code.contains("import Observation"));
+        assert!(code.contains("public struct CounterView: View {"));
+        assert!(code.contains("@Bindable public var model: CounterViewModel"));
+        assert!(code.contains("public var title: String"));
+        assert!(code.contains("public var body: some View {"));
+        assert!(code.contains("VStack(spacing: 8) {"));
+        assert!(code.contains("Text(\"title\")"));
+        assert!(code.contains(".font(.headline)"));
+        assert!(code.contains(".padding()"));
+        assert!(code.contains("HStack {"));
+        assert!(code.contains("Button(\"Decrement\") {"));
+        assert!(code.contains("model.decrement()"));
+        assert!(code.contains("Spacer()"));
     }
 }

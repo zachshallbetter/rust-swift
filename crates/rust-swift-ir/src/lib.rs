@@ -484,6 +484,76 @@ pub struct TraitImpl {
     pub span: SourceSpan,
 }
 
+/// Declarative SwiftUI View Kind.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ViewKind {
+    VStack { spacing: Option<i32> },
+    HStack { spacing: Option<i32> },
+    ZStack,
+    Text(String),
+    Button { label: String, action: String },
+    Toggle { label: String, binding: String },
+    List,
+    Spacer,
+    Divider,
+    ForEach { items: String, id: Option<String> },
+    Custom(String),
+}
+
+/// View modifier for styling and layout.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ViewModifier {
+    Padding(Option<i32>),
+    ForegroundColor(String),
+    Font(String),
+    Frame {
+        width: Option<i32>,
+        height: Option<i32>,
+    },
+    Disabled(String),
+    Background(String),
+}
+
+/// Node in a declarative view tree.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ViewNode {
+    pub kind: ViewKind,
+    pub children: Vec<ViewNode>,
+    pub modifiers: Vec<ViewModifier>,
+    pub span: SourceSpan,
+}
+
+/// Property binding mode in a View.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum PropertyBindingKind {
+    Plain,
+    Binding,
+    State,
+    Observable,
+}
+
+/// Property in a View component.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ViewProperty {
+    pub name: String,
+    pub ty: Type,
+    pub kind: PropertyBindingKind,
+    pub is_public: bool,
+}
+
+/// Declarative View component definition.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ViewDef {
+    pub name: String,
+    pub properties: Vec<ViewProperty>,
+    pub root: ViewNode,
+    pub is_public: bool,
+    pub span: SourceSpan,
+}
+
 /// Item in a module.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -494,6 +564,7 @@ pub enum Item {
     Impl(ImplBlock),
     Trait(TraitDef),
     TraitImpl(TraitImpl),
+    View(ViewDef),
 }
 
 /// Top-level compilation unit module.
@@ -740,6 +811,48 @@ impl Module {
                             from: impl_id.clone(),
                             to: method_id,
                             relationship: "defines".into(),
+                            minimum_access: AccessLevel::Public,
+                        });
+                    }
+                }
+                Item::View(view) => {
+                    let view_id = format!("{}::{}", root_id, view.name);
+                    nodes.push(CsgNode {
+                        id: view_id.clone(),
+                        name: view.name.clone(),
+                        kind: CsgNodeKind::Struct,
+                        span: view.span.clone().into(),
+                        minimum_access: if view.is_public {
+                            AccessLevel::Public
+                        } else {
+                            AccessLevel::Owner
+                        },
+                        size_bytes: None,
+                    });
+                    edges.push(CsgEdge {
+                        from: root_id.clone(),
+                        to: view_id.clone(),
+                        relationship: "contains_item".into(),
+                        minimum_access: AccessLevel::Public,
+                    });
+                    for prop in &view.properties {
+                        let prop_id = format!("{}::{}", view_id, prop.name);
+                        nodes.push(CsgNode {
+                            id: prop_id.clone(),
+                            name: prop.name.clone(),
+                            kind: CsgNodeKind::Field,
+                            span: view.span.clone().into(),
+                            minimum_access: if prop.is_public {
+                                AccessLevel::Public
+                            } else {
+                                AccessLevel::Owner
+                            },
+                            size_bytes: None,
+                        });
+                        edges.push(CsgEdge {
+                            from: view_id.clone(),
+                            to: prop_id,
+                            relationship: "contains_field".into(),
                             minimum_access: AccessLevel::Public,
                         });
                     }
