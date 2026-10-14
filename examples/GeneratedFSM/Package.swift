@@ -17,5 +17,10 @@ let package = Package(
             name: "fsm_example",
             path: "Sources/fsm_example"
         ),
+        .testTarget(
+            name: "fsm_exampleTests",
+            dependencies: ["fsm_example"],
+            path: "Tests/fsm_exampleTests"
+        ),
     ]
 )
