@@ -6,7 +6,7 @@
   "selectedPaths": [],
   "sourceSelection": {
     "includedCount": 161,
-    "includedBytes": 2340324,
+    "includedBytes": 2352659,
     "excludedCounts": {
       "excluded-directory": 41295,
       "excluded-path": 1,
@@ -20,14 +20,14 @@
     "repositories": [
       {
         "path": ".",
-        "commit": "588574b997a547765bd2c7193378430912c29303",
+        "commit": "9eef621530073cf019c8d766ef5fef0386bc9213",
         "branch": "main",
-        "dirty": false,
+        "dirty": true,
         "remote": "https://github.com/zachshallbetter/rust-swift.git"
       }
     ]
   },
-  "aggregateSourceDigest": "7ff760940c03fd8c053d6103a8a4fc4ec798a656610f718646e752ead30d78fe",
+  "aggregateSourceDigest": "f9f2bba467d912333f3ff6325d3f5f7231baa56c379b45c6cb0ed629d812a381",
   "sources": [
     {
       "path": ".agents/rules/ci.md",
@@ -96,8 +96,8 @@
     },
     {
       "path": "CHANGELOG.md",
-      "bytes": 4833,
-      "sha256": "8ad085806dce662cbe615bac62ebe6865a55af3360e992216519bc738ed5f073"
+      "bytes": 8779,
+      "sha256": "fb1848f8c89c92059104e54f86594501c2ef279c4153b74eea85ede800b1ac8e"
     },
     {
       "path": "CONTEXT_SOURCES.json",
@@ -131,8 +131,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 11389,
-      "sha256": "614ff6de274f4685104c66532c4e3c2b7e76863716100c66a8d8c08b4a1f32a0"
+      "bytes": 14771,
+      "sha256": "5d69d51f61398a3aa20e6716ba0a9f69c11d2d86095315231830503c542afead"
     },
     {
       "path": "VERSION",
@@ -281,18 +281,18 @@
     },
     {
       "path": "docs/04-language-matrix.md",
-      "bytes": 1184,
-      "sha256": "349860fc9b87734de3f2f8a0f5ab1da6eb50dda754d7bf8eebcf56367fcbcb37"
+      "bytes": 3349,
+      "sha256": "5a6f8a3f2ae8826f2d7afa21ed435218cb5f843d0b38021fc98a879a2056d0b5"
     },
     {
       "path": "docs/05-validation.md",
-      "bytes": 1213,
-      "sha256": "f69c4609c74da9b2f4c58d1b2475186a6f4c5a30fbf1e0871b9f920fce743544"
+      "bytes": 3356,
+      "sha256": "bd090e23c4199487c5d5b874a27cfd2a1fb0280a436e2e3e4e8fe7e2adb58f0f"
     },
     {
       "path": "docs/06-implementation-plan.md",
-      "bytes": 1344,
-      "sha256": "d5c811193c2feca6580af9253b498dbd67f7f4a4926d8fc16b04219a514fa547"
+      "bytes": 2043,
+      "sha256": "61c74de84c62748acd50c4f703172a3ba89b532c207b91ceeef406083c6c081e"
     },
     {
       "path": "docs/07-rfc.md",
