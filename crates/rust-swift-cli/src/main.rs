@@ -47,6 +47,10 @@ enum Commands {
         /// Emit #sourceLocation directives for debugger / IDE source mapping
         #[arg(long, alias = "source-maps")]
         source_locations: bool,
+
+        /// Emit full Swift Package Manager (SPM) manifest and test scaffold
+        #[arg(long, alias = "package", default_value_t = true)]
+        spm: bool,
     },
     /// Run differential qualification test suite across Rust reference and Swift outputs
     DiffTest {
@@ -69,6 +73,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             emit_csg,
             emit_ir,
             source_locations,
+            spm,
         } => {
             compile_command(
                 &input,
@@ -77,6 +82,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 emit_csg,
                 emit_ir,
                 source_locations,
+                spm,
             )?;
         }
         Commands::DiffTest { output_dir } => {
@@ -97,6 +103,7 @@ fn compile_command(
     emit_csg: bool,
     emit_ir: bool,
     source_locations: bool,
+    spm: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     if !input.exists() {
         eprintln!("Error: Input file does not exist: {}", input.display());
@@ -127,7 +134,23 @@ fn compile_command(
     };
 
     let mut generator = SwiftGenerator::new().with_source_locations(source_locations);
-    let manifest = generator.emit_package(&module, output_dir, pkg_name)?;
+    let manifest = if spm {
+        generator.emit_package(&module, output_dir, pkg_name)?
+    } else {
+        let (swift_code, symbols) = generator.generate_module(&module);
+        fs::create_dir_all(output_dir)?;
+        let file_path = output_dir.join(format!("{}.swift", module.name));
+        fs::write(&file_path, &swift_code)?;
+        rust_swift_codegen::PackageManifest {
+            package_name: pkg_name.to_string(),
+            swift_tools_version: "5.9".into(),
+            platforms: vec![],
+            generated_files: vec![format!("{}.swift", module.name)],
+            symbols,
+            source_locations_enabled: source_locations,
+            test_target_generated: false,
+        }
+    };
 
     if emit_ir {
         let ir_json = serde_json::to_string_pretty(&module)?;
@@ -164,7 +187,7 @@ fn diff_test_command(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>
     println!("============================================================");
 
     const EXPECTED_NEGATIVE_FIXTURES: usize = 10;
-    const EXPECTED_TOTAL_REPORTS: usize = 11 + EXPECTED_NEGATIVE_FIXTURES;
+    const EXPECTED_TOTAL_REPORTS: usize = 12 + EXPECTED_NEGATIVE_FIXTURES;
 
     let mut reports = Vec::new();
     let mut execution_failed = false;
@@ -366,8 +389,27 @@ fn diff_test_command(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>
         }
     }
 
-    // 12. Negative rejections
-    println!("\n[12/12] Running Negative Rejection policy test...");
+    // 12. SPM Package Manifest Emission and Test Scaffold
+    println!("\n[12/13] Running SPM Package Manifest Emission and Test Scaffold qualification...");
+    match runner.test_spm_package_build(output_dir) {
+        Ok(report) => {
+            println!(
+                "  Status: {} ({} of {} cases passed)",
+                report.status, report.cases_passed, report.cases_tested
+            );
+            reports.push(report);
+        }
+        Err(e) => {
+            execution_failed = true;
+            eprintln!(
+                "  FAILED execution in SPM Package Manifest qualification: {}",
+                e
+            );
+        }
+    }
+
+    // 13. Negative rejections
+    println!("\n[13/13] Running Negative Rejection policy test...");
     match runner.test_negative_rejections() {
         Ok(neg_reports) => {
             if neg_reports.len() != EXPECTED_NEGATIVE_FIXTURES {

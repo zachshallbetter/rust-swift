@@ -26,10 +26,14 @@ pub struct SymbolMapping {
 pub struct PackageManifest {
     pub package_name: String,
     pub swift_tools_version: String,
+    #[serde(default)]
+    pub platforms: Vec<String>,
     pub generated_files: Vec<String>,
     pub symbols: Vec<SymbolMapping>,
     #[serde(default)]
     pub source_locations_enabled: bool,
+    #[serde(default)]
+    pub test_target_generated: bool,
 }
 
 pub struct SwiftGenerator {
@@ -1299,7 +1303,11 @@ import PackageDescription
 let package = Package(
     name: "{pkg}",
     platforms: [
-        .macOS(.v13),
+        .macOS(.v14),
+        .iOS(.v17),
+        .tvOS(.v17),
+        .watchOS(.v10),
+        .visionOS(.v1),
     ],
     products: [
         .library(
@@ -1311,6 +1319,11 @@ let package = Package(
         .target(
             name: "{pkg}",
             path: "Sources/{pkg}"
+        ),
+        .testTarget(
+            name: "{pkg}Tests",
+            dependencies: ["{pkg}"],
+            path: "Tests/{pkg}Tests"
         ),
     ]
 )
@@ -1445,16 +1458,45 @@ extension Result {
 "#;
         fs::write(sources_dir.join("RustCompat.swift"), runtime_shims)?;
 
+        let tests_dir = output_dir
+            .join("Tests")
+            .join(format!("{}Tests", package_name));
+        fs::create_dir_all(&tests_dir)?;
+
+        let test_swift = format!(
+            r#"import XCTest
+@testable import {pkg}
+
+final class {pkg}Tests: XCTestCase {{
+    func testPackageSanity() throws {{
+        XCTAssertTrue(true)
+    }}
+}}
+"#,
+            pkg = package_name
+        );
+        let test_file_path = tests_dir.join(format!("{}Tests.swift", package_name));
+        fs::write(&test_file_path, test_swift)?;
+
         let manifest = PackageManifest {
             package_name: package_name.to_string(),
             swift_tools_version: "5.9".into(),
+            platforms: vec![
+                "macOS(.v14)".into(),
+                "iOS(.v17)".into(),
+                "tvOS(.v17)".into(),
+                "watchOS(.v10)".into(),
+                "visionOS(.v1)".into(),
+            ],
             generated_files: vec![
                 format!("Sources/{}/{}.swift", package_name, module.name),
                 format!("Sources/{}/RustCompat.swift", package_name),
+                format!("Tests/{}Tests/{}Tests.swift", package_name, package_name),
                 "Package.swift".into(),
             ],
             symbols,
             source_locations_enabled: self.emit_source_locations,
+            test_target_generated: true,
         };
 
         let manifest_json = serde_json::to_string_pretty(&manifest).unwrap();
@@ -2090,5 +2132,33 @@ mod tests {
         assert!(symbols
             .iter()
             .any(|s| s.swift_name == "Describable" && s.kind == "trait"));
+    }
+
+    #[test]
+    fn test_emit_package_generates_spm_manifest_and_tests() {
+        let module = Module::new("CoreLogic");
+        let temp_dir = std::env::temp_dir().join("test_emit_package_spm");
+        let _ = fs::remove_dir_all(&temp_dir);
+        fs::create_dir_all(&temp_dir).unwrap();
+
+        let mut gen = SwiftGenerator::new();
+        let manifest = gen.emit_package(&module, &temp_dir, "CoreLogic").unwrap();
+
+        assert_eq!(manifest.package_name, "CoreLogic");
+        assert!(manifest.test_target_generated);
+        assert!(manifest.platforms.iter().any(|p| p.contains("macOS(.v14)")));
+        assert!(manifest.platforms.iter().any(|p| p.contains("iOS(.v17)")));
+
+        let package_swift = fs::read_to_string(temp_dir.join("Package.swift")).unwrap();
+        assert!(package_swift.contains(".macOS(.v14)"));
+        assert!(package_swift.contains(".iOS(.v17)"));
+        assert!(package_swift.contains(".testTarget("));
+        assert!(package_swift.contains("name: \"CoreLogicTests\""));
+
+        let test_file = temp_dir.join("Tests/CoreLogicTests/CoreLogicTests.swift");
+        assert!(test_file.exists());
+        let test_content = fs::read_to_string(&test_file).unwrap();
+        assert!(test_content.contains("import XCTest"));
+        assert!(test_content.contains("@testable import CoreLogic"));
     }
 }
