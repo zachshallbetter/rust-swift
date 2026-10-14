@@ -467,11 +467,28 @@ pub struct TraitMethod {
 }
 
 /// Trait definition.
+/// Associated type declaration inside a trait definition.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AssociatedTypeDef {
+    pub name: String,
+    pub span: SourceSpan,
+}
+
+/// Trait definition representing an abstract interface.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TraitDef {
     pub name: String,
+    pub associated_types: Vec<AssociatedTypeDef>,
     pub methods: Vec<TraitMethod>,
     pub is_public: bool,
+    pub span: SourceSpan,
+}
+
+/// Type alias definition in a trait implementation or module.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TypeAlias {
+    pub name: String,
+    pub target: Type,
     pub span: SourceSpan,
 }
 
@@ -480,6 +497,7 @@ pub struct TraitDef {
 pub struct TraitImpl {
     pub trait_name: String,
     pub target_type: String,
+    pub type_aliases: Vec<TypeAlias>,
     pub methods: Vec<Method>,
     pub span: SourceSpan,
 }
@@ -756,6 +774,23 @@ impl Module {
                         relationship: "contains_item".into(),
                         minimum_access: AccessLevel::Public,
                     });
+                    for assoc in &trt.associated_types {
+                        let assoc_id = format!("{}::{}", trait_id, assoc.name);
+                        nodes.push(CsgNode {
+                            id: assoc_id.clone(),
+                            name: assoc.name.clone(),
+                            kind: CsgNodeKind::Field,
+                            span: assoc.span.clone().into(),
+                            minimum_access: AccessLevel::Public,
+                            size_bytes: None,
+                        });
+                        edges.push(CsgEdge {
+                            from: trait_id.clone(),
+                            to: assoc_id,
+                            relationship: "declares_associated_type".into(),
+                            minimum_access: AccessLevel::Public,
+                        });
+                    }
                     for method in &trt.methods {
                         let method_id = format!("{}::{}", trait_id, method.name);
                         nodes.push(CsgNode {
@@ -793,6 +828,23 @@ impl Module {
                         relationship: "contains_item".into(),
                         minimum_access: AccessLevel::Public,
                     });
+                    for alias in &timpl.type_aliases {
+                        let alias_id = format!("{}::{}", impl_id, alias.name);
+                        nodes.push(CsgNode {
+                            id: alias_id.clone(),
+                            name: alias.name.clone(),
+                            kind: CsgNodeKind::Field,
+                            span: alias.span.clone().into(),
+                            minimum_access: AccessLevel::Public,
+                            size_bytes: None,
+                        });
+                        edges.push(CsgEdge {
+                            from: impl_id.clone(),
+                            to: alias_id,
+                            relationship: "binds_associated_type".into(),
+                            minimum_access: AccessLevel::Public,
+                        });
+                    }
                     for method in &timpl.methods {
                         let method_id = format!("{}::{}", impl_id, method.name);
                         nodes.push(CsgNode {
