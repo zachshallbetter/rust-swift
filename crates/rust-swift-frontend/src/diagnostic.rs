@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /// Stable diagnostic codes required by the language matrix policy.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum DiagnosticCode {
     UnsafeRejected,
     AsyncRejected,
@@ -16,11 +16,12 @@ pub enum DiagnosticCode {
     ClosureBorrowRejected,
     UnsupportedTypeRejected,
     SyntaxError,
+    AliasedMutationRejected,
     UnspecializableGenericRejected,
-    CustomDropRejected,
     InteriorMutabilityRejected,
     SharedReferenceRejected,
-    AliasedMutationRejected,
+    CustomDropRejected,
+    Int128UnsupportedRejected,
 }
 
 impl DiagnosticCode {
@@ -35,12 +36,33 @@ impl DiagnosticCode {
             Self::ClosureBorrowRejected => "E0007_CLOSURE_BORROW_REJECTED",
             Self::UnsupportedTypeRejected => "E0008_UNSUPPORTED_TYPE_REJECTED",
             Self::SyntaxError => "E0009_SYNTAX_ERROR",
+            Self::AliasedMutationRejected => "E0010_ALIASED_MUTATION_REJECTED",
             Self::UnspecializableGenericRejected => "E0011_UNSPECIALIZABLE_GENERIC_REJECTED",
-            Self::CustomDropRejected => "E0007_CUSTOM_DROP_REJECTED",
             Self::InteriorMutabilityRejected => "E0012_INTERIOR_MUTABILITY_REJECTED",
             Self::SharedReferenceRejected => "E0013_SHARED_REFERENCE_REJECTED",
-            Self::AliasedMutationRejected => "E0006_ALIASED_MUTATION_REJECTED",
+            Self::CustomDropRejected => "E0014_CUSTOM_DROP_REJECTED",
+            Self::Int128UnsupportedRejected => "E0015_INT128_UNSUPPORTED_REJECTED",
         }
+    }
+
+    pub fn all_variants() -> &'static [DiagnosticCode] {
+        &[
+            Self::UnsafeRejected,
+            Self::AsyncRejected,
+            Self::RawPointerRejected,
+            Self::MacroRejected,
+            Self::DynamicDispatchRejected,
+            Self::ComplexTraitRejected,
+            Self::ClosureBorrowRejected,
+            Self::UnsupportedTypeRejected,
+            Self::SyntaxError,
+            Self::AliasedMutationRejected,
+            Self::UnspecializableGenericRejected,
+            Self::InteriorMutabilityRejected,
+            Self::SharedReferenceRejected,
+            Self::CustomDropRejected,
+            Self::Int128UnsupportedRejected,
+        ]
     }
 }
 
@@ -90,3 +112,39 @@ impl fmt::Display for Diagnostic {
 }
 
 impl std::error::Error for Diagnostic {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashSet;
+
+    #[test]
+    fn test_diagnostic_codes_are_strictly_unique() {
+        let mut seen_numbers = HashSet::new();
+        let mut seen_strings = HashSet::new();
+
+        for code in DiagnosticCode::all_variants() {
+            let s = code.as_str();
+            assert!(
+                seen_strings.insert(s),
+                "Duplicate diagnostic string found: {}",
+                s
+            );
+
+            // Extract numeric prefix between 'E' and '_' (e.g. '0001')
+            let num_part = s
+                .strip_prefix('E')
+                .and_then(|rem| rem.split('_').next())
+                .expect("Diagnostic code must follow E<number>_<NAME> format");
+            assert!(
+                seen_numbers.insert(num_part),
+                "Duplicate diagnostic numeric code found: {} (full: {})",
+                num_part,
+                s
+            );
+        }
+
+        assert_eq!(seen_strings.len(), 15);
+        assert_eq!(seen_numbers.len(), 15);
+    }
+}

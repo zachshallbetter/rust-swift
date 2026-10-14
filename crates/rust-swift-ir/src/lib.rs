@@ -323,6 +323,20 @@ pub struct Param {
     pub mutable: bool,
 }
 
+impl Param {
+    /// Returns true if this parameter is an exclusive mutable reference (&mut T),
+    /// requiring inout parameter semantics in Swift and & at call sites.
+    pub fn is_exclusive_ref(&self) -> bool {
+        matches!(&self.ty, Type::Ref { mutable: true, .. })
+    }
+
+    /// Returns true if this parameter is an owned value with a mutable local binding (mut x: T).
+    /// In Swift, this lowers to an owned parameter with a local mutable copy (`var x = x`).
+    pub fn is_mutable_binding(&self) -> bool {
+        self.mutable && !self.is_exclusive_ref()
+    }
+}
+
 /// Function declaration and body.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Function {

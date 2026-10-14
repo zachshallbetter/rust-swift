@@ -232,16 +232,15 @@ impl Frontend {
                             "arg".into()
                         }
                     };
-                    let ty = self.lower_type(&pat_type.ty);
-                    let is_ref_mut = matches!(&ty, Type::Ref { mutable: true, .. });
-                    let mutable = match &*pat_type.pat {
+                    let is_mutable_binding = match &*pat_type.pat {
                         syn::Pat::Ident(id) => id.mutability.is_some(),
                         _ => false,
-                    } || is_ref_mut;
+                    };
+                    let ty = self.lower_type(&pat_type.ty);
                     params.push(Param {
                         name: param_name,
                         ty,
-                        mutable,
+                        mutable: is_mutable_binding,
                     });
                 }
             }
@@ -289,16 +288,15 @@ impl Frontend {
                         syn::Pat::Ident(id) => id.ident.to_string(),
                         _ => "arg".into(),
                     };
-                    let ty = self.lower_type(&pat_type.ty);
-                    let is_ref_mut = matches!(&ty, Type::Ref { mutable: true, .. });
-                    let mutable = match &*pat_type.pat {
+                    let is_mutable_binding = match &*pat_type.pat {
                         syn::Pat::Ident(id) => id.mutability.is_some(),
                         _ => false,
-                    } || is_ref_mut;
+                    };
+                    let ty = self.lower_type(&pat_type.ty);
                     params.push(Param {
                         name: param_name,
                         ty,
-                        mutable,
+                        mutable: is_mutable_binding,
                     });
                 }
             }
@@ -418,13 +416,23 @@ impl Frontend {
                         "i16" => Type::I16,
                         "i32" => Type::I32,
                         "i64" => Type::I64,
-                        "i128" => Type::I128,
+                        "i128" | "u128" => {
+                            self.reject(
+                                DiagnosticCode::Int128UnsupportedRejected,
+                                format!(
+                                    "128-bit integer type '{}' is rejected in v0.1: Swift has no portable native 128-bit integer representation (silent narrowing to 64-bit is forbidden)",
+                                    ident_str
+                                ),
+                                &segment.ident,
+                                Some("Use i64 or u64"),
+                            );
+                            Type::Unit
+                        }
                         "isize" => Type::Isize,
                         "u8" => Type::U8,
                         "u16" => Type::U16,
                         "u32" => Type::U32,
                         "u64" => Type::U64,
-                        "u128" => Type::U128,
                         "usize" => Type::Usize,
                         "bool" => Type::Bool,
                         "String" | "str" => Type::String,
@@ -1404,13 +1412,20 @@ impl Frontend {
                     "i16" => Type::I16,
                     "i32" => Type::I32,
                     "i64" => Type::I64,
-                    "i128" => Type::I128,
+                    "i128" | "u128" => {
+                        self.reject(
+                            DiagnosticCode::Int128UnsupportedRejected,
+                            "128-bit integer literals are rejected in v0.1: Swift has no portable native 128-bit integer representation (silent narrowing to 64-bit is forbidden)",
+                            i,
+                            Some("Use i64 or u64"),
+                        );
+                        Type::I64
+                    }
                     "isize" => Type::Isize,
                     "u8" => Type::U8,
                     "u16" => Type::U16,
                     "u32" => Type::U32,
                     "u64" => Type::U64,
-                    "u128" => Type::U128,
                     "usize" => Type::Usize,
                     _ => Type::I32,
                 };

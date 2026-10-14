@@ -156,7 +156,7 @@ fn diff_test_command(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>
     println!("Running Rust -> Swift Differential Qualification Suite");
     println!("============================================================");
 
-    const EXPECTED_NEGATIVE_FIXTURES: usize = 9;
+    const EXPECTED_NEGATIVE_FIXTURES: usize = 10;
     const EXPECTED_TOTAL_REPORTS: usize = 7 + EXPECTED_NEGATIVE_FIXTURES;
 
     let mut reports = Vec::new();
