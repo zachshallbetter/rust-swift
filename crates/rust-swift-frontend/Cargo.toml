@@ -1,9 +1,11 @@
 [package]
 name = "rust-swift-frontend"
+description = "Syntax parsing, lowering pass, and language matrix rejection with stable diagnostic codes for rust-swift"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
+repository.workspace = true
 
 [dependencies]
 rust-swift-ir = { path = "../rust-swift-ir" }

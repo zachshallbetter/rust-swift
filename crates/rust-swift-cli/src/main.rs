@@ -234,7 +234,9 @@ fn diff_test_command(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>
     }
 
     // 5. Event Dispatch & Trace Model
-    println!("\n[5/11] Running Event Dispatch & Trace Model (50-Step History) differential test...");
+    println!(
+        "\n[5/11] Running Event Dispatch & Trace Model (50-Step History) differential test..."
+    );
     match runner.test_event_trace(output_dir) {
         Ok(report) => {
             println!(
@@ -253,7 +255,9 @@ fn diff_test_command(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>
     }
 
     // 6. Data Semantics (Option, Result, UTF-8 Strings)
-    println!("\n[6/11] Running Data Semantics (Option, Result, UTF-8 Strings) differential test...");
+    println!(
+        "\n[6/11] Running Data Semantics (Option, Result, UTF-8 Strings) differential test..."
+    );
     match runner.test_data_semantics(output_dir) {
         Ok(report) => {
             println!(
@@ -304,7 +308,9 @@ fn diff_test_command(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>
     }
 
     // 9. Source Mapping & Traceability (#sourceLocation Directives)
-    println!("\n[9/11] Running Source Mapping & Traceability (#sourceLocation) differential test...");
+    println!(
+        "\n[9/11] Running Source Mapping & Traceability (#sourceLocation) differential test..."
+    );
     match runner.test_source_mapping(output_dir) {
         Ok(report) => {
             println!(
@@ -315,7 +321,10 @@ fn diff_test_command(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>
         }
         Err(e) => {
             execution_failed = true;
-            eprintln!("  FAILED execution in Source Mapping differential test: {}", e);
+            eprintln!(
+                "  FAILED execution in Source Mapping differential test: {}",
+                e
+            );
         }
     }
 
@@ -331,7 +340,10 @@ fn diff_test_command(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>
         }
         Err(e) => {
             execution_failed = true;
-            eprintln!("  FAILED execution in Property Fuzzing differential test: {}", e);
+            eprintln!(
+                "  FAILED execution in Property Fuzzing differential test: {}",
+                e
+            );
         }
     }
 
