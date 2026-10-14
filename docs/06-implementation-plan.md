@@ -12,6 +12,7 @@ Rust → Swift Compiler | Milestone Status & Implementation Plan | 14 October 20
 | **M5 - Protocols & SPM** | Traits to protocols, default method extensions, SPM `Package.swift` | **COMPLETE** | Protocol qualification, clean-room `swift build` and `swift test` runs |
 | **M6 - Hardening & Evals** | Failure injection ("Gates That Cannot Fail"), performance benchmarks, adversarial stress | **COMPLETE** | 6/6 defect mutations caught, 24/24 adversarial assertions, `benchmarks.jsonl` |
 | **M7 - Distribution & Apps** | SwiftUI `@Observable`, App Store Connect API, automated notarization | **COMPLETE** | `PlayerApp`, `PeelCoreKit`, `asc-token.py`, `apple-notarize.sh` |
+| **M8 - Companion Systems** | SPM Build Tool Plugin, declarative SwiftUI view synthesis, proof dossiers, CSG delta synchronizer | **COMPLETE** | `RustSwiftPlugin` fixture, SwiftUI differential, `proof-receipt.json`, CSG delta skipping |
 
 ## Next Phase Horizons
 

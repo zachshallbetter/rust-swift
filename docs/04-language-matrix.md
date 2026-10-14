@@ -22,6 +22,10 @@ The following constructs are admitted, lowered to standalone native Swift, and q
 - **System & Framework Integrations**:
   - Codable synthesis (`#[derive(Codable)]` on structs and enums).
   - SwiftUI `@Observable` class emission (`#[observable]` $\to$ `@Observable public final class`).
+  - Declarative SwiftUI View synthesis (`#[view]` $\to$ native `struct Name: View { var body: some View { ... } }` with `@Bindable` and `@Binding`).
+  - Native Swift Package Manager Build Tool Plugin (`rust-swift-spm-plugin` scanning `.rs` and compiling directly into `swift build` passes).
+  - Formal Invariant Certification & Epistemic Proof Dossiers (`rust-swift-proof` generating cryptographically signed `proof-receipt.json`).
+  - Incremental Compiler Semantic Graph (CSG) delta synchronizer and live watcher daemon (`rust-swift-sync`).
   - Contract assertions (`assert!`, `debug_assert!`, `assert_eq!`, `panic!` $\to$ `precondition`, `assert`, `fatalError`).
   - Debugger source mapping directives (`#sourceLocation(file:line:)`).
   - Swift Package Manager manifest generation (`Package.swift`, library products, test targets).
