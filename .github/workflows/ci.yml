@@ -33,3 +33,10 @@ jobs:
 
       - name: Validate Formal Bootstrap
         run: python3 scripts/validate-bootstrap.py
+
+      - name: Validate App Store Connect & Notarization Pipeline
+        run: |
+          python3 scripts/asc-token.py --test
+          ./scripts/apple-notarize.sh --help
+          ./scripts/apple-notarize.sh --app target/debug/rust-swift --dry-run
+
