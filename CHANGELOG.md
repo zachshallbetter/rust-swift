@@ -8,6 +8,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **SPM Build Tool Plugin (`rust-swift-spm-plugin`, `WI-SPM-PLUGIN-001`)**:
+  - Root `Package.swift` declaring `.buildTool()` plugin capability for Swift Package Manager and Xcode.
+  - Native build tool plugin implementation in `Plugins/RustSwiftPlugin/plugin.swift` automatically scanning target source directories for `.rs` files and compiling them to native Swift source files ahead of target compilation.
+  - Consumer integration fixture in `examples/PluginDemoApp`.
+  - Differential qualification suite verifying clean-room `swift build` execution of plugin-enabled target packages.
+- **Declarative SwiftUI View Tree Synthesis (`rust-swiftui`, `WI-SWIFTUI-001`)**:
+  - Semantic IR additions (`ViewDef`, `ViewNode`, `ViewKind`, `ViewModifier`, `PropertyBindingKind`) projected to Compiler Semantic Graph (CSG) nodes and edges.
+  - Syntax lowering in `rust-swift-frontend` admitting `#[view]` annotated structs, view hierarchies (`VStack`, `HStack`, `ZStack`, `Text`, `Button`, `TextField`, `List`, `Spacer`, `Divider`), and modifiers (`padding`, `font`, `foregroundColor`, `background`, `frame`).
+  - Swift code generator synthesis into idiomatic `struct Name: View { var body: some View { ... } }` with `@Bindable`, `@Binding`, and `@Observable` state binding.
+  - Differential qualification suite compiling generated SwiftUI views with `swiftc -parse-as-library` and validating observation tracking.
+- **Formal Invariant Verification & Proof Dossier Generator (`rust-swift-proof`, `WI-PROOF-001`)**:
+  - `ProofVerifier` assessing memory safety, arithmetic overflow (&+, &-, &*), FSM totality, and contract runtime invariants.
+  - Cryptographically signed `EpistemicProofReceipt` generation (`proof-receipt.json`) certifying that emitted Swift artifacts inherit formal guarantees proven in Rust domain models.
+  - CLI `rust-swift proof <input.rs> [-o receipt.json]` subcommand with SHA-256 integrity proofs.
+  - Differential qualification suite certifying formal verification dossiers.
+- **Incremental CSG Delta Synchronizer & Watcher Daemon (`rust-swift-sync`, `WI-SYNC-001`)**:
+  - `SyncEngine` in `crates/rust-swift-qualification/src/sync.rs` providing bidirectional delta synchronization and persistent `.rust-swift-sync-cache.json` cache management across compilation sessions.
+  - Compiler Semantic Graph (CSG) AST hash tracking to elide redundant Swift code generation when source edits preserve semantic invariants.
+  - CLI `rust-swift sync [--input-dir <dir>] [--output-dir <dir>] [--watch] [--interval-ms <ms>]` subcommand supporting single-pass delta execution and continuous daemon file watching.
+  - Differential qualification suite and telemetry records appended to `records/sync.jsonl`.
 - **Protocols & Traits (`WI-TRAIT-001`)**:
   - Rust trait definitions (`pub trait Foo { ... }`) lowering into native Swift `public protocol Foo { ... }`.
   - Default trait method implementations lowered to protocol extension defaults.

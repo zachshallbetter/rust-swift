@@ -20,6 +20,10 @@ Unlike traditional FFI binding generators or C ABI wrappers, this compiler emits
 - **Zero C Bridging / Zero FFI**: Output is 100% native Swift value types (`struct`, `enum`, `Array`) with copy-on-write semantics.
 - **Formal Invariant Preservation**: Rust integer wrapping semantics (`wrapping_add`, `wrapping_sub`, `wrapping_mul`) lower directly to Swift overflow operators (`&+`, `&-`, `&*`).
 - **Traits & Protocol Extensions**: Rust trait definitions lower to native Swift `protocol` definitions, with default trait method implementations lowered to protocol extension defaults.
+- **SPM Build Tool Plugin (`rust-swift-spm-plugin`)**: Native Swift Package Manager Build Tool Plugin for automated, zero-configuration compilation of `.rs` files during Xcode and `swift build` passes.
+- **Declarative SwiftUI Synthesis (`rust-swiftui`)**: Synthesizes native SwiftUI view trees (`struct Name: View`) from `#[view]` annotated Rust models, binding directly to `@Observable` classes with `@Bindable` and `@Binding`.
+- **Epistemic Invariant Proofs (`rust-swift-proof`)**: Formally certifies memory safety, arithmetic overflow, FSM totality, and contract invariants, outputting cryptographically signed verification dossiers (`proof-receipt.json`).
+- **CSG Delta Synchronizer & Watcher (`rust-swift-sync`)**: Continuous file watcher daemon and delta synchronizer that inspects Compiler Semantic Graph (CSG) AST hashes to elide redundant Swift rebuilds when edits preserve semantic invariants.
 - **SPM Package Manifest Emission**: Emits buildable Swift 5.9+ `Package.swift` manifests with multi-target layouts, library products, and executable test suites.
 - **Codable Synthesis**: Structs and payload enums with `#[derive(Codable)]` lower to native Swift `Codable`, supporting cross-language JSON serialization parity.
 - **SwiftUI `@Observable` Architecture**: Classes annotated with `#[observable]` lower to Swift `@Observable final class` with observation tracking.
@@ -240,7 +244,120 @@ Reports:
   - `BENCH-003-FSM-CYCLES`: 50,000 finite state machine cycles (300,000 transitions).
 - Results and microsecond execution comparisons are appended to [`records/benchmarks.jsonl`](records/benchmarks.jsonl).
 
-### 5. App Store Connect & macOS Notarization
+### 5. Formal Invariant Certification & Proof Dossier (`rust-swift proof`)
+
+Certify that emitted Swift code inherits formal guarantees proven in Rust domain models:
+
+```bash
+cargo run -p rust-swift-cli -- proof examples/fsm_example.rs -o proof-receipt.json
+```
+
+Evaluates:
+- **Memory Safety & Invariant Isolation**: Verifies absence of unsafe blocks, raw pointers, interior mutability, or unchecked deallocations.
+- **Arithmetic Invariant Lowering**: Verifies deterministic mapping of wrapping operations to Swift overflow operators (`&+`, `&-`, `&*`).
+- **Finite State Machine Totality**: Confirms exhaustive enum matching and absence of unreachable state deadlocks.
+- **Contract & Precondition Parity**: Verifies process traps map deterministically between Rust assertions and Swift preconditions.
+
+Produces a cryptographically signed verification dossier conforming to Reflective Rust CSG specs:
+```json
+{
+  "receipt_id": "PROOF-1768407185-FSMModule",
+  "module_name": "FSMModule",
+  "source_sha256": "37f4...",
+  "invariants_evaluated": 4,
+  "invariants_proven": 4,
+  "is_certified": true,
+  "cryptographic_signature": "SIG-ED25519-58ec71253a6509f6...",
+  "spec_version": "rr-csg-proof-0.1"
+}
+```
+
+### 6. Incremental CSG Delta Synchronizer & Watcher Daemon (`rust-swift sync`)
+
+Synchronize Rust domain crates into generated Swift packages incrementally using the Compiler Semantic Graph:
+
+```bash
+# One-shot delta compilation pass
+cargo run -p rust-swift-cli -- sync --input-dir src --output-dir generated-swift
+
+# Continuous live watcher daemon (500ms polling)
+cargo run -p rust-swift-cli -- sync --input-dir src --output-dir generated-swift --watch --interval-ms 500
+```
+
+- **Invariant Elision**: Recomputes CSG AST digests and skips code generation if changes preserve semantic invariants (e.g. comment additions or non-semantic whitespace).
+- **Persistent State**: Maintains `.rust-swift-sync-cache.json` across compiler runs.
+- **Telemetry**: Records synchronization latency and delta actions to `records/sync.jsonl`.
+
+### 7. Native Swift Package Manager Build Tool Plugin (`rust-swift-spm-plugin`)
+
+Integrate `rust-swift` directly into Xcode and `swift build` workflows without custom shell scripts.
+
+Add `rust-swift` to your consumer `Package.swift`:
+
+```swift
+// swift-tools-version: 5.9
+import PackageDescription
+
+let package = Package(
+    name: "MyClientApp",
+    platforms: [.macOS(.v14), .iOS(.v17)],
+    dependencies: [
+        .package(path: "../rust-swift")
+    ],
+    targets: [
+        .executableTarget(
+            name: "MyClientApp",
+            plugins: [
+                .plugin(name: "RustSwiftPlugin", package: "rust-swift")
+            ]
+        )
+    ]
+)
+```
+
+Place any admitted `.rs` files in your target source directory (e.g. `Sources/MyClientApp/Domain.rs`). During `swift build` or Xcode build passes, the plugin automatically invokes `rust-swift compile` to generate native Swift source files into the build cache prior to target compilation.
+
+### 8. Declarative SwiftUI View Synthesis (`rust-swiftui`)
+
+Synthesize native SwiftUI components directly from Rust models annotated with `#[view]`:
+
+```rust
+#[view]
+pub struct CounterView {
+    pub model: CounterModel,
+}
+
+impl CounterView {
+    pub fn body(&self) -> ViewBody {
+        VStack(vec![
+            Text("Counter Status"),
+            Button("Increment", "model.increment()"),
+        ])
+    }
+}
+```
+
+Lowers to native Swift 5.9+ SwiftUI view trees:
+
+```swift
+import SwiftUI
+import Observation
+
+public struct CounterView: View {
+    @Bindable var model: CounterModel
+
+    public var body: some View {
+        VStack {
+            Text("Counter Status")
+            Button("Increment") {
+                model.increment()
+            }
+        }
+    }
+}
+```
+
+### 9. App Store Connect & macOS Notarization
 
 The project provides automated tooling for packaging, signing, sandboxing, and notarizing generated Swift applications:
 
