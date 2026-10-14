@@ -5,6 +5,7 @@ use rust_swift_codegen::SwiftGenerator;
 use rust_swift_frontend::Frontend;
 use rust_swift_qualification::benchmark::BenchmarkRunner;
 use rust_swift_qualification::differential::DifferentialRunner;
+use rust_swift_qualification::evals::AdversarialRunner;
 use rust_swift_qualification::mutation::MutationRunner;
 use sha2::{Digest, Sha256};
 use std::fs::{self, OpenOptions};
@@ -79,6 +80,10 @@ enum Commands {
         /// Run defect injection and mutation testing
         #[arg(long, default_value_t = true)]
         mutations: bool,
+
+        /// Run aggressive adversarial stress testing and assertion counting
+        #[arg(long, default_value_t = true)]
+        adversarial: bool,
     },
     /// Run differential performance benchmarking suite across compiler throughput and runtime parity
     Bench {
@@ -124,8 +129,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Commands::Eval {
             output_dir,
             mutations,
+            adversarial,
         } => {
-            eval_command(&output_dir, mutations)?;
+            eval_command(&output_dir, mutations, adversarial)?;
         }
         Commands::Bench { output_dir } => {
             bench_command(&output_dir)?;
@@ -626,7 +632,11 @@ fn print_manifest() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn eval_command(output_dir: &Path, mutations: bool) -> Result<(), Box<dyn std::error::Error>> {
+fn eval_command(
+    output_dir: &Path,
+    mutations: bool,
+    adversarial: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
     fs::create_dir_all(output_dir)?;
     println!("============================================================");
     println!("Running rust-swift Aggressive Evals & Gate Capability Suite");
@@ -662,6 +672,48 @@ fn eval_command(output_dir: &Path, mutations: bool) -> Result<(), Box<dyn std::e
 
         println!("\nSuccess: All simulated defects were deterministically detected by qualification gates.");
         println!("Appended failure receipts to records/negative-results.jsonl");
+    }
+
+    if adversarial {
+        let runner = AdversarialRunner::new(".");
+        println!("\nExecuting Aggressive Adversarial Stress Suite (Deep AST Nesting, Extreme Unicode, Integer Bounds)...");
+        let report = runner.run_all_evals(output_dir)?;
+        println!(
+            "  Total Assertions Executed: {} | Passed: {} | Failed: {} (No-Op Threshold: {})",
+            report.total_assertions,
+            report.passed_assertions,
+            report.failed_assertions,
+            report.minimum_required_assertions
+        );
+
+        for rec in &report.assertion_records {
+            let badge = if rec.passed { "PASS" } else { "FAIL" };
+            println!(
+                "  [{}] [{}] {}: {}",
+                badge, rec.domain, rec.assertion_id, rec.description
+            );
+        }
+
+        if report.failed_assertions > 0 {
+            eprintln!(
+                "\nERROR: {} adversarial assertion(s) failed!",
+                report.failed_assertions
+            );
+            std::process::exit(1);
+        }
+
+        if report.total_assertions < report.minimum_required_assertions {
+            eprintln!(
+                "\nERROR: No-Op Protection Triggered! Executed {} assertions, expected at least {}.",
+                report.total_assertions, report.minimum_required_assertions
+            );
+            std::process::exit(1);
+        }
+
+        println!(
+            "\nSuccess: All adversarial stress evaluations passed with full assertion telemetry."
+        );
+        println!("Appended evaluation receipt to records/evidence.jsonl");
     }
 
     Ok(())
