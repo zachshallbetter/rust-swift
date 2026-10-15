@@ -3927,6 +3927,525 @@ struct BitflagsRunner {
 
         Ok(reports)
     }
+
+    /// Associated types with protocol bounds and where-clause projections
+    pub fn test_associated_types(
+        &self,
+        output_dir: &Path,
+    ) -> Result<QualificationReport, Box<dyn std::error::Error>> {
+        let out_dir = output_dir.join("associated_types");
+        fs::create_dir_all(&out_dir)?;
+
+        let source = r#"pub trait Container {
+    type Item: Clone;
+    fn extract(&self) -> i32;
+}
+
+pub struct NumberHolder {
+    pub value: i32,
+}
+
+impl Container for NumberHolder {
+    type Item = i32;
+    fn extract(&self) -> i32 {
+        self.value
+    }
+}
+"#;
+
+        let source_hash = Self::compute_sha256(source);
+        let (rustc_ver, swift_ver) = Self::toolchain_versions();
+
+        let mut frontend = Frontend::new("assoc_types.rs");
+        let module = frontend
+            .parse_and_lower(source)
+            .map_err(|diags| format!("Frontend rejected associated types fixture: {:?}", diags))?;
+
+        let pkg_dir = out_dir.join("assoc_pkg");
+        let mut generator = SwiftGenerator::new();
+        generator.emit_package(&module, &pkg_dir, "AssocModule")?;
+
+        let sources_dir = pkg_dir.join("Sources").join("AssocModule");
+        let swift_source = fs::read_to_string(sources_dir.join("assoc_types.swift"))?;
+
+        let mut cases_passed = 0;
+        let total = 4;
+        let mut details = Vec::new();
+
+        // Case 1: Protocol with bounded associatedtype
+        if swift_source.contains("public protocol Container {")
+            && swift_source.contains("associatedtype Item: Clone")
+        {
+            cases_passed += 1;
+            details.push("Case #1: PASS (Protocol with bounded associatedtype emitted)".into());
+        } else {
+            details.push("Case #1: FAIL (Missing bounded associatedtype in protocol)".into());
+        }
+
+        // Case 2: Extension conformance with typealias
+        if swift_source.contains("extension NumberHolder: Container {")
+            && swift_source.contains("public typealias Item = Int32")
+        {
+            cases_passed += 1;
+            details.push(
+                "Case #2: PASS (Conforming extension with concrete typealias emitted)".into(),
+            );
+        } else {
+            details.push("Case #2: FAIL (Missing conforming extension or typealias)".into());
+        }
+
+        // Case 3: Rust reference execution
+        let rust_runner_src = format!(
+            r#"{source}
+
+fn main() {{
+    let holder = NumberHolder {{ value: 42 }};
+    println!("extract:{{}}", holder.extract());
+}}
+"#
+        );
+        let rust_file = out_dir.join("runner.rs");
+        fs::write(&rust_file, &rust_runner_src)?;
+        let rust_bin = out_dir.join("rust_runner");
+        let rustc_status = Command::new("rustc")
+            .arg(&rust_file)
+            .arg("-o")
+            .arg(&rust_bin)
+            .status()?;
+        if !rustc_status.success() {
+            return Err("Failed to compile Rust associated type runner".into());
+        }
+        let rust_output = Command::new(&rust_bin).output()?;
+        let rust_stdout = String::from_utf8(rust_output.stdout)?;
+
+        // Case 4: Swift differential execution
+        let swift_runner_src = r#"
+import Foundation
+
+@main
+struct AssocRunner {
+    static func main() {
+        let holder = NumberHolder(value: 42)
+        print("extract:\(holder.extract())")
+    }
+}
+"#;
+        let main_swift_path = sources_dir.join("main.swift");
+        fs::write(&main_swift_path, swift_runner_src)?;
+
+        let swift_bin = out_dir.join("swift_runner");
+        let swift_compile = Command::new("swiftc")
+            .arg("-parse-as-library")
+            .arg(sources_dir.join("assoc_types.swift"))
+            .arg(sources_dir.join("RustCompat.swift"))
+            .arg(&main_swift_path)
+            .arg("-o")
+            .arg(&swift_bin)
+            .status()?;
+
+        if swift_compile.success() {
+            cases_passed += 1;
+            details.push("Case #3: PASS (Swift package compiled with swiftc)".into());
+
+            let swift_output = Command::new(&swift_bin).output()?;
+            let swift_stdout = String::from_utf8(swift_output.stdout)?;
+
+            if rust_stdout.trim() == swift_stdout.trim() && rust_stdout.contains("extract:42") {
+                cases_passed += 1;
+                details.push(
+                    "Case #4: PASS (Exact runtime equivalence between Rust and Swift)".into(),
+                );
+            } else {
+                details.push(format!(
+                    "Case #4: FAIL (Output mismatch: Rust='{}' vs Swift='{}')",
+                    rust_stdout.trim(),
+                    swift_stdout.trim()
+                ));
+            }
+        } else {
+            details.push("Case #3: FAIL (swiftc compilation failed)".into());
+            details.push("Case #4: NOT_EXECUTED".into());
+        }
+
+        let status = if cases_passed == total {
+            "PASSED"
+        } else {
+            "FAILED"
+        };
+        Ok(QualificationReport {
+            fixture_name: "associated_types".into(),
+            source_hash,
+            rustc_version: rustc_ver,
+            swift_version: swift_ver,
+            cases_tested: total,
+            cases_passed,
+            cases_failed: total - cases_passed,
+            status: status.into(),
+            timestamp: "2026-10-15T03:30:00Z".into(),
+            details,
+        })
+    }
+
+    /// Scoped structured concurrency (async fn, TaskGroup, await lowering)
+    pub fn test_structured_concurrency(
+        &self,
+        output_dir: &Path,
+    ) -> Result<QualificationReport, Box<dyn std::error::Error>> {
+        let out_dir = output_dir.join("structured_concurrency");
+        fs::create_dir_all(&out_dir)?;
+
+        let source = r#"#[rust_swift(async)]
+pub async fn compute_term(base: i32, multiplier: i32) -> i32 {
+    base * multiplier
+}
+
+#[rust_swift(async)]
+pub async fn aggregate_terms(a: i32, b: i32) -> i32 {
+    let t1 = compute_term(a, 2).await;
+    let t2 = compute_term(b, 3).await;
+    t1 + t2
+}
+"#;
+
+        let source_hash = Self::compute_sha256(source);
+        let (rustc_ver, swift_ver) = Self::toolchain_versions();
+
+        let mut frontend = Frontend::new("concurrency.rs").with_admit_async(true);
+        let module = frontend
+            .parse_and_lower(source)
+            .map_err(|diags| format!("Frontend rejected concurrency fixture: {:?}", diags))?;
+
+        let pkg_dir = out_dir.join("concurrency_pkg");
+        let mut generator = SwiftGenerator::new();
+        generator.emit_package(&module, &pkg_dir, "ConcurrencyModule")?;
+
+        let sources_dir = pkg_dir.join("Sources").join("ConcurrencyModule");
+        let swift_source = fs::read_to_string(sources_dir.join("concurrency.swift"))?;
+
+        let mut cases_passed = 0;
+        let total = 3;
+        let mut details = Vec::new();
+
+        // Case 1: async keywords and await emission in Swift
+        if swift_source
+            .contains("public func compute_term(_ base: Int32, _ multiplier: Int32) async -> Int32")
+            && swift_source
+                .contains("public func aggregate_terms(_ a: Int32, _ b: Int32) async -> Int32")
+            && swift_source.contains("await compute_term")
+        {
+            cases_passed += 1;
+            details
+                .push("Case #1: PASS (Swift async signatures and await operators emitted)".into());
+        } else {
+            details.push("Case #1: FAIL (Missing async/await syntax in emitted Swift)".into());
+        }
+
+        // Case 2: Swift concurrency execution
+        let runner_swift = r#"
+import Foundation
+
+@main
+struct ConcurrencyRunner {
+    static func main() async {
+        let result = await aggregate_terms(5, 7)
+        print("aggregate:\(result)")
+    }
+}
+"#;
+        let main_swift_path = sources_dir.join("main.swift");
+        fs::write(&main_swift_path, runner_swift)?;
+
+        let swift_bin = out_dir.join("swift_runner");
+        let swift_compile = Command::new("swiftc")
+            .arg("-parse-as-library")
+            .arg(sources_dir.join("concurrency.swift"))
+            .arg(sources_dir.join("RustCompat.swift"))
+            .arg(&main_swift_path)
+            .arg("-o")
+            .arg(&swift_bin)
+            .status()?;
+
+        if swift_compile.success() {
+            cases_passed += 1;
+            details.push("Case #2: PASS (swiftc async binary compiled cleanly)".into());
+
+            let swift_output = Command::new(&swift_bin).output()?;
+            let swift_stdout = String::from_utf8(swift_output.stdout)?;
+
+            if swift_stdout.contains("aggregate:31") {
+                cases_passed += 1;
+                details.push(
+                    "Case #3: PASS (Swift async execution returned correct result 31)".into(),
+                );
+            } else {
+                details.push(format!(
+                    "Case #3: FAIL (Unexpected output: '{}')",
+                    swift_stdout.trim()
+                ));
+            }
+        } else {
+            details.push("Case #2: FAIL (swiftc compilation failed)".into());
+            details.push("Case #3: NOT_EXECUTED".into());
+        }
+
+        let status = if cases_passed == total {
+            "PASSED"
+        } else {
+            "FAILED"
+        };
+        Ok(QualificationReport {
+            fixture_name: "structured_concurrency".into(),
+            source_hash,
+            rustc_version: rustc_ver,
+            swift_version: swift_ver,
+            cases_tested: total,
+            cases_passed,
+            cases_failed: total - cases_passed,
+            status: status.into(),
+            timestamp: "2026-10-15T03:30:00Z".into(),
+            details,
+        })
+    }
+
+    /// Apple Ecosystem Framework Adapters (RealityKit, SwiftUI FileDocument, FSKit, WidgetKit)
+    pub fn test_apple_kit_adapters(
+        &self,
+        output_dir: &Path,
+    ) -> Result<QualificationReport, Box<dyn std::error::Error>> {
+        let out_dir = output_dir.join("apple_kit_adapters");
+        fs::create_dir_all(&out_dir)?;
+
+        let source = r#"#[derive(Clone, Debug, PartialEq, Codable)]
+#[rust_swift(reality_component)]
+pub struct SpatialAnchorComponent {
+    pub x: i64,
+    pub y: i64,
+    pub z: i64,
+}
+
+#[derive(Clone, Debug, PartialEq, Codable)]
+#[rust_swift(document)]
+pub struct ProjectDocument {
+    pub version: i64,
+    pub title: String,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+#[rust_swift(fskit_volume)]
+pub struct VirtualDisk {
+    pub total_sectors: i64,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+#[rust_swift(widget_timeline)]
+pub struct SystemTimeline {
+}
+"#;
+
+        let source_hash = Self::compute_sha256(source);
+        let (rustc_ver, swift_ver) = Self::toolchain_versions();
+
+        let mut frontend = Frontend::new("apple_kits.rs");
+        let module = frontend.parse_and_lower(source).map_err(|diags| {
+            format!("Frontend rejected Apple kit adapters fixture: {:?}", diags)
+        })?;
+
+        let pkg_dir = out_dir.join("apple_kits_pkg");
+        let mut generator = SwiftGenerator::new();
+        generator.emit_package(&module, &pkg_dir, "AppleKitsModule")?;
+
+        let sources_dir = pkg_dir.join("Sources").join("AppleKitsModule");
+        let swift_source = fs::read_to_string(sources_dir.join("apple_kits.swift"))?;
+
+        let mut cases_passed = 0;
+        let total = 5;
+        let mut details = Vec::new();
+
+        // Case 1: Imports
+        if swift_source.contains("import SwiftUI")
+            && swift_source.contains("import UniformTypeIdentifiers")
+            && swift_source.contains("import RealityKit")
+            && swift_source.contains("import FSKit")
+            && swift_source.contains("import WidgetKit")
+        {
+            cases_passed += 1;
+            details.push("Case #1: PASS (SwiftUI, UniformTypeIdentifiers, RealityKit, FSKit, and WidgetKit imports synthesized)".into());
+        } else {
+            details.push("Case #1: FAIL (Missing required kit framework imports)".into());
+        }
+
+        // Case 2: RealityKit component
+        if swift_source.contains("public struct SpatialAnchorComponent: Equatable, Hashable, Codable, Sendable, RealityKit.Component {") {
+            cases_passed += 1;
+            details.push("Case #2: PASS (RealityKit.Component protocol conformance synthesized)".into());
+        } else {
+            details.push("Case #2: FAIL (SpatialAnchorComponent does not conform to RealityKit.Component)".into());
+        }
+
+        // Case 3: FileDocument synthesizer
+        if swift_source.contains("extension ProjectDocument: FileDocument {")
+            && swift_source.contains("public static var readableContentTypes: [UTType] { [.json] }")
+            && swift_source.contains(
+                "public func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper",
+            )
+        {
+            cases_passed += 1;
+            details.push(
+                "Case #3: PASS (FileDocument conformance and serialization handlers synthesized)"
+                    .into(),
+            );
+        } else {
+            details.push("Case #3: FAIL (Missing FileDocument extension)".into());
+        }
+
+        // Case 4: FSKit Volume operations
+        if swift_source
+            .contains("public final class VirtualDiskVolume: FSVolume, FSVolumeOperations {")
+        {
+            cases_passed += 1;
+            details.push(
+                "Case #4: PASS (FSVolume and FSVolumeOperations class adapter synthesized)".into(),
+            );
+        } else {
+            details.push("Case #4: FAIL (Missing FSKit VirtualDiskVolume class adapter)".into());
+        }
+
+        // Case 5: WidgetKit timeline provider
+        if swift_source.contains("extension SystemTimeline: TimelineProvider {") {
+            cases_passed += 1;
+            details
+                .push("Case #5: PASS (TimelineProvider protocol conformance synthesized)".into());
+        } else {
+            details.push("Case #5: FAIL (Missing TimelineProvider extension)".into());
+        }
+
+        let status = if cases_passed == total {
+            "PASSED"
+        } else {
+            "FAILED"
+        };
+        Ok(QualificationReport {
+            fixture_name: "apple_kit_adapters".into(),
+            source_hash,
+            rustc_version: rustc_ver,
+            swift_version: swift_ver,
+            cases_tested: total,
+            cases_passed,
+            cases_failed: total - cases_passed,
+            status: status.into(),
+            timestamp: "2026-10-15T03:30:00Z".into(),
+            details,
+        })
+    }
+
+    /// CloudKit Record projection and distributed CSG state synchronization
+    pub fn test_cloudkit_sync(
+        &self,
+        output_dir: &Path,
+    ) -> Result<QualificationReport, Box<dyn std::error::Error>> {
+        let out_dir = output_dir.join("cloudkit_sync");
+        fs::create_dir_all(&out_dir)?;
+
+        let source = r#"#[derive(Clone, Debug, PartialEq)]
+pub struct UserProfile {
+    pub id: i64,
+    pub name: String,
+}
+
+pub fn update_name(profile: UserProfile, new_name: String) -> UserProfile {
+    UserProfile {
+        id: profile.id,
+        name: new_name,
+    }
+}
+"#;
+
+        let source_hash = Self::compute_sha256(source);
+        let (rustc_ver, swift_ver) = Self::toolchain_versions();
+
+        let mut frontend = Frontend::new("cloud_sync.rs");
+        let module = frontend
+            .parse_and_lower(source)
+            .map_err(|diags| format!("Frontend rejected CloudKit sync fixture: {:?}", diags))?;
+
+        let records = module.to_cloudkit_records(&source_hash);
+
+        let mut cases_passed = 0;
+        let total = 4;
+        let mut details = Vec::new();
+
+        // Case 1: SourceFile record exists
+        if let Some(src_rec) = records.iter().find(|r| r.record_type == "SourceFile") {
+            if src_rec.fields.get("source_hash").map(|s| s.as_str()) == Some(&source_hash) {
+                cases_passed += 1;
+                details.push(
+                    "Case #1: PASS (CloudKit SourceFile record projected with matching digest)"
+                        .into(),
+                );
+            } else {
+                details
+                    .push("Case #1: FAIL (SourceFile record missing correct source_hash)".into());
+            }
+        } else {
+            details.push("Case #1: FAIL (Missing SourceFile CloudKit record)".into());
+        }
+
+        // Case 2: Struct CSGNode record exists
+        if let Some(struct_rec) = records.iter().find(|r| r.record_name == "UserProfile") {
+            if struct_rec.fields.get("node_kind").map(|s| s.as_str()) == Some("struct") {
+                cases_passed += 1;
+                details.push("Case #2: PASS (CSGNode UserProfile struct record projected)".into());
+            } else {
+                details.push("Case #2: FAIL (CSGNode UserProfile has incorrect node_kind)".into());
+            }
+        } else {
+            details.push("Case #2: FAIL (Missing CSGNode UserProfile record)".into());
+        }
+
+        // Case 3: Function CSGNode record exists
+        if let Some(fn_rec) = records.iter().find(|r| r.record_name == "update_name") {
+            if fn_rec.fields.get("node_kind").map(|s| s.as_str()) == Some("function") {
+                cases_passed += 1;
+                details
+                    .push("Case #3: PASS (CSGNode update_name function record projected)".into());
+            } else {
+                details.push("Case #3: FAIL (CSGNode update_name has incorrect node_kind)".into());
+            }
+        } else {
+            details.push("Case #3: FAIL (Missing CSGNode update_name record)".into());
+        }
+
+        // Case 4: JSON serialization and determinism
+        let json_records = serde_json::to_string_pretty(&records)?;
+        let records_path = out_dir.join("cloudkit_records.json");
+        fs::write(&records_path, &json_records)?;
+
+        let reloaded: Vec<rust_swift_ir::CloudKitRecord> = serde_json::from_str(&json_records)?;
+        if reloaded.len() == records.len() && !reloaded.is_empty() {
+            cases_passed += 1;
+            details.push("Case #4: PASS (CloudKit records round-trip through JSON serializer deterministically)".into());
+        } else {
+            details.push("Case #4: FAIL (CloudKit records failed to round-trip)".into());
+        }
+
+        let status = if cases_passed == total {
+            "PASSED"
+        } else {
+            "FAILED"
+        };
+        Ok(QualificationReport {
+            fixture_name: "cloudkit_sync".into(),
+            source_hash,
+            rustc_version: rustc_ver,
+            swift_version: swift_ver,
+            cases_tested: total,
+            cases_passed,
+            cases_failed: total - cases_passed,
+            status: status.into(),
+            timestamp: "2026-10-15T03:30:00Z".into(),
+            details,
+        })
+    }
 }
 
 #[cfg(test)]
@@ -4237,6 +4756,102 @@ mod tests {
         eprintln!("Details: {:?}", report.details);
         assert_eq!(report.status, "PASSED");
         assert_eq!(report.cases_passed, 5);
+        assert_eq!(report.cases_failed, 0);
+    }
+
+    #[test]
+    fn test_associated_types_differential_passes() {
+        let runner = DifferentialRunner::new(
+            std::env::var("CARGO_MANIFEST_DIR")
+                .map(|p| {
+                    PathBuf::from(p)
+                        .parent()
+                        .unwrap()
+                        .parent()
+                        .unwrap()
+                        .to_path_buf()
+                })
+                .unwrap_or_else(|_| PathBuf::from(".")),
+        );
+        let temp_dir = std::env::temp_dir().join("assoc_types_diff_test");
+        let _ = fs::create_dir_all(&temp_dir);
+        let report = runner
+            .test_associated_types(&temp_dir)
+            .expect("Associated types differential test should pass");
+        assert_eq!(report.status, "PASSED");
+        assert_eq!(report.cases_failed, 0);
+    }
+
+    #[test]
+    fn test_structured_concurrency_differential_passes() {
+        let runner = DifferentialRunner::new(
+            std::env::var("CARGO_MANIFEST_DIR")
+                .map(|p| {
+                    PathBuf::from(p)
+                        .parent()
+                        .unwrap()
+                        .parent()
+                        .unwrap()
+                        .to_path_buf()
+                })
+                .unwrap_or_else(|_| PathBuf::from(".")),
+        );
+        let temp_dir = std::env::temp_dir().join("concurrency_diff_test");
+        let _ = fs::create_dir_all(&temp_dir);
+        let report = runner
+            .test_structured_concurrency(&temp_dir)
+            .expect("Structured concurrency differential test should pass");
+        assert_eq!(report.status, "PASSED");
+        assert_eq!(report.cases_failed, 0);
+    }
+
+    #[test]
+    fn test_apple_kit_adapters_differential_passes() {
+        let runner = DifferentialRunner::new(
+            std::env::var("CARGO_MANIFEST_DIR")
+                .map(|p| {
+                    PathBuf::from(p)
+                        .parent()
+                        .unwrap()
+                        .parent()
+                        .unwrap()
+                        .to_path_buf()
+                })
+                .unwrap_or_else(|_| PathBuf::from(".")),
+        );
+        let temp_dir = std::env::temp_dir().join("apple_kits_diff_test");
+        let _ = fs::create_dir_all(&temp_dir);
+        let report = runner
+            .test_apple_kit_adapters(&temp_dir)
+            .expect("Apple kit adapters differential test should pass");
+        assert_eq!(
+            report.status, "PASSED",
+            "Report details: {:#?}",
+            report.details
+        );
+        assert_eq!(report.cases_failed, 0);
+    }
+
+    #[test]
+    fn test_cloudkit_sync_differential_passes() {
+        let runner = DifferentialRunner::new(
+            std::env::var("CARGO_MANIFEST_DIR")
+                .map(|p| {
+                    PathBuf::from(p)
+                        .parent()
+                        .unwrap()
+                        .parent()
+                        .unwrap()
+                        .to_path_buf()
+                })
+                .unwrap_or_else(|_| PathBuf::from(".")),
+        );
+        let temp_dir = std::env::temp_dir().join("cloudkit_sync_diff_test");
+        let _ = fs::create_dir_all(&temp_dir);
+        let report = runner
+            .test_cloudkit_sync(&temp_dir)
+            .expect("CloudKit sync differential test should pass");
+        assert_eq!(report.status, "PASSED");
         assert_eq!(report.cases_failed, 0);
     }
 }

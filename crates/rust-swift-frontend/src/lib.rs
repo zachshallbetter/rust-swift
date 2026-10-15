@@ -20,6 +20,7 @@ pub struct Frontend {
     diagnostics: Vec<Diagnostic>,
     default_codable: bool,
     default_observable: bool,
+    pub admit_async: bool,
 }
 
 impl Frontend {
@@ -29,6 +30,7 @@ impl Frontend {
             diagnostics: Vec::new(),
             default_codable: false,
             default_observable: false,
+            admit_async: false,
         }
     }
 
@@ -39,6 +41,11 @@ impl Frontend {
 
     pub fn with_default_observable(mut self, enabled: bool) -> Self {
         self.default_observable = enabled;
+        self
+    }
+
+    pub fn with_admit_async(mut self, enabled: bool) -> Self {
+        self.admit_async = enabled;
         self
     }
 
@@ -270,15 +277,20 @@ impl Frontend {
     }
 
     fn lower_fn(&mut self, item_fn: &syn::ItemFn) -> Option<Function> {
-        if item_fn.sig.asyncness.is_some() {
-            self.reject(
-                DiagnosticCode::AsyncRejected,
-                "Async functions are rejected in v0.1",
-                &item_fn.sig.fn_token,
-                Some("Use synchronous execution"),
-            );
-            return None;
-        }
+        let is_async = if item_fn.sig.asyncness.is_some() {
+            if !self.admit_async && !Self::has_async_attr(&item_fn.attrs) {
+                self.reject(
+                    DiagnosticCode::AsyncRejected,
+                    "Async functions are rejected in v0.1 without structured concurrency mode enabled",
+                    &item_fn.sig.fn_token,
+                    Some("Use synchronous execution or enable structured concurrency mode"),
+                );
+                return None;
+            }
+            true
+        } else {
+            false
+        };
 
         if item_fn.sig.unsafety.is_some() {
             self.reject(
@@ -354,12 +366,28 @@ impl Frontend {
             return_type,
             body,
             is_public,
+            is_async,
             doc_comments: Self::extract_doc_comments(&item_fn.attrs),
             span: self.make_span(item_fn),
         })
     }
 
     fn lower_method(&mut self, method: &syn::ImplItemFn) -> Option<Method> {
+        let is_async = if method.sig.asyncness.is_some() {
+            if !self.admit_async && !Self::has_async_attr(&method.attrs) {
+                self.reject(
+                    DiagnosticCode::AsyncRejected,
+                    "Async methods are rejected in v0.1 without structured concurrency mode enabled",
+                    &method.sig.fn_token,
+                    Some("Use synchronous execution or enable structured concurrency mode"),
+                );
+                return None;
+            }
+            true
+        } else {
+            false
+        };
+
         let name = method.sig.ident.to_string();
         let is_public = matches!(method.vis, syn::Visibility::Public(_));
 
@@ -412,6 +440,7 @@ impl Frontend {
             return_type,
             body,
             is_public,
+            is_async,
             doc_comments: Self::extract_doc_comments(&method.attrs),
             span: self.make_span(method),
         })
@@ -487,8 +516,19 @@ impl Frontend {
                     }
                 }
                 syn::TraitItem::Type(trait_type) => {
+                    let bounds = trait_type
+                        .bounds
+                        .iter()
+                        .filter_map(|b| match b {
+                            syn::TypeParamBound::Trait(tb) => {
+                                tb.path.segments.last().map(|s| s.ident.to_string())
+                            }
+                            _ => None,
+                        })
+                        .collect();
                     associated_types.push(AssociatedTypeDef {
                         name: trait_type.ident.to_string(),
+                        bounds,
                         span: self.make_span(trait_type),
                     });
                 }
@@ -515,6 +555,21 @@ impl Frontend {
     }
 
     fn lower_trait_method(&mut self, method: &syn::TraitItemFn) -> Option<TraitMethod> {
+        let is_async = if method.sig.asyncness.is_some() {
+            if !self.admit_async && !Self::has_async_attr(&method.attrs) {
+                self.reject(
+                    DiagnosticCode::AsyncRejected,
+                    "Async trait methods are rejected in v0.1 without structured concurrency mode enabled",
+                    &method.sig.fn_token,
+                    Some("Use synchronous execution or enable structured concurrency mode"),
+                );
+                return None;
+            }
+            true
+        } else {
+            false
+        };
+
         let name = method.sig.ident.to_string();
 
         let mut receiver = None;
@@ -565,6 +620,7 @@ impl Frontend {
             params,
             return_type,
             default_body,
+            is_async,
             doc_comments: Self::extract_doc_comments(&method.attrs),
             span: self.make_span(method),
         })
@@ -580,6 +636,47 @@ impl Frontend {
                 .unwrap_or_else(|| "Target".into()),
             _ => "Target".into(),
         };
+
+        let where_clause = imp.generics.where_clause.as_ref().and_then(|wc| {
+            let preds: Vec<String> = wc
+                .predicates
+                .iter()
+                .filter_map(|pred| match pred {
+                    syn::WherePredicate::Type(pt) => {
+                        let ty_str = match &pt.bounded_ty {
+                            syn::Type::Path(tp) => tp
+                                .path
+                                .segments
+                                .last()
+                                .map(|s| s.ident.to_string())
+                                .unwrap_or_else(|| "T".into()),
+                            _ => "T".into(),
+                        };
+                        let bounds_strs: Vec<String> = pt
+                            .bounds
+                            .iter()
+                            .filter_map(|b| match b {
+                                syn::TypeParamBound::Trait(tb) => {
+                                    tb.path.segments.last().map(|s| s.ident.to_string())
+                                }
+                                _ => None,
+                            })
+                            .collect();
+                        if bounds_strs.is_empty() {
+                            None
+                        } else {
+                            Some(format!("{}: {}", ty_str, bounds_strs.join(" & ")))
+                        }
+                    }
+                    _ => None,
+                })
+                .collect();
+            if preds.is_empty() {
+                None
+            } else {
+                Some(preds.join(", "))
+            }
+        });
 
         let mut type_aliases = Vec::new();
         let mut methods = Vec::new();
@@ -609,6 +706,7 @@ impl Frontend {
         Some(TraitImpl {
             trait_name,
             target_type,
+            where_clause,
             type_aliases,
             methods,
             span: self.make_span(imp),
@@ -617,10 +715,28 @@ impl Frontend {
 
     fn has_codable_derive(attrs: &[syn::Attribute]) -> bool {
         attrs.iter().any(|attr| {
+            if attr.path().is_ident("codable") {
+                return true;
+            }
+            if attr.path().is_ident("rust_swift") {
+                let mut found = false;
+                let _ = attr.parse_nested_meta(|meta| {
+                    if meta.path.is_ident("codable") {
+                        found = true;
+                    }
+                    Ok(())
+                });
+                if found {
+                    return true;
+                }
+            }
             if attr.path().is_ident("derive") {
                 let mut found = false;
                 let _ = attr.parse_nested_meta(|meta| {
-                    if meta.path.is_ident("Serialize") || meta.path.is_ident("Deserialize") {
+                    if meta.path.is_ident("Serialize")
+                        || meta.path.is_ident("Deserialize")
+                        || meta.path.is_ident("Codable")
+                    {
                         found = true;
                     }
                     Ok(())
@@ -688,6 +804,158 @@ impl Frontend {
                 found
             } else {
                 false
+            }
+        })
+    }
+
+    fn has_document_attr(attrs: &[syn::Attribute]) -> bool {
+        attrs.iter().any(|attr| {
+            if attr.path().is_ident("document") {
+                return true;
+            }
+            if attr.path().is_ident("rust_swift") {
+                let mut found = false;
+                let _ = attr.parse_nested_meta(|meta| {
+                    if meta.path.is_ident("document") || meta.path.is_ident("file_document") {
+                        found = true;
+                    }
+                    Ok(())
+                });
+                if found {
+                    return true;
+                }
+            }
+            if attr.path().is_ident("derive") {
+                let mut found = false;
+                let _ = attr.parse_nested_meta(|meta| {
+                    if meta.path.is_ident("FileDocument") || meta.path.is_ident("Document") {
+                        found = true;
+                    }
+                    Ok(())
+                });
+                found
+            } else {
+                false
+            }
+        })
+    }
+
+    fn has_reality_component_attr(attrs: &[syn::Attribute]) -> bool {
+        attrs.iter().any(|attr| {
+            if attr.path().is_ident("reality_component") || attr.path().is_ident("component") {
+                return true;
+            }
+            if attr.path().is_ident("rust_swift") {
+                let mut found = false;
+                let _ = attr.parse_nested_meta(|meta| {
+                    if meta.path.is_ident("reality_component") || meta.path.is_ident("component") {
+                        found = true;
+                    }
+                    Ok(())
+                });
+                if found {
+                    return true;
+                }
+            }
+            if attr.path().is_ident("derive") {
+                let mut found = false;
+                let _ = attr.parse_nested_meta(|meta| {
+                    if meta.path.is_ident("RealityComponent") || meta.path.is_ident("Component") {
+                        found = true;
+                    }
+                    Ok(())
+                });
+                found
+            } else {
+                false
+            }
+        })
+    }
+
+    fn has_fskit_attr(attrs: &[syn::Attribute]) -> bool {
+        attrs.iter().any(|attr| {
+            if attr.path().is_ident("fskit") || attr.path().is_ident("fs_volume") {
+                return true;
+            }
+            if attr.path().is_ident("rust_swift") {
+                let mut found = false;
+                let _ = attr.parse_nested_meta(|meta| {
+                    if meta.path.is_ident("fskit")
+                        || meta.path.is_ident("fskit_volume")
+                        || meta.path.is_ident("fs_volume")
+                    {
+                        found = true;
+                    }
+                    Ok(())
+                });
+                if found {
+                    return true;
+                }
+            }
+            if attr.path().is_ident("derive") {
+                let mut found = false;
+                let _ = attr.parse_nested_meta(|meta| {
+                    if meta.path.is_ident("FSVolume") || meta.path.is_ident("FSVolumeOperations") {
+                        found = true;
+                    }
+                    Ok(())
+                });
+                found
+            } else {
+                false
+            }
+        })
+    }
+
+    fn has_widget_timeline_attr(attrs: &[syn::Attribute]) -> bool {
+        attrs.iter().any(|attr| {
+            if attr.path().is_ident("widget_timeline") || attr.path().is_ident("timeline_entry") {
+                return true;
+            }
+            if attr.path().is_ident("rust_swift") {
+                let mut found = false;
+                let _ = attr.parse_nested_meta(|meta| {
+                    if meta.path.is_ident("widget_timeline")
+                        || meta.path.is_ident("timeline_entry")
+                        || meta.path.is_ident("timeline")
+                    {
+                        found = true;
+                    }
+                    Ok(())
+                });
+                if found {
+                    return true;
+                }
+            }
+            if attr.path().is_ident("derive") {
+                let mut found = false;
+                let _ = attr.parse_nested_meta(|meta| {
+                    if meta.path.is_ident("TimelineEntry") || meta.path.is_ident("TimelineProvider")
+                    {
+                        found = true;
+                    }
+                    Ok(())
+                });
+                found
+            } else {
+                false
+            }
+        })
+    }
+
+    fn has_async_attr(attrs: &[syn::Attribute]) -> bool {
+        attrs.iter().any(|attr| {
+            if attr.path().is_ident("rust_swift") {
+                let mut found = false;
+                let _ = attr.parse_nested_meta(|meta| {
+                    if meta.path.is_ident("async_admitted") || meta.path.is_ident("async") {
+                        found = true;
+                    }
+                    Ok(())
+                });
+                found
+            } else {
+                attr.path().is_ident("async_trait")
             }
         })
     }
@@ -1180,6 +1448,10 @@ impl Frontend {
         let is_observable =
             self.default_observable || Self::has_observable_attr(&item_struct.attrs);
         let is_bitflags = Self::has_bitflags_attr(&item_struct.attrs);
+        let is_document = Self::has_document_attr(&item_struct.attrs);
+        let is_reality_component = Self::has_reality_component_attr(&item_struct.attrs);
+        let is_fskit_volume = Self::has_fskit_attr(&item_struct.attrs);
+        let is_widget_timeline = Self::has_widget_timeline_attr(&item_struct.attrs);
         let doc_comments = Self::extract_doc_comments(&item_struct.attrs);
 
         Some(StructDef {
@@ -1189,6 +1461,10 @@ impl Frontend {
             is_codable,
             is_observable,
             is_bitflags,
+            is_document,
+            is_reality_component,
+            is_fskit_volume,
+            is_widget_timeline,
             doc_comments,
             span: self.make_span(item_struct),
         })
@@ -1914,13 +2190,19 @@ impl Frontend {
                 Expr::new(ExprKind::Literal(Literal::Unit), Type::Unit)
             }
             syn::Expr::Await(a) => {
-                self.reject(
-                    DiagnosticCode::AsyncRejected,
-                    ".await is rejected in v0.1",
-                    &a.dot_token,
-                    Some("Use synchronous calls"),
-                );
-                Expr::new(ExprKind::Literal(Literal::Unit), Type::Unit)
+                if !self.admit_async {
+                    self.reject(
+                        DiagnosticCode::AsyncRejected,
+                        ".await is rejected in v0.1 without structured concurrency mode enabled",
+                        &a.dot_token,
+                        Some("Use synchronous calls or enable structured concurrency mode"),
+                    );
+                    Expr::new(ExprKind::Literal(Literal::Unit), Type::Unit)
+                } else {
+                    let base = self.lower_expr(&a.base);
+                    let ty = base.ty.clone();
+                    Expr::new(ExprKind::Await(Box::new(base)), ty)
+                }
             }
             syn::Expr::Closure(c) => {
                 self.reject(
@@ -2993,6 +3275,136 @@ mod tests {
             assert_eq!(e.variants[0].doc_comments, vec!["System is operational."]);
         } else {
             panic!("Expected Item::Enum");
+        }
+    }
+
+    #[test]
+    fn test_trait_associated_types_with_bounds_and_where_clause() {
+        let src = r#"
+            pub trait Sequence {
+                type Item: Codable;
+                fn next(&mut self) -> Option<Self::Item>;
+            }
+
+            pub struct NumberList {
+                pub numbers: Vec<i64>,
+            }
+
+            impl Sequence for NumberList where NumberList: Equatable {
+                type Item = i64;
+                fn next(&mut self) -> Option<i64> {
+                    None
+                }
+            }
+        "#;
+        let mut fe = Frontend::new("assoc.rs");
+        let module = fe.parse_and_lower(src).expect("lowering failed");
+
+        if let IrItem::Trait(t) = &module.items[0] {
+            assert_eq!(t.name, "Sequence");
+            assert_eq!(t.associated_types.len(), 1);
+            assert_eq!(t.associated_types[0].name, "Item");
+            assert_eq!(t.associated_types[0].bounds, vec!["Codable"]);
+        } else {
+            panic!("Expected Item::Trait");
+        }
+
+        if let IrItem::TraitImpl(ti) = &module.items[2] {
+            assert_eq!(ti.trait_name, "Sequence");
+            assert_eq!(ti.target_type, "NumberList");
+            assert_eq!(ti.where_clause.as_deref(), Some("NumberList: Equatable"));
+            assert_eq!(ti.type_aliases.len(), 1);
+            assert_eq!(ti.type_aliases[0].name, "Item");
+        } else {
+            panic!("Expected Item::TraitImpl");
+        }
+    }
+
+    #[test]
+    fn test_structured_concurrency_admitted_lowering() {
+        let src = r#"
+            pub async fn fetch_data(id: i64) -> i64 {
+                id + 1
+            }
+
+            pub async fn orchestrate() -> i64 {
+                fetch_data(10).await
+            }
+        "#;
+        let mut fe = Frontend::new("async_concurrency.rs").with_admit_async(true);
+        let module = fe
+            .parse_and_lower(src)
+            .expect("lowering async functions should succeed");
+
+        if let IrItem::Function(f1) = &module.items[0] {
+            assert_eq!(f1.name, "fetch_data");
+            assert!(f1.is_async);
+        } else {
+            panic!("Expected Item::Function");
+        }
+
+        if let IrItem::Function(f2) = &module.items[1] {
+            assert_eq!(f2.name, "orchestrate");
+            assert!(f2.is_async);
+        } else {
+            panic!("Expected Item::Function");
+        }
+    }
+
+    #[test]
+    fn test_apple_kit_attributes_lowering() {
+        let src = r#"
+            #[document]
+            pub struct CanvasDocument {
+                pub title: String,
+            }
+
+            #[fskit]
+            pub struct VirtualFileSystemVolume {
+                pub mount_point: String,
+            }
+
+            #[reality_component]
+            pub struct SpatialParticleComponent {
+                pub speed: f64,
+            }
+
+            #[widget_timeline]
+            pub struct BatteryStatusEntry {
+                pub level: i32,
+            }
+        "#;
+        let mut fe = Frontend::new("kits.rs");
+        let module = fe
+            .parse_and_lower(src)
+            .expect("lowering kit structs should succeed");
+
+        if let IrItem::Struct(s) = &module.items[0] {
+            assert_eq!(s.name, "CanvasDocument");
+            assert!(s.is_document);
+        } else {
+            panic!("Expected Struct");
+        }
+
+        if let IrItem::Struct(s) = &module.items[1] {
+            assert_eq!(s.name, "VirtualFileSystemVolume");
+            assert!(s.is_fskit_volume);
+        } else {
+            panic!("Expected Struct");
+        }
+
+        if let IrItem::Struct(s) = &module.items[2] {
+            assert_eq!(s.name, "SpatialParticleComponent");
+            assert!(s.is_reality_component);
+        } else {
+            panic!("Expected Struct");
+        }
+
+        if let IrItem::Struct(s) = &module.items[3] {
+            assert_eq!(s.name, "BatteryStatusEntry");
+            assert!(s.is_widget_timeline);
+        } else {
+            panic!("Expected Struct");
         }
     }
 }

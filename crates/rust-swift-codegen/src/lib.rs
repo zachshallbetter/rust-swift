@@ -138,6 +138,22 @@ impl SwiftGenerator {
             }
         }
         let has_view = module.items.iter().any(|i| matches!(i, Item::View(_)));
+        let has_document = module
+            .items
+            .iter()
+            .any(|i| matches!(i, Item::Struct(s) if s.is_document));
+        let has_reality = module
+            .items
+            .iter()
+            .any(|i| matches!(i, Item::Struct(s) if s.is_reality_component));
+        let has_fskit = module
+            .items
+            .iter()
+            .any(|i| matches!(i, Item::Struct(s) if s.is_fskit_volume));
+        let has_widget = module
+            .items
+            .iter()
+            .any(|i| matches!(i, Item::Struct(s) if s.is_widget_timeline));
         let has_observable = !self.observable_types.is_empty() || has_view;
 
         let mut out = String::new();
@@ -149,8 +165,20 @@ impl SwiftGenerator {
         out.push_str("// Strict semantic preservation - do not edit directly.\n");
         out.push_str("//\n\n");
         out.push_str("import Foundation\n");
-        if has_view {
+        if has_view || has_document {
             out.push_str("import SwiftUI\n");
+        }
+        if has_document {
+            out.push_str("import UniformTypeIdentifiers\n");
+        }
+        if has_reality {
+            out.push_str("import RealityKit\n");
+        }
+        if has_fskit {
+            out.push_str("import FSKit\n");
+        }
+        if has_widget {
+            out.push_str("import WidgetKit\n");
         }
         if has_observable {
             out.push_str("import Observation\n");
@@ -447,11 +475,21 @@ impl SwiftGenerator {
                 conformances
             ));
         } else {
-            let conformances = if strct.is_codable {
-                "Equatable, Hashable, Codable, Sendable"
+            let mut confs = Vec::new();
+            if strct.is_codable {
+                confs.push("Equatable");
+                confs.push("Hashable");
+                confs.push("Codable");
+                confs.push("Sendable");
             } else {
-                "Equatable, Hashable, Sendable"
-            };
+                confs.push("Equatable");
+                confs.push("Hashable");
+                confs.push("Sendable");
+            }
+            if strct.is_reality_component {
+                confs.push("RealityKit.Component");
+            }
+            let conformances = confs.join(", ");
             out.push_str(&format!(
                 "{}struct {}: {} {{\n",
                 vis, strct.name, conformances
@@ -496,6 +534,103 @@ impl SwiftGenerator {
 
         self.indent_level -= 1;
         out.push_str(&format!("{}}}", self.indent()));
+
+        if strct.is_document {
+            out.push_str("\n\n");
+            out.push_str(&format!(
+                "{}extension {}: FileDocument {{\n",
+                self.indent(),
+                strct.name
+            ));
+            self.indent_level += 1;
+            out.push_str(&format!(
+                "{}public static var readableContentTypes: [UTType] {{ [.json] }}\n\n",
+                self.indent()
+            ));
+            out.push_str(&format!(
+                "{}public init(configuration: ReadConfiguration) throws {{\n",
+                self.indent()
+            ));
+            self.indent_level += 1;
+            out.push_str(&format!(
+                "{}guard let data = configuration.file.regularFileContents else {{\n",
+                self.indent()
+            ));
+            self.indent_level += 1;
+            out.push_str(&format!(
+                "{}throw CocoaError(.fileReadCorruptFile)\n",
+                self.indent()
+            ));
+            self.indent_level -= 1;
+            out.push_str(&format!("{}}}\n", self.indent()));
+            out.push_str(&format!(
+                "{}self = try JSONDecoder().decode({}.self, from: data)\n",
+                self.indent(),
+                strct.name
+            ));
+            self.indent_level -= 1;
+            out.push_str(&format!("{}}}\n\n", self.indent()));
+            out.push_str(&format!(
+                "{}public func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {{\n",
+                self.indent()
+            ));
+            self.indent_level += 1;
+            out.push_str(&format!(
+                "{}let data = try JSONEncoder().encode(self)\n",
+                self.indent()
+            ));
+            out.push_str(&format!(
+                "{}return FileWrapper(regularFileWithContents: data)\n",
+                self.indent()
+            ));
+            self.indent_level -= 1;
+            out.push_str(&format!("{}}}\n", self.indent()));
+            self.indent_level -= 1;
+            out.push_str(&format!("{}}}", self.indent()));
+        }
+
+        if strct.is_fskit_volume {
+            out.push_str("\n\n");
+            out.push_str(&format!(
+                "{}public final class {}Volume: FSVolume, FSVolumeOperations {{\n",
+                self.indent(),
+                strct.name
+            ));
+            self.indent_level += 1;
+            out.push_str(&format!(
+                "{}public var state: {}\n\n",
+                self.indent(),
+                strct.name
+            ));
+            out.push_str(&format!(
+                "{}public init(state: {}) {{\n",
+                self.indent(),
+                strct.name
+            ));
+            self.indent_level += 1;
+            out.push_str(&format!("{}self.state = state\n", self.indent()));
+            self.indent_level -= 1;
+            out.push_str(&format!("{}}}\n", self.indent()));
+            self.indent_level -= 1;
+            out.push_str(&format!("{}}}", self.indent()));
+        }
+
+        if strct.is_widget_timeline {
+            out.push_str("\n\n");
+            out.push_str(&format!(
+                "{}extension {}: TimelineProvider {{\n",
+                self.indent(),
+                strct.name
+            ));
+            self.indent_level += 1;
+            out.push_str(&format!(
+                "{}public typealias Entry = SimpleTimelineEntry\n",
+                self.indent()
+            ));
+            self.indent_level -= 1;
+            out.push_str(&format!("{}}}", self.indent()));
+        }
+
         out
     }
 
@@ -870,7 +1005,16 @@ impl SwiftGenerator {
         ));
         self.indent_level += 1;
         for assoc in &trt.associated_types {
-            out.push_str(&format!("{}associatedtype {}\n", self.indent(), assoc.name));
+            if assoc.bounds.is_empty() {
+                out.push_str(&format!("{}associatedtype {}\n", self.indent(), assoc.name));
+            } else {
+                out.push_str(&format!(
+                    "{}associatedtype {}: {}\n",
+                    self.indent(),
+                    assoc.name,
+                    assoc.bounds.join(", ")
+                ));
+            }
         }
         if !trt.associated_types.is_empty() && !trt.methods.is_empty() {
             out.push('\n');
@@ -905,12 +1049,14 @@ impl SwiftGenerator {
                 format!(" -> {}", self.map_type(&method.return_type))
             };
 
+            let async_kw = if method.is_async { " async" } else { "" };
             out.push_str(&format!(
-                "{}{}func {}({}){}\n",
+                "{}{}func {}({}){}{}\n",
                 self.indent(),
                 mutating_kw,
                 method.name,
                 params_str,
+                async_kw,
                 ret_str
             ));
         }
@@ -965,12 +1111,14 @@ impl SwiftGenerator {
                     format!(" -> {}", self.map_type(&method.return_type))
                 };
 
+                let async_kw = if method.is_async { " async" } else { "" };
                 out.push_str(&format!(
-                    "{}{}func {}({}){} {{\n",
+                    "{}{}func {}({}){}{} {{\n",
                     self.indent(),
                     mutating_kw,
                     method.name,
                     params_str,
+                    async_kw,
                     ret_str
                 ));
                 self.indent_level += 1;
@@ -1011,11 +1159,16 @@ impl SwiftGenerator {
                 timpl.span.start_line
             ));
         }
+        let where_suffix = match &timpl.where_clause {
+            Some(w) => format!(" where {}", w),
+            None => String::new(),
+        };
         out.push_str(&format!(
-            "{}extension {}: {} {{\n",
+            "{}extension {}: {}{} {{\n",
             self.indent(),
             timpl.target_type,
-            timpl.trait_name
+            timpl.trait_name,
+            where_suffix
         ));
         self.indent_level += 1;
         for alias in &timpl.type_aliases {
@@ -1109,13 +1262,15 @@ impl SwiftGenerator {
             format!(" -> {}", self.map_type(&method.return_type))
         };
 
+        let async_kw = if method.is_async { " async" } else { "" };
         out.push_str(&format!(
-            "{}{}{}func {}({}){} {{\n",
+            "{}{}{}func {}({}){}{} {{\n",
             self.indent(),
             vis,
             modifier,
             method.name,
             params_str,
+            async_kw,
             ret_str
         ));
 
@@ -1176,12 +1331,14 @@ impl SwiftGenerator {
             format!(" -> {}", self.map_type(&func.return_type))
         };
 
+        let async_kw = if func.is_async { " async" } else { "" };
         out.push_str(&format!(
-            "{}{}func {}({}){} {{\n",
+            "{}{}func {}({}){}{} {{\n",
             self.indent(),
             vis,
             func.name,
             params_str,
+            async_kw,
             ret_str
         ));
 
@@ -1845,6 +2002,9 @@ impl SwiftGenerator {
             ExprKind::StringFormat { template, args } => {
                 self.generate_string_format(template, args)
             }
+            ExprKind::Await(inner) => {
+                format!("await {}", self.generate_expr(inner))
+            }
             _ => "/* unsupported inline expression */".into(),
         }
     }
@@ -2110,6 +2270,25 @@ extension Result {
         }
     }
 }
+
+public protocol Clone {}
+extension Int: Clone {}
+extension Int8: Clone {}
+extension Int16: Clone {}
+extension Int32: Clone {}
+extension Int64: Clone {}
+extension UInt: Clone {}
+extension UInt8: Clone {}
+extension UInt16: Clone {}
+extension UInt32: Clone {}
+extension UInt64: Clone {}
+extension String: Clone {}
+extension Bool: Clone {}
+extension Float: Clone {}
+extension Double: Clone {}
+extension Array: Clone {}
+extension Dictionary: Clone {}
+extension Optional: Clone {}
 "#;
         fs::write(sources_dir.join("RustCompat.swift"), runtime_shims)?;
 
@@ -2195,6 +2374,7 @@ mod tests {
                 Type::Named("State".into()),
             ),
             is_public: true,
+            is_async: false,
             doc_comments: vec![],
             span: SourceSpan {
                 file: "sm.rs".into(),
@@ -2241,6 +2421,7 @@ mod tests {
                 Type::I32,
             ),
             is_public: true,
+            is_async: false,
             doc_comments: vec![],
             span: SourceSpan {
                 file: "math.rs".into(),
@@ -2299,6 +2480,7 @@ mod tests {
                 Type::I32,
             ),
             is_public: true,
+            is_async: false,
             doc_comments: vec![],
             span: SourceSpan {
                 file: "contracts.rs".into(),
@@ -2330,6 +2512,10 @@ mod tests {
             is_codable: false,
             is_observable: false,
             is_bitflags: false,
+            is_document: false,
+            is_reality_component: false,
+            is_fskit_volume: false,
+            is_widget_timeline: false,
             doc_comments: vec![],
             span: SourceSpan {
                 file: "types.rs".into(),
@@ -2349,6 +2535,7 @@ mod tests {
                     mutable: false,
                 }],
                 return_type: Type::Unit,
+                is_async: false,
                 body: Expr::new(
                     ExprKind::Block {
                         stmts: vec![Stmt::Assign {
@@ -2489,6 +2676,7 @@ mod tests {
                 Type::String,
             ),
             is_public: true,
+            is_async: false,
             doc_comments: vec![],
             span: SourceSpan {
                 file: "data.rs".into(),
@@ -2543,6 +2731,7 @@ mod tests {
                 Type::Unit,
             ),
             is_public: true,
+            is_async: false,
             doc_comments: vec![],
             span: SourceSpan {
                 file: "own.rs".into(),
@@ -2570,6 +2759,7 @@ mod tests {
             return_type: Type::I32,
             body: Expr::new(ExprKind::Variable("val".into()), Type::I32),
             is_public: true,
+            is_async: false,
             doc_comments: vec![],
             span: SourceSpan {
                 file: "mut_bind.rs".into(),
@@ -2666,6 +2856,7 @@ mod tests {
                 Type::I32,
             ),
             is_public: true,
+            is_async: false,
             doc_comments: vec![],
             span: SourceSpan {
                 file: "loop.rs".into(),
@@ -2704,6 +2895,7 @@ mod tests {
                 Type::I32,
             ),
             is_public: true,
+            is_async: false,
             doc_comments: vec![],
             span: SourceSpan {
                 file: "math/calc.rs".into(),
@@ -2737,6 +2929,7 @@ mod tests {
                     receiver: Some(ReceiverKind::Ref),
                     params: vec![],
                     return_type: Type::String,
+                    is_async: false,
                     default_body: None,
                     doc_comments: vec![],
                     span: SourceSpan {
@@ -2750,6 +2943,7 @@ mod tests {
                     receiver: Some(ReceiverKind::Ref),
                     params: vec![],
                     return_type: Type::I32,
+                    is_async: false,
                     default_body: Some(Expr::new(
                         ExprKind::Literal(Literal::Int {
                             value: 42,
@@ -2778,11 +2972,13 @@ mod tests {
             trait_name: "Describable".into(),
             target_type: "Track".into(),
             type_aliases: vec![],
+            where_clause: None,
             methods: vec![Method {
                 name: "describe".into(),
                 receiver: Some(ReceiverKind::Ref),
                 params: vec![],
                 return_type: Type::String,
+                is_async: false,
                 body: Expr::new(
                     ExprKind::Literal(Literal::String("AudioTrack".into())),
                     Type::String,
@@ -2859,6 +3055,10 @@ mod tests {
             is_codable: true,
             is_observable: false,
             is_bitflags: false,
+            is_document: false,
+            is_reality_component: false,
+            is_fskit_volume: false,
+            is_widget_timeline: false,
             doc_comments: vec![],
             span: SourceSpan::default(),
         }));
@@ -2913,6 +3113,10 @@ mod tests {
             is_codable: false,
             is_observable: true,
             is_bitflags: false,
+            is_document: false,
+            is_reality_component: false,
+            is_fskit_volume: false,
+            is_widget_timeline: false,
             doc_comments: vec![],
             span: SourceSpan::default(),
         }));
@@ -2923,6 +3127,7 @@ mod tests {
                 receiver: Some(ReceiverKind::MutRef),
                 params: vec![],
                 return_type: Type::Unit,
+                is_async: false,
                 body: Expr::new(
                     ExprKind::Block {
                         stmts: vec![Stmt::Assign {
@@ -3088,6 +3293,10 @@ mod tests {
             is_codable: false,
             is_observable: false,
             is_bitflags: true,
+            is_document: false,
+            is_reality_component: false,
+            is_fskit_volume: false,
+            is_widget_timeline: false,
             doc_comments: vec![],
             span: SourceSpan::default(),
         }));
@@ -3227,6 +3436,7 @@ mod tests {
                 Type::String,
             ),
             is_public: true,
+            is_async: false,
             doc_comments: vec!["Greets a user with unread count.".into()],
             span: SourceSpan::default(),
         }));
@@ -3252,6 +3462,10 @@ mod tests {
             is_codable: false,
             is_observable: false,
             is_bitflags: false,
+            is_document: false,
+            is_reality_component: false,
+            is_fskit_volume: false,
+            is_widget_timeline: false,
             doc_comments: vec!["Main configuration payload.".into()],
             span: SourceSpan::default(),
         }));
@@ -3262,5 +3476,178 @@ mod tests {
         assert!(code.contains("public struct Config: Equatable, Hashable, Sendable {"));
         assert!(code.contains("    /// Timeout in milliseconds."));
         assert!(code.contains("    public var timeout_ms: UInt64"));
+    }
+
+    #[test]
+    fn test_codegen_associated_types_and_where_clause() {
+        let mut module = Module::new("AssocTypesDemo");
+        module.items.push(Item::Trait(TraitDef {
+            name: "Container".into(),
+            associated_types: vec![rust_swift_ir::AssociatedTypeDef {
+                name: "Item".into(),
+                bounds: vec!["Equatable".into(), "Sendable".into()],
+                span: SourceSpan::default(),
+            }],
+            methods: vec![],
+            is_public: true,
+            doc_comments: vec![],
+            span: SourceSpan::default(),
+        }));
+
+        module.items.push(Item::TraitImpl(TraitImpl {
+            trait_name: "Container".into(),
+            target_type: "MyBox".into(),
+            type_aliases: vec![TypeAlias {
+                name: "Item".into(),
+                target: Type::I64,
+                is_public: true,
+                doc_comments: vec![],
+                span: SourceSpan::default(),
+            }],
+            where_clause: Some("T: Sendable".into()),
+            methods: vec![],
+            span: SourceSpan::default(),
+        }));
+
+        let mut gen = SwiftGenerator::new();
+        let (code, _) = gen.generate_module(&module);
+        assert!(code.contains("associatedtype Item: Equatable, Sendable"));
+        assert!(code.contains("extension MyBox: Container where T: Sendable {"));
+        assert!(code.contains("public typealias Item = Int64"));
+    }
+
+    #[test]
+    fn test_codegen_async_function_and_await() {
+        let mut module = Module::new("AsyncDemo");
+        module.items.push(Item::Function(Function {
+            name: "fetch_count".into(),
+            params: vec![],
+            return_type: Type::I64,
+            is_public: true,
+            is_async: true,
+            doc_comments: vec![],
+            span: SourceSpan::default(),
+            body: Expr::new(
+                ExprKind::Block {
+                    stmts: vec![],
+                    expr: Some(Box::new(Expr::new(
+                        ExprKind::Await(Box::new(Expr::new(
+                            ExprKind::Call {
+                                func: "get_remote".into(),
+                                args: vec![],
+                            },
+                            Type::I64,
+                        ))),
+                        Type::I64,
+                    ))),
+                },
+                Type::I64,
+            ),
+        }));
+
+        let mut gen = SwiftGenerator::new();
+        let (code, _) = gen.generate_module(&module);
+        assert!(code.contains("public func fetch_count() async -> Int64 {"));
+        assert!(code.contains("return await get_remote()"));
+    }
+
+    #[test]
+    fn test_codegen_apple_ecosystem_kits() {
+        let mut module = Module::new("AppleKitsDemo");
+        module.items.push(Item::Struct(StructDef {
+            name: "TextDocument".into(),
+            fields: vec![FieldDef {
+                name: "text".into(),
+                ty: Type::String,
+                is_public: true,
+                doc_comments: vec![],
+            }],
+            is_public: true,
+            is_codable: true,
+            is_observable: false,
+            is_bitflags: false,
+            is_document: true,
+            is_reality_component: false,
+            is_fskit_volume: false,
+            is_widget_timeline: false,
+            doc_comments: vec![],
+            span: SourceSpan::default(),
+        }));
+
+        module.items.push(Item::Struct(StructDef {
+            name: "PhysicsComponent".into(),
+            fields: vec![FieldDef {
+                name: "velocity".into(),
+                ty: Type::I64,
+                is_public: true,
+                doc_comments: vec![],
+            }],
+            is_public: true,
+            is_codable: true,
+            is_observable: false,
+            is_bitflags: false,
+            is_document: false,
+            is_reality_component: true,
+            is_fskit_volume: false,
+            is_widget_timeline: false,
+            doc_comments: vec![],
+            span: SourceSpan::default(),
+        }));
+
+        module.items.push(Item::Struct(StructDef {
+            name: "MyDisk".into(),
+            fields: vec![FieldDef {
+                name: "sectors".into(),
+                ty: Type::I64,
+                is_public: true,
+                doc_comments: vec![],
+            }],
+            is_public: true,
+            is_codable: false,
+            is_observable: false,
+            is_bitflags: false,
+            is_document: false,
+            is_reality_component: false,
+            is_fskit_volume: true,
+            is_widget_timeline: false,
+            doc_comments: vec![],
+            span: SourceSpan::default(),
+        }));
+
+        module.items.push(Item::Struct(StructDef {
+            name: "ClockWidget".into(),
+            fields: vec![],
+            is_public: true,
+            is_codable: false,
+            is_observable: false,
+            is_bitflags: false,
+            is_document: false,
+            is_reality_component: false,
+            is_fskit_volume: false,
+            is_widget_timeline: true,
+            doc_comments: vec![],
+            span: SourceSpan::default(),
+        }));
+
+        let mut gen = SwiftGenerator::new();
+        let (code, _) = gen.generate_module(&module);
+        assert!(code.contains("import SwiftUI"));
+        assert!(code.contains("import UniformTypeIdentifiers"));
+        assert!(code.contains("import RealityKit"));
+        assert!(code.contains("import FSKit"));
+        assert!(code.contains("import WidgetKit"));
+
+        // FileDocument conformance:
+        assert!(code.contains("extension TextDocument: FileDocument {"));
+        assert!(code.contains("public static var readableContentTypes: [UTType] { [.json] }"));
+
+        // RealityKit Component conformance:
+        assert!(code.contains("public struct PhysicsComponent: Equatable, Hashable, Codable, Sendable, RealityKit.Component {"));
+
+        // FSKit Volume:
+        assert!(code.contains("public final class MyDiskVolume: FSVolume, FSVolumeOperations {"));
+
+        // WidgetKit TimelineProvider:
+        assert!(code.contains("extension ClockWidget: TimelineProvider {"));
     }
 }

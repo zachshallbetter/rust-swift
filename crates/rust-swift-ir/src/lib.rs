@@ -277,6 +277,7 @@ pub enum ExprKind {
         template: String,
         args: Vec<Expr>,
     },
+    Await(Box<Expr>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -355,6 +356,8 @@ pub struct Function {
     pub body: Expr,
     pub is_public: bool,
     #[serde(default)]
+    pub is_async: bool,
+    #[serde(default)]
     pub doc_comments: Vec<String>,
     pub span: SourceSpan,
 }
@@ -381,6 +384,14 @@ pub struct StructDef {
     pub is_observable: bool,
     #[serde(default)]
     pub is_bitflags: bool,
+    #[serde(default)]
+    pub is_document: bool,
+    #[serde(default)]
+    pub is_reality_component: bool,
+    #[serde(default)]
+    pub is_fskit_volume: bool,
+    #[serde(default)]
+    pub is_widget_timeline: bool,
     #[serde(default)]
     pub doc_comments: Vec<String>,
     pub span: SourceSpan,
@@ -463,6 +474,8 @@ pub struct Method {
     pub body: Expr,
     pub is_public: bool,
     #[serde(default)]
+    pub is_async: bool,
+    #[serde(default)]
     pub doc_comments: Vec<String>,
     pub span: SourceSpan,
 }
@@ -498,6 +511,8 @@ pub struct TraitMethod {
     pub return_type: Type,
     pub default_body: Option<Expr>,
     #[serde(default)]
+    pub is_async: bool,
+    #[serde(default)]
     pub doc_comments: Vec<String>,
     pub span: SourceSpan,
 }
@@ -507,6 +522,8 @@ pub struct TraitMethod {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AssociatedTypeDef {
     pub name: String,
+    #[serde(default)]
+    pub bounds: Vec<String>,
     pub span: SourceSpan,
 }
 
@@ -539,6 +556,8 @@ pub struct TypeAlias {
 pub struct TraitImpl {
     pub trait_name: String,
     pub target_type: String,
+    #[serde(default)]
+    pub where_clause: Option<String>,
     pub type_aliases: Vec<TypeAlias>,
     pub methods: Vec<Method>,
     pub span: SourceSpan,
@@ -1037,6 +1056,63 @@ impl Module {
             edges,
         }
     }
+
+    /// Projects module CSG items into deterministic CloudKit record representations for distributed state synchronization.
+    pub fn to_cloudkit_records(&self, source_hash: &str) -> Vec<CloudKitRecord> {
+        let csg = self.to_csg(source_hash);
+        let mut records = Vec::new();
+
+        // Root SourceFile record
+        let mut src_fields = std::collections::BTreeMap::new();
+        src_fields.insert("source_hash".to_string(), source_hash.to_string());
+        src_fields.insert("module_name".to_string(), self.name.clone());
+        records.push(CloudKitRecord {
+            record_type: "SourceFile".to_string(),
+            record_name: format!("source_file::{}", self.name),
+            record_id: format!("source_file::{}", self.name),
+            fields: src_fields,
+        });
+
+        // CSGNode records
+        for node in csg.nodes {
+            let mut fields = std::collections::BTreeMap::new();
+            fields.insert("name".to_string(), node.name.clone());
+            let kind_str = match node.kind {
+                reflective_rust_csg::CsgNodeKind::Crate => "crate",
+                reflective_rust_csg::CsgNodeKind::Module => "module",
+                reflective_rust_csg::CsgNodeKind::Struct => "struct",
+                reflective_rust_csg::CsgNodeKind::Function => "function",
+                reflective_rust_csg::CsgNodeKind::Enum => "enum",
+                reflective_rust_csg::CsgNodeKind::Field => "field",
+                reflective_rust_csg::CsgNodeKind::Trait => "trait",
+                reflective_rust_csg::CsgNodeKind::Impl => "impl",
+            };
+            fields.insert("node_kind".to_string(), kind_str.to_string());
+            fields.insert(
+                "minimum_access".to_string(),
+                format!("{:?}", node.minimum_access),
+            );
+            fields.insert("span_file".to_string(), node.span.file);
+            fields.insert("source_hash".to_string(), source_hash.to_string());
+            records.push(CloudKitRecord {
+                record_type: "CSGNode".to_string(),
+                record_name: node.name,
+                record_id: node.id,
+                fields,
+            });
+        }
+
+        records
+    }
+}
+
+/// CloudKit Record projection representing a synchronized CSG node or domain entity.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CloudKitRecord {
+    pub record_type: String,
+    pub record_name: String,
+    pub record_id: String,
+    pub fields: std::collections::BTreeMap<String, String>,
 }
 
 #[cfg(test)]
@@ -1062,6 +1138,7 @@ mod tests {
                 Type::I32,
             ),
             is_public: true,
+            is_async: false,
             doc_comments: vec!["Calculates a test constant value.".into()],
             span: SourceSpan {
                 file: "test_mod.rs".into(),
@@ -1073,5 +1150,15 @@ mod tests {
         let csg = module.to_csg("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
         assert!(csg.provenance.is_compiler_certified());
         assert!(csg.validate().is_ok());
+
+        let ck_records = module.to_cloudkit_records(
+            "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        );
+        assert_eq!(ck_records.len(), 3);
+        assert_eq!(ck_records[0].record_type, "SourceFile");
+        assert_eq!(ck_records[0].record_id, "source_file::test_mod");
+        assert_eq!(ck_records[1].record_type, "CSGNode");
+        assert_eq!(ck_records[1].record_id, "crate::test_mod");
+        assert_eq!(ck_records[2].record_id, "crate::test_mod::calculate");
     }
 }

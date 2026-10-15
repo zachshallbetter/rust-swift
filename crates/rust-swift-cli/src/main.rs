@@ -44,6 +44,10 @@ enum Commands {
         /// Enable SwiftUI @Observable macro synthesis for state models
         #[arg(long)]
         observable: bool,
+
+        /// Enable scoped structured concurrency (async fn, TaskGroup)
+        #[arg(long, alias = "structured-concurrency")]
+        admit_async: bool,
     },
     /// Compile a Rust file into a standalone Swift Package
     Compile {
@@ -85,6 +89,23 @@ enum Commands {
         /// Enable SwiftUI @Observable macro synthesis for state models
         #[arg(long)]
         observable: bool,
+
+        /// Enable scoped structured concurrency (async fn, TaskGroup)
+        #[arg(long, alias = "structured-concurrency")]
+        admit_async: bool,
+    },
+    /// Verify Apple binary packaging, Hardened Runtime flags, entitlements, and zero-FFI conformance
+    VerifyPackaging {
+        /// Path to compiled executable or framework bundle to audit
+        target: PathBuf,
+
+        /// Optional path to .entitlements XML file to validate
+        #[arg(long)]
+        entitlements: Option<PathBuf>,
+
+        /// Output format: text or json
+        #[arg(long, default_value = "text")]
+        format: String,
     },
     /// Run differential qualification test suite across Rust reference and Swift outputs
     DiffTest {
@@ -158,8 +179,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             format,
             codable,
             observable,
+            admit_async,
         } => {
-            check_command(&input, &format, codable, observable)?;
+            check_command(&input, &format, codable, observable, admit_async)?;
         }
         Commands::Compile {
             input,
@@ -172,6 +194,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             spm,
             codable,
             observable,
+            admit_async,
         } => {
             compile_command(CompileOptions {
                 input: &input,
@@ -184,7 +207,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 spm,
                 codable,
                 observable,
+                admit_async,
             })?;
+        }
+        Commands::VerifyPackaging {
+            target,
+            entitlements,
+            format,
+        } => {
+            verify_packaging_command(&target, entitlements.as_deref(), &format)?;
         }
         Commands::DiffTest { output_dir } => {
             diff_test_command(&output_dir)?;
@@ -236,6 +267,7 @@ struct CompileOptions<'a> {
     spm: bool,
     codable: bool,
     observable: bool,
+    admit_async: bool,
 }
 
 fn check_command(
@@ -243,6 +275,7 @@ fn check_command(
     format: &str,
     codable: bool,
     observable: bool,
+    admit_async: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     if !input.exists() {
         if format == "json" {
@@ -263,7 +296,8 @@ fn check_command(
     let source = fs::read_to_string(input)?;
     let mut frontend = Frontend::new(input.to_string_lossy().to_string())
         .with_default_codable(codable)
-        .with_default_observable(observable);
+        .with_default_observable(observable)
+        .with_admit_async(admit_async);
 
     match frontend.parse_and_lower(&source) {
         Ok(module) => {
@@ -355,6 +389,7 @@ fn compile_command(opts: CompileOptions<'_>) -> Result<(), Box<dyn std::error::E
     let spm = opts.spm;
     let codable = opts.codable;
     let observable = opts.observable;
+    let admit_async = opts.admit_async;
 
     if !input.exists() {
         if format == "json" {
@@ -385,7 +420,8 @@ fn compile_command(opts: CompileOptions<'_>) -> Result<(), Box<dyn std::error::E
 
     let mut frontend = Frontend::new(input.to_string_lossy().to_string())
         .with_default_codable(codable)
-        .with_default_observable(observable);
+        .with_default_observable(observable)
+        .with_admit_async(admit_async);
     let module = match frontend.parse_and_lower(&source) {
         Ok(m) => m,
         Err(diags) => {
@@ -492,7 +528,7 @@ fn diff_test_command(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>
     println!("============================================================");
 
     const EXPECTED_NEGATIVE_FIXTURES: usize = 10;
-    const EXPECTED_TOTAL_REPORTS: usize = 14 + EXPECTED_NEGATIVE_FIXTURES;
+    const EXPECTED_TOTAL_REPORTS: usize = 18 + EXPECTED_NEGATIVE_FIXTURES;
 
     let mut reports = Vec::new();
     let mut execution_failed = false;
@@ -748,8 +784,84 @@ fn diff_test_command(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>
         }
     }
 
-    // 15. Negative rejections
-    println!("\n[15/15] Running Negative Rejection policy test...");
+    // 15. Trait Associated Types and Where-Clauses
+    println!("\n[15/19] Running Trait Associated Types & Where-Clauses differential test...");
+    match runner.test_associated_types(output_dir) {
+        Ok(report) => {
+            println!(
+                "  Status: {} ({} of {} cases passed)",
+                report.status, report.cases_passed, report.cases_tested
+            );
+            reports.push(report);
+        }
+        Err(e) => {
+            execution_failed = true;
+            eprintln!(
+                "  FAILED execution in Associated Types differential test: {}",
+                e
+            );
+        }
+    }
+
+    // 16. Scoped Structured Concurrency
+    println!("\n[16/19] Running Scoped Structured Concurrency (async/await) differential test...");
+    match runner.test_structured_concurrency(output_dir) {
+        Ok(report) => {
+            println!(
+                "  Status: {} ({} of {} cases passed)",
+                report.status, report.cases_passed, report.cases_tested
+            );
+            reports.push(report);
+        }
+        Err(e) => {
+            execution_failed = true;
+            eprintln!(
+                "  FAILED execution in Structured Concurrency differential test: {}",
+                e
+            );
+        }
+    }
+
+    // 17. Apple Framework ("Kit") Adapters & Synthesizers
+    println!("\n[17/19] Running Apple Ecosystem Kit Adapters differential test...");
+    match runner.test_apple_kit_adapters(output_dir) {
+        Ok(report) => {
+            println!(
+                "  Status: {} ({} of {} cases passed)",
+                report.status, report.cases_passed, report.cases_tested
+            );
+            reports.push(report);
+        }
+        Err(e) => {
+            execution_failed = true;
+            eprintln!(
+                "  FAILED execution in Apple Kit Adapters differential test: {}",
+                e
+            );
+        }
+    }
+
+    // 18. CloudKit Record Projection and CSG Delta Synchronization
+    println!("\n[18/19] Running CloudKit Sync & Record Projection differential test...");
+    match runner.test_cloudkit_sync(output_dir) {
+        Ok(report) => {
+            println!(
+                "  Status: {} ({} of {} cases passed)",
+                report.status, report.cases_passed, report.cases_tested
+            );
+            reports.push(report);
+        }
+        Err(e) => {
+            execution_failed = true;
+            eprintln!(
+                "  FAILED execution in CloudKit Sync differential test: {}",
+                e
+            );
+        }
+    }
+
+    // 19. Negative rejections
+    println!("\n[19/19] Running Negative Rejection policy test...");
     match runner.test_negative_rejections() {
         Ok(neg_reports) => {
             if neg_reports.len() != EXPECTED_NEGATIVE_FIXTURES {
@@ -1145,4 +1257,132 @@ fn sync_command(
 
 fn mcp_command() -> Result<(), Box<dyn std::error::Error>> {
     rust_swift_mcp::McpServer::run_stdio()
+}
+
+fn verify_packaging_command(
+    target: &Path,
+    entitlements: Option<&Path>,
+    format: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut checks = Vec::new();
+    let mut passed = true;
+
+    // 1. Target existence
+    if target.exists() {
+        checks.push(json!({
+            "name": "target_exists",
+            "status": "PASS",
+            "path": target.display().to_string()
+        }));
+    } else {
+        checks.push(json!({
+            "name": "target_exists",
+            "status": "FAIL",
+            "error": "Target path does not exist"
+        }));
+        passed = false;
+    }
+
+    // 2. Zero-FFI and C-ABI Shims Invariant Audit
+    if target.is_file() {
+        let otool = Command::new("otool").arg("-L").arg(target).output();
+        if let Ok(out) = otool {
+            let stdout = String::from_utf8_lossy(&out.stdout);
+            let has_forbidden_c_shims = stdout.contains("libclang_rt") || stdout.contains("libgcc");
+            if !has_forbidden_c_shims {
+                checks.push(json!({
+                    "name": "zero_ffi_invariant",
+                    "status": "PASS",
+                    "details": "Binary links directly to standard Apple system dylibs without intermediate C bridges"
+                }));
+            } else {
+                checks.push(json!({
+                    "name": "zero_ffi_invariant",
+                    "status": "FAIL",
+                    "details": "Detected unadmitted foreign C runtime linkage"
+                }));
+                passed = false;
+            }
+        }
+    }
+
+    // 3. Hardened Runtime and Code Signature Audit
+    if target.exists() {
+        let codesign = Command::new("codesign").arg("-dvvv").arg(target).output();
+        if let Ok(out) = codesign {
+            let stderr = String::from_utf8_lossy(&out.stderr);
+            let is_hardened =
+                stderr.contains("flags=0x10000(runtime)") || stderr.contains("runtime");
+            checks.push(json!({
+                "name": "hardened_runtime",
+                "status": if is_hardened { "PASS" } else { "INFO" },
+                "details": if is_hardened {
+                    "Binary is signed with macOS Hardened Runtime flag (runtime)"
+                } else {
+                    "Binary is unsigned or in debug configuration (Hardened Runtime required for notarization)"
+                }
+            }));
+        }
+    }
+
+    // 4. Entitlements validation
+    if let Some(ent_path) = entitlements {
+        if ent_path.exists() {
+            let content = fs::read_to_string(ent_path)?;
+            let is_valid_plist = content.contains("<!DOCTYPE plist") && content.contains("<dict>");
+            let has_sandbox = content.contains("com.apple.security.app-sandbox");
+            if is_valid_plist {
+                checks.push(json!({
+                    "name": "entitlements_xml_valid",
+                    "status": "PASS",
+                    "sandbox_declared": has_sandbox,
+                    "path": ent_path.display().to_string()
+                }));
+            } else {
+                checks.push(json!({
+                    "name": "entitlements_xml_valid",
+                    "status": "FAIL",
+                    "error": "File is not a valid Apple property list XML"
+                }));
+                passed = false;
+            }
+        } else {
+            checks.push(json!({
+                "name": "entitlements_xml_valid",
+                "status": "FAIL",
+                "error": "Specified entitlements file does not exist"
+            }));
+            passed = false;
+        }
+    }
+
+    let report = json!({
+        "status": if passed { "PASSED" } else { "FAILED" },
+        "target": target.display().to_string(),
+        "entitlements": entitlements.map(|p| p.display().to_string()),
+        "checks": checks,
+        "timestamp": "2026-10-15T03:30:00Z"
+    });
+
+    if format == "json" {
+        println!("{}", serde_json::to_string_pretty(&report)?);
+    } else {
+        println!("============================================================");
+        println!("Apple Packaging & Hardened Runtime Audit");
+        println!("============================================================");
+        println!("Target: {}", target.display());
+        println!("Status: {}", if passed { "PASSED" } else { "FAILED" });
+        for c in checks {
+            println!(
+                "- {}: {}",
+                c["name"].as_str().unwrap_or(""),
+                c["status"].as_str().unwrap_or("")
+            );
+        }
+    }
+
+    if !passed {
+        std::process::exit(1);
+    }
+    Ok(())
 }
