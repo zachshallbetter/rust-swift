@@ -56,7 +56,7 @@ struct RustSwiftPlugin: BuildToolPlugin {
     private func resolveExecutablePath() -> String {
         if let envBin = ProcessInfo.processInfo.environment["RUST_SWIFT_BIN"],
            FileManager.default.fileExists(atPath: envBin) {
-            return envBin
+            return URL(fileURLWithPath: envBin).path
         }
 
         let home = ProcessInfo.processInfo.environment["HOME"] ?? ""
@@ -74,10 +74,27 @@ struct RustSwiftPlugin: BuildToolPlugin {
 
         for path in searchPaths {
             if FileManager.default.fileExists(atPath: path) {
-                return path
+                return URL(fileURLWithPath: path).path
             }
         }
 
-        return "rust-swift"
+        // Search for rust-swift on PATH using /usr/bin/which
+        let whichProcess = Process()
+        whichProcess.executableURL = URL(fileURLWithPath: "/usr/bin/which")
+        whichProcess.arguments = ["rust-swift"]
+        let pipe = Pipe()
+        whichProcess.standardOutput = pipe
+        if (try? whichProcess.run()) != nil {
+            whichProcess.waitUntilExit()
+            if whichProcess.terminationStatus == 0 {
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                if let path = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+                   !path.isEmpty, FileManager.default.fileExists(atPath: path) {
+                    return URL(fileURLWithPath: path).path
+                }
+            }
+        }
+
+        return URL(fileURLWithPath: "./target/debug/rust-swift").path
     }
 }

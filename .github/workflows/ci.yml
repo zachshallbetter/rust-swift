@@ -25,6 +25,9 @@ jobs:
       - name: Clippy Linter
         run: cargo clippy --workspace --all-targets -- -D warnings
 
+      - name: Build Workspace Binaries
+        run: cargo build --workspace
+
       - name: Run Workspace Tests
         run: cargo test --workspace
 
