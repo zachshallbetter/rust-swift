@@ -5,10 +5,10 @@
   "validityBasis": "aggregate-source-digest",
   "selectedPaths": [],
   "sourceSelection": {
-    "includedCount": 212,
-    "includedBytes": 3642329,
+    "includedCount": 213,
+    "includedBytes": 3659241,
     "excludedCounts": {
-      "excluded-directory": 51570,
+      "excluded-directory": 51586,
       "excluded-path": 1,
       "extension": 8235,
       "symlink": 5
@@ -20,15 +20,20 @@
     "repositories": [
       {
         "path": ".",
-        "commit": "63180836d71e4495893480031df10bbbabdef306",
-        "branch": "feature/agent-mcp-integration",
+        "commit": "4f2935b32a8dc49db47c269473b92ac2ca0fc8e5",
+        "branch": "feature/agents-and-docs-polish",
         "dirty": true,
         "remote": "https://github.com/zachshallbetter/rust-swift.git"
       }
     ]
   },
-  "aggregateSourceDigest": "1ec686131e4eefcf7ec93ae8a289e7e9f86f134c4ea814657d1eb81a41c4eaf5",
+  "aggregateSourceDigest": "7bdf7e7eae84eeaf0033b831febf1148f2ecc4b72c7b1e20bf8fd6f95b0e744b",
   "sources": [
+    {
+      "path": ".agents/AGENTS.md",
+      "bytes": 11715,
+      "sha256": "c969aa7e673b2a891e0eba3610dca6c3a03f307295c835a43a88fa46d4ee5967"
+    },
     {
       "path": ".agents/rules/ci.md",
       "bytes": 1139,
@@ -101,8 +106,8 @@
     },
     {
       "path": "AGENTS.md",
-      "bytes": 10611,
-      "sha256": "9ccb7c144fbb9d26ccd74c0b5cb015b90de9cbe404fef95d20a2d941005a2469"
+      "bytes": 11600,
+      "sha256": "484ac2707bd04e054b630eff45660fd68012bbdae35b862602f56a1ce52770a7"
     },
     {
       "path": "CHANGELOG.md",
@@ -141,8 +146,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 24782,
-      "sha256": "0102feb6b0849c419f6b98c30e860122bad84957acbd2c3774d598ba19b92640"
+      "bytes": 28990,
+      "sha256": "0a0e23f6fd9a60f7aec2573f0ce115ef1b73a8bc7bbe3fddd06b57577488da5e"
     },
     {
       "path": "VERSION",
