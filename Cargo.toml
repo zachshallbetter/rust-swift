@@ -5,6 +5,7 @@ members = [
     "crates/rust-swift-codegen",
     "crates/rust-swift-cli",
     "crates/rust-swift-qualification",
+    "crates/rust-swift-mcp",
 ]
 resolver = "2"
 

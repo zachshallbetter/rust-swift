@@ -2821,7 +2821,7 @@ impl ComputeEngine {
         }
 
         // Case 3: Execution of SPM build with plugin
-        let bin_path = if self.workspace_dir.join("target/debug/rust-swift").exists() {
+        let bin_candidate = if self.workspace_dir.join("target/debug/rust-swift").exists() {
             self.workspace_dir.join("target/debug/rust-swift")
         } else if self
             .workspace_dir
@@ -2830,8 +2830,15 @@ impl ComputeEngine {
         {
             self.workspace_dir.join("target/release/rust-swift")
         } else {
-            PathBuf::from("rust-swift")
+            let _ = Command::new("cargo")
+                .arg("build")
+                .arg("-p")
+                .arg("rust-swift-cli")
+                .current_dir(&self.workspace_dir)
+                .output();
+            self.workspace_dir.join("target/debug/rust-swift")
         };
+        let bin_path = fs::canonicalize(&bin_candidate).unwrap_or(bin_candidate);
 
         let run_output = Command::new("swift")
             .arg("run")
