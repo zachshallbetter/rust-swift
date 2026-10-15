@@ -5,10 +5,10 @@
 //! for exact compatibility with Rust wrapping operations.
 
 use rust_swift_ir::{
-    BinaryOp, CmpOp, EnumDef, Expr, ExprKind, Function, ImplBlock, IntegerMode, IntegerOp, Item,
-    Literal, LogicalOp, MatchArm, Method, Module, Pattern, PropertyBindingKind, ReceiverKind, Stmt,
-    StructDef, TraitDef, TraitImpl, TraitMethod, Type, UnaryOp, VariantPayload, ViewDef, ViewKind,
-    ViewModifier, ViewNode,
+    BinaryOp, CmpOp, ConstantDef, EnumDef, Expr, ExprKind, Function, ImplBlock, IntegerMode,
+    IntegerOp, Item, Literal, LogicalOp, MatchArm, Method, Module, Pattern, PropertyBindingKind,
+    ReceiverKind, Stmt, StructDef, TraitDef, TraitImpl, TraitMethod, Type, TypeAlias, UnaryOp,
+    VariantPayload, ViewDef, ViewKind, ViewModifier, ViewNode,
 };
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -84,6 +84,19 @@ impl SwiftGenerator {
 
     fn indent(&self) -> String {
         "    ".repeat(self.indent_level)
+    }
+
+    fn emit_doc_comments(&self, out: &mut String, doc_comments: &[String]) {
+        for doc in doc_comments {
+            let trimmed = doc.trim_end();
+            if trimmed.is_empty() {
+                out.push_str(&format!("{}///\n", self.indent()));
+            } else if trimmed.starts_with(' ') {
+                out.push_str(&format!("{}///{}\n", self.indent(), trimmed));
+            } else {
+                out.push_str(&format!("{}/// {}\n", self.indent(), trimmed));
+            }
+        }
     }
 
     pub fn generate_module(&mut self, module: &Module) -> (String, Vec<SymbolMapping>) {
@@ -174,6 +187,14 @@ impl SwiftGenerator {
                     out.push_str(&self.generate_function(func));
                     out.push_str("\n\n");
                 }
+                Item::Constant(c) => {
+                    out.push_str(&self.generate_constant(c));
+                    out.push_str("\n\n");
+                }
+                Item::TypeAlias(ta) => {
+                    out.push_str(&self.generate_type_alias(ta));
+                    out.push_str("\n\n");
+                }
             }
         }
 
@@ -250,6 +271,7 @@ impl SwiftGenerator {
                 enm.span.start_line
             ));
         }
+        self.emit_doc_comments(&mut out, &enm.doc_comments);
         let vis = if enm.is_public { "public " } else { "" };
 
         if enm.is_fieldless() {
@@ -261,6 +283,7 @@ impl SwiftGenerator {
             out.push_str(&format!("{}enum {}: {} {{\n", vis, enm.name, conformances));
             self.indent_level += 1;
             for variant in &enm.variants {
+                self.emit_doc_comments(&mut out, &variant.doc_comments);
                 out.push_str(&format!(
                     "{}case {} = \"{}\"\n",
                     self.indent(),
@@ -279,6 +302,7 @@ impl SwiftGenerator {
             out.push_str(&format!("{}enum {}: {} {{\n", vis, enm.name, conformances));
             self.indent_level += 1;
             for variant in &enm.variants {
+                self.emit_doc_comments(&mut out, &variant.doc_comments);
                 match &variant.payload {
                     VariantPayload::Unit => {
                         out.push_str(&format!("{}case {}\n", self.indent(), variant.name));
@@ -336,6 +360,7 @@ impl SwiftGenerator {
                 strct.span.start_line
             ));
         }
+        self.emit_doc_comments(&mut out, &strct.doc_comments);
         let vis = if strct.is_public { "public " } else { "" };
         let is_observable = strct.is_observable || self.emit_observable;
 
@@ -435,6 +460,7 @@ impl SwiftGenerator {
         self.indent_level += 1;
 
         for field in &strct.fields {
+            self.emit_doc_comments(&mut out, &field.doc_comments);
             let f_vis = if field.is_public { "public " } else { "" };
             out.push_str(&format!(
                 "{}{}var {}: {}\n",
@@ -790,6 +816,7 @@ impl SwiftGenerator {
                 out.push_str("\n\n");
             }
             has_emitted = true;
+            self.emit_doc_comments(&mut out, &constant.doc_comments);
             let vis = if constant.is_public { "public " } else { "" };
             let val_str = self.generate_expr(&constant.value);
             out.push_str(&format!(
@@ -833,6 +860,7 @@ impl SwiftGenerator {
                 trt.span.start_line
             ));
         }
+        self.emit_doc_comments(&mut out, &trt.doc_comments);
         let vis = if trt.is_public { "public " } else { "" };
         out.push_str(&format!(
             "{}{}protocol {} {{\n",
@@ -848,6 +876,7 @@ impl SwiftGenerator {
             out.push('\n');
         }
         for method in &trt.methods {
+            self.emit_doc_comments(&mut out, &method.doc_comments);
             let mutating_kw = if matches!(method.receiver, Some(ReceiverKind::MutRef)) {
                 "mutating "
             } else {
@@ -990,6 +1019,7 @@ impl SwiftGenerator {
         ));
         self.indent_level += 1;
         for alias in &timpl.type_aliases {
+            self.emit_doc_comments(&mut out, &alias.doc_comments);
             out.push_str(&format!(
                 "{}public typealias {} = {}\n",
                 self.indent(),
@@ -1037,6 +1067,7 @@ impl SwiftGenerator {
                 method.span.start_line
             ));
         }
+        self.emit_doc_comments(&mut out, &method.doc_comments);
         let vis = if is_protocol_conformance || method.is_public {
             "public "
         } else {
@@ -1120,6 +1151,7 @@ impl SwiftGenerator {
                 func.span.start_line
             ));
         }
+        self.emit_doc_comments(&mut out, &func.doc_comments);
         let vis = if func.is_public { "public " } else { "" };
         let params_str = func
             .params
@@ -1163,6 +1195,72 @@ impl SwiftGenerator {
         self.indent_level -= 1;
 
         out.push_str(&format!("{}}}", self.indent()));
+        out
+    }
+
+    fn generate_constant(&mut self, c: &ConstantDef) -> String {
+        self.symbols.push(SymbolMapping {
+            rust_name: c.name.clone(),
+            swift_name: c.name.clone(),
+            kind: "constant".into(),
+            rust_file: c.span.file.clone(),
+            rust_line: c.span.start_line,
+        });
+
+        let mut out = String::new();
+        if self.emit_source_locations && c.span.start_line > 0 && !c.span.file.is_empty() {
+            let escaped = c.span.file.replace('\\', "\\\\").replace('"', "\\\"");
+            out.push_str(&format!(
+                "{}#sourceLocation(file: \"{}\", line: {})\n",
+                self.indent(),
+                escaped,
+                c.span.start_line
+            ));
+        }
+        self.emit_doc_comments(&mut out, &c.doc_comments);
+        let vis = if c.is_public { "public " } else { "" };
+        let ty_str = self.map_type(&c.ty);
+        let val_str = self.generate_expr(&c.value);
+        out.push_str(&format!(
+            "{}{}let {}: {} = {}",
+            self.indent(),
+            vis,
+            c.name,
+            ty_str,
+            val_str
+        ));
+        out
+    }
+
+    fn generate_type_alias(&mut self, ta: &TypeAlias) -> String {
+        self.symbols.push(SymbolMapping {
+            rust_name: ta.name.clone(),
+            swift_name: ta.name.clone(),
+            kind: "typealias".into(),
+            rust_file: ta.span.file.clone(),
+            rust_line: ta.span.start_line,
+        });
+
+        let mut out = String::new();
+        if self.emit_source_locations && ta.span.start_line > 0 && !ta.span.file.is_empty() {
+            let escaped = ta.span.file.replace('\\', "\\\\").replace('"', "\\\"");
+            out.push_str(&format!(
+                "{}#sourceLocation(file: \"{}\", line: {})\n",
+                self.indent(),
+                escaped,
+                ta.span.start_line
+            ));
+        }
+        self.emit_doc_comments(&mut out, &ta.doc_comments);
+        let vis = if ta.is_public { "public " } else { "" };
+        let target_str = self.map_type(&ta.target);
+        out.push_str(&format!(
+            "{}{}typealias {} = {}",
+            self.indent(),
+            vis,
+            ta.name,
+            target_str
+        ));
         out
     }
 
@@ -1744,8 +1842,66 @@ impl SwiftGenerator {
                     "fatalError(\"panic\")".into()
                 }
             }
+            ExprKind::StringFormat { template, args } => {
+                self.generate_string_format(template, args)
+            }
             _ => "/* unsupported inline expression */".into(),
         }
+    }
+
+    fn generate_string_format(&self, template: &str, args: &[Expr]) -> String {
+        let mut result = String::from("\"");
+        let mut chars = template.chars().peekable();
+        let mut arg_idx = 0;
+
+        while let Some(ch) = chars.next() {
+            if ch == '{' {
+                if chars.peek() == Some(&'{') {
+                    chars.next();
+                    result.push('{');
+                } else {
+                    let mut spec = String::new();
+                    while let Some(&c) = chars.peek() {
+                        if c == '}' {
+                            chars.next();
+                            break;
+                        }
+                        spec.push(chars.next().unwrap());
+                    }
+                    if spec.is_empty() || spec == ":?" || spec == "?" {
+                        if arg_idx < args.len() {
+                            let arg_str = self.generate_expr(&args[arg_idx]);
+                            result.push_str(&format!("\\({})", arg_str));
+                            arg_idx += 1;
+                        } else {
+                            result.push_str("{}");
+                        }
+                    } else if !args.is_empty() && arg_idx < args.len() {
+                        let arg_str = self.generate_expr(&args[arg_idx]);
+                        result.push_str(&format!("\\({})", arg_str));
+                        arg_idx += 1;
+                    } else {
+                        let var_name = spec.split(':').next().unwrap_or(&spec).trim();
+                        result.push_str(&format!("\\({})", var_name));
+                    }
+                }
+            } else if ch == '}' {
+                if chars.peek() == Some(&'}') {
+                    chars.next();
+                    result.push('}');
+                } else {
+                    result.push('}');
+                }
+            } else if ch == '"' {
+                result.push_str("\\\"");
+            } else if ch == '\\' {
+                result.push_str("\\\\");
+            } else {
+                result.push(ch);
+            }
+        }
+        result.push('"');
+        result
     }
 
     fn generate_literal(&self, lit: &Literal) -> String {
@@ -2018,6 +2174,7 @@ mod tests {
             variants: vec!["Idle".into(), "Active".into()],
             is_public: true,
             is_codable: false,
+            doc_comments: vec![],
             span: SourceSpan {
                 file: "sm.rs".into(),
                 start_line: 1,
@@ -2038,6 +2195,7 @@ mod tests {
                 Type::Named("State".into()),
             ),
             is_public: true,
+            doc_comments: vec![],
             span: SourceSpan {
                 file: "sm.rs".into(),
                 start_line: 7,
@@ -2083,6 +2241,7 @@ mod tests {
                 Type::I32,
             ),
             is_public: true,
+            doc_comments: vec![],
             span: SourceSpan {
                 file: "math.rs".into(),
                 start_line: 1,
@@ -2140,6 +2299,7 @@ mod tests {
                 Type::I32,
             ),
             is_public: true,
+            doc_comments: vec![],
             span: SourceSpan {
                 file: "contracts.rs".into(),
                 start_line: 1,
@@ -2164,11 +2324,13 @@ mod tests {
                 name: "count".into(),
                 ty: Type::I64,
                 is_public: true,
+                doc_comments: vec![],
             }],
             is_public: true,
             is_codable: false,
             is_observable: false,
             is_bitflags: false,
+            doc_comments: vec![],
             span: SourceSpan {
                 file: "types.rs".into(),
                 start_line: 1,
@@ -2229,6 +2391,7 @@ mod tests {
                     Type::Unit,
                 ),
                 is_public: true,
+                doc_comments: vec![],
                 span: SourceSpan {
                     file: "types.rs".into(),
                     start_line: 5,
@@ -2249,14 +2412,17 @@ mod tests {
                 EnumVariant {
                     name: "Stop".into(),
                     payload: VariantPayload::Unit,
+                    doc_comments: vec![],
                 },
                 EnumVariant {
                     name: "Move".into(),
                     payload: VariantPayload::Tuple(vec![Type::I64, Type::I64]),
+                    doc_comments: vec![],
                 },
             ],
             is_public: true,
             is_codable: false,
+            doc_comments: vec![],
             span: SourceSpan {
                 file: "types.rs".into(),
                 start_line: 9,
@@ -2323,6 +2489,7 @@ mod tests {
                 Type::String,
             ),
             is_public: true,
+            doc_comments: vec![],
             span: SourceSpan {
                 file: "data.rs".into(),
                 start_line: 1,
@@ -2376,6 +2543,7 @@ mod tests {
                 Type::Unit,
             ),
             is_public: true,
+            doc_comments: vec![],
             span: SourceSpan {
                 file: "own.rs".into(),
                 start_line: 1,
@@ -2402,6 +2570,7 @@ mod tests {
             return_type: Type::I32,
             body: Expr::new(ExprKind::Variable("val".into()), Type::I32),
             is_public: true,
+            doc_comments: vec![],
             span: SourceSpan {
                 file: "mut_bind.rs".into(),
                 start_line: 1,
@@ -2497,6 +2666,7 @@ mod tests {
                 Type::I32,
             ),
             is_public: true,
+            doc_comments: vec![],
             span: SourceSpan {
                 file: "loop.rs".into(),
                 start_line: 1,
@@ -2534,6 +2704,7 @@ mod tests {
                 Type::I32,
             ),
             is_public: true,
+            doc_comments: vec![],
             span: SourceSpan {
                 file: "math/calc.rs".into(),
                 start_line: 77,
@@ -2567,6 +2738,7 @@ mod tests {
                     params: vec![],
                     return_type: Type::String,
                     default_body: None,
+                    doc_comments: vec![],
                     span: SourceSpan {
                         file: "traits.rs".into(),
                         start_line: 2,
@@ -2585,6 +2757,7 @@ mod tests {
                         }),
                         Type::I32,
                     )),
+                    doc_comments: vec![],
                     span: SourceSpan {
                         file: "traits.rs".into(),
                         start_line: 5,
@@ -2593,6 +2766,7 @@ mod tests {
                 },
             ],
             is_public: true,
+            doc_comments: vec![],
             span: SourceSpan {
                 file: "traits.rs".into(),
                 start_line: 1,
@@ -2614,6 +2788,7 @@ mod tests {
                     Type::String,
                 ),
                 is_public: true,
+                doc_comments: vec![],
                 span: SourceSpan {
                     file: "traits.rs".into(),
                     start_line: 10,
@@ -2678,11 +2853,13 @@ mod tests {
                 name: "data".into(),
                 ty: Type::String,
                 is_public: true,
+                doc_comments: vec![],
             }],
             is_public: true,
             is_codable: true,
             is_observable: false,
             is_bitflags: false,
+            doc_comments: vec![],
             span: SourceSpan::default(),
         }));
         module.items.push(Item::Enum(EnumDef {
@@ -2691,14 +2868,17 @@ mod tests {
                 EnumVariant {
                     name: "Halt".into(),
                     payload: VariantPayload::Unit,
+                    doc_comments: vec![],
                 },
                 EnumVariant {
                     name: "Send".into(),
                     payload: VariantPayload::Tuple(vec![Type::String]),
+                    doc_comments: vec![],
                 },
             ],
             is_public: true,
             is_codable: true,
+            doc_comments: vec![],
             span: SourceSpan::default(),
         }));
 
@@ -2720,17 +2900,20 @@ mod tests {
                     name: "id".into(),
                     ty: Type::I64,
                     is_public: true,
+                    doc_comments: vec![],
                 },
                 FieldDef {
                     name: "count".into(),
                     ty: Type::I64,
                     is_public: true,
+                    doc_comments: vec![],
                 },
             ],
             is_public: true,
             is_codable: false,
             is_observable: true,
             is_bitflags: false,
+            doc_comments: vec![],
             span: SourceSpan::default(),
         }));
         module.items.push(Item::Impl(ImplBlock {
@@ -2785,6 +2968,7 @@ mod tests {
                     Type::Unit,
                 ),
                 is_public: true,
+                doc_comments: vec![],
                 span: SourceSpan::default(),
             }],
             constants: vec![],
@@ -2898,11 +3082,13 @@ mod tests {
                 name: "raw_value".into(),
                 ty: Type::U32,
                 is_public: true,
+                doc_comments: vec![],
             }],
             is_public: true,
             is_codable: false,
             is_observable: false,
             is_bitflags: true,
+            doc_comments: vec![],
             span: SourceSpan::default(),
         }));
 
@@ -2930,6 +3116,7 @@ mod tests {
                         Type::Named("FilePermissions".into()),
                     ),
                     is_public: true,
+                    doc_comments: vec![],
                     span: SourceSpan::default(),
                 },
                 ConstantDef {
@@ -2952,6 +3139,7 @@ mod tests {
                         Type::Named("FilePermissions".into()),
                     ),
                     is_public: true,
+                    doc_comments: vec![],
                     span: SourceSpan::default(),
                 },
             ],
@@ -2972,5 +3160,107 @@ mod tests {
         );
         assert!(code
             .contains("public static let WRITE: FilePermissions = FilePermissions(rawValue: 2)"));
+    }
+
+    #[test]
+    fn test_codegen_file_scope_constants_and_type_aliases() {
+        let mut module = Module::new("ConstantsDemo");
+        module.items.push(Item::Constant(ConstantDef {
+            name: "MAX_RETRIES".into(),
+            ty: Type::U32,
+            value: Expr::new(
+                ExprKind::Literal(Literal::Int {
+                    value: 5,
+                    ty: Type::U32,
+                }),
+                Type::U32,
+            ),
+            is_public: true,
+            doc_comments: vec!["Maximum retry count.".into()],
+            span: SourceSpan::default(),
+        }));
+
+        module.items.push(Item::TypeAlias(TypeAlias {
+            name: "Identifier".into(),
+            target: Type::U64,
+            is_public: true,
+            doc_comments: vec!["Unique user identifier.".into()],
+            span: SourceSpan::default(),
+        }));
+
+        let mut gen = SwiftGenerator::new();
+        let (code, symbols) = gen.generate_module(&module);
+        assert!(code.contains("/// Maximum retry count."));
+        assert!(code.contains("public let MAX_RETRIES: UInt32 = 5"));
+        assert!(code.contains("/// Unique user identifier."));
+        assert!(code.contains("public typealias Identifier = UInt64"));
+        assert!(symbols.iter().any(|s| s.swift_name == "MAX_RETRIES"));
+        assert!(symbols.iter().any(|s| s.swift_name == "Identifier"));
+    }
+
+    #[test]
+    fn test_codegen_string_format_interpolation() {
+        let mut module = Module::new("FormatDemo");
+        module.items.push(Item::Function(Function {
+            name: "greet".into(),
+            params: vec![
+                Param {
+                    name: "name".into(),
+                    ty: Type::String,
+                    mutable: false,
+                },
+                Param {
+                    name: "count".into(),
+                    ty: Type::I32,
+                    mutable: false,
+                },
+            ],
+            return_type: Type::String,
+            body: Expr::new(
+                ExprKind::StringFormat {
+                    template: "Hello {}, you have {} messages!".into(),
+                    args: vec![
+                        Expr::new(ExprKind::Variable("name".into()), Type::String),
+                        Expr::new(ExprKind::Variable("count".into()), Type::I32),
+                    ],
+                },
+                Type::String,
+            ),
+            is_public: true,
+            doc_comments: vec!["Greets a user with unread count.".into()],
+            span: SourceSpan::default(),
+        }));
+
+        let mut gen = SwiftGenerator::new();
+        let (code, _) = gen.generate_module(&module);
+        assert!(code.contains("/// Greets a user with unread count."));
+        assert!(code.contains("return \"Hello \\(name), you have \\(count) messages!\""));
+    }
+
+    #[test]
+    fn test_codegen_emits_doc_comments_on_structs_and_fields() {
+        let mut module = Module::new("DocTest");
+        module.items.push(Item::Struct(StructDef {
+            name: "Config".into(),
+            fields: vec![FieldDef {
+                name: "timeout_ms".into(),
+                ty: Type::U64,
+                is_public: true,
+                doc_comments: vec!["Timeout in milliseconds.".into()],
+            }],
+            is_public: true,
+            is_codable: false,
+            is_observable: false,
+            is_bitflags: false,
+            doc_comments: vec!["Main configuration payload.".into()],
+            span: SourceSpan::default(),
+        }));
+
+        let mut gen = SwiftGenerator::new();
+        let (code, _) = gen.generate_module(&module);
+        assert!(code.contains("/// Main configuration payload."));
+        assert!(code.contains("public struct Config: Equatable, Hashable, Sendable {"));
+        assert!(code.contains("    /// Timeout in milliseconds."));
+        assert!(code.contains("    public var timeout_ms: UInt64"));
     }
 }

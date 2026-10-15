@@ -273,6 +273,10 @@ pub enum ExprKind {
     Break(Option<Box<Expr>>),
     Continue,
     Panic(Option<String>),
+    StringFormat {
+        template: String,
+        args: Vec<Expr>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -350,6 +354,8 @@ pub struct Function {
     pub return_type: Type,
     pub body: Expr,
     pub is_public: bool,
+    #[serde(default)]
+    pub doc_comments: Vec<String>,
     pub span: SourceSpan,
 }
 
@@ -359,6 +365,8 @@ pub struct FieldDef {
     pub name: String,
     pub ty: Type,
     pub is_public: bool,
+    #[serde(default)]
+    pub doc_comments: Vec<String>,
 }
 
 /// Struct definition.
@@ -373,6 +381,8 @@ pub struct StructDef {
     pub is_observable: bool,
     #[serde(default)]
     pub is_bitflags: bool,
+    #[serde(default)]
+    pub doc_comments: Vec<String>,
     pub span: SourceSpan,
 }
 
@@ -389,6 +399,8 @@ pub enum VariantPayload {
 pub struct EnumVariant {
     pub name: String,
     pub payload: VariantPayload,
+    #[serde(default)]
+    pub doc_comments: Vec<String>,
 }
 
 /// Enum definition supporting fieldless and payload-carrying variants.
@@ -399,6 +411,8 @@ pub struct EnumDef {
     pub is_public: bool,
     #[serde(default)]
     pub is_codable: bool,
+    #[serde(default)]
+    pub doc_comments: Vec<String>,
     pub span: SourceSpan,
 }
 
@@ -415,6 +429,7 @@ impl From<&str> for EnumVariant {
         Self {
             name: name.to_string(),
             payload: VariantPayload::Unit,
+            doc_comments: Vec::new(),
         }
     }
 }
@@ -424,6 +439,7 @@ impl From<String> for EnumVariant {
         Self {
             name,
             payload: VariantPayload::Unit,
+            doc_comments: Vec::new(),
         }
     }
 }
@@ -446,6 +462,8 @@ pub struct Method {
     pub return_type: Type,
     pub body: Expr,
     pub is_public: bool,
+    #[serde(default)]
+    pub doc_comments: Vec<String>,
     pub span: SourceSpan,
 }
 
@@ -456,6 +474,8 @@ pub struct ConstantDef {
     pub ty: Type,
     pub value: Expr,
     pub is_public: bool,
+    #[serde(default)]
+    pub doc_comments: Vec<String>,
     pub span: SourceSpan,
 }
 
@@ -477,6 +497,8 @@ pub struct TraitMethod {
     pub params: Vec<Param>,
     pub return_type: Type,
     pub default_body: Option<Expr>,
+    #[serde(default)]
+    pub doc_comments: Vec<String>,
     pub span: SourceSpan,
 }
 
@@ -495,6 +517,8 @@ pub struct TraitDef {
     pub associated_types: Vec<AssociatedTypeDef>,
     pub methods: Vec<TraitMethod>,
     pub is_public: bool,
+    #[serde(default)]
+    pub doc_comments: Vec<String>,
     pub span: SourceSpan,
 }
 
@@ -503,6 +527,10 @@ pub struct TraitDef {
 pub struct TypeAlias {
     pub name: String,
     pub target: Type,
+    #[serde(default)]
+    pub is_public: bool,
+    #[serde(default)]
+    pub doc_comments: Vec<String>,
     pub span: SourceSpan,
 }
 
@@ -597,6 +625,8 @@ pub enum Item {
     Trait(TraitDef),
     TraitImpl(TraitImpl),
     View(ViewDef),
+    Constant(ConstantDef),
+    TypeAlias(TypeAlias),
 }
 
 /// Top-level compilation unit module.
@@ -944,6 +974,48 @@ impl Module {
                         });
                     }
                 }
+                Item::Constant(c) => {
+                    let const_id = format!("{}::{}", root_id, c.name);
+                    nodes.push(CsgNode {
+                        id: const_id.clone(),
+                        name: c.name.clone(),
+                        kind: CsgNodeKind::Field,
+                        span: c.span.clone().into(),
+                        minimum_access: if c.is_public {
+                            AccessLevel::Public
+                        } else {
+                            AccessLevel::Owner
+                        },
+                        size_bytes: None,
+                    });
+                    edges.push(CsgEdge {
+                        from: root_id.clone(),
+                        to: const_id,
+                        relationship: "contains_item".into(),
+                        minimum_access: AccessLevel::Public,
+                    });
+                }
+                Item::TypeAlias(ta) => {
+                    let alias_id = format!("{}::{}", root_id, ta.name);
+                    nodes.push(CsgNode {
+                        id: alias_id.clone(),
+                        name: ta.name.clone(),
+                        kind: CsgNodeKind::Field,
+                        span: ta.span.clone().into(),
+                        minimum_access: if ta.is_public {
+                            AccessLevel::Public
+                        } else {
+                            AccessLevel::Owner
+                        },
+                        size_bytes: None,
+                    });
+                    edges.push(CsgEdge {
+                        from: root_id.clone(),
+                        to: alias_id,
+                        relationship: "contains_item".into(),
+                        minimum_access: AccessLevel::Public,
+                    });
+                }
             }
         }
 
@@ -990,6 +1062,7 @@ mod tests {
                 Type::I32,
             ),
             is_public: true,
+            doc_comments: vec!["Calculates a test constant value.".into()],
             span: SourceSpan {
                 file: "test_mod.rs".into(),
                 start_line: 1,

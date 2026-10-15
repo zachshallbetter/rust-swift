@@ -28,6 +28,8 @@ Most cross-language bridging stories either rely on fragile C-FFI pointer gymnas
 | **Build & Toolchain** | Multi-step toolchain orchestration, complex CMake/cargo-c pipelines | **Native SPM Build Tool Plugin**: Direct `.rs` compilation inside Xcode and `swift build` passes with zero configuration |
 | **Agent Autonomy** | Cryptic C-linkage linker errors requiring human manual debugging | **Native MCP Protocol & Pre-flight Diagnostics**: LLM agents (Claude, Cursor, Codex) run in-memory checks with actionable auto-remediation |
 
+> **Architectural Comparison**: Evaluating multi-platform architectures across iOS, macOS, tvOS, watchOS, visionOS, and Android? See the comprehensive [**Multi-Platform Architecture Decision Matrix**](docs/08-platform-architecture-matrix.md) comparing `rust-swift` vs. `UniFFI`, `egui`, and `Tauri`.
+
 ---
 
 ## What is here
@@ -38,6 +40,7 @@ Most cross-language bridging stories either rely on fragile C-FFI pointer gymnas
 | [`Plugins/`](Plugins/) | Native Swift Package Manager Build Tool Plugin (`RustSwiftPlugin`) |
 | [`examples/`](examples/) | Fully buildable consumer applications demonstrating Player, Peel Inspector, SPM Plugin, and SwiftUI models |
 | [`contracts/`](contracts/) | Normative semantic lowering contracts governing execution, data, arithmetic, ownership, and source mapping |
+| [`docs/`](docs/) | Architecture specifications, RFCs, and [Platform Decision Matrix](docs/08-platform-architecture-matrix.md) |
 | [`records/`](records/) | Cryptographic telemetry logs: differential receipts (`evidence.jsonl`), negative results (`negative-results.jsonl`), benchmarks (`benchmarks.jsonl`), sync cache (`sync.jsonl`) |
 | [`.agents/`](.agents/) | Agent operating guide ([`.agents/AGENTS.md`](.agents/AGENTS.md)), portable skills ([`.agents/skills/rust-to-swift/`](.agents/skills/rust-to-swift/)), and compiled context |
 | [`scripts/`](scripts/) | Packaging, App Store Connect token generation, macOS notarization, and context verification gates |

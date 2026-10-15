@@ -5,10 +5,10 @@
   "validityBasis": "aggregate-source-digest",
   "selectedPaths": [],
   "sourceSelection": {
-    "includedCount": 213,
-    "includedBytes": 3659241,
+    "includedCount": 215,
+    "includedBytes": 3696362,
     "excludedCounts": {
-      "excluded-directory": 51586,
+      "excluded-directory": 54126,
       "excluded-path": 1,
       "extension": 8235,
       "symlink": 5
@@ -20,14 +20,14 @@
     "repositories": [
       {
         "path": ".",
-        "commit": "4f2935b32a8dc49db47c269473b92ac2ca0fc8e5",
-        "branch": "feature/agents-and-docs-polish",
+        "commit": "a7fe2763ce9a32ce9438be3c2e9d0667ca8de074",
+        "branch": "main",
         "dirty": true,
         "remote": "https://github.com/zachshallbetter/rust-swift.git"
       }
     ]
   },
-  "aggregateSourceDigest": "7bdf7e7eae84eeaf0033b831febf1148f2ecc4b72c7b1e20bf8fd6f95b0e744b",
+  "aggregateSourceDigest": "112cd7092f222b1557a9368da26550c9c179569c788f16e14682157fbaec28dc",
   "sources": [
     {
       "path": ".agents/AGENTS.md",
@@ -126,8 +126,8 @@
     },
     {
       "path": "FORMAL_RESOURCE_MANIFEST.json",
-      "bytes": 1315,
-      "sha256": "2e4100402309d2bd379d35fbdd5835f1e618036aad8fa7eeb573ff3e3e634330"
+      "bytes": 1366,
+      "sha256": "0dcf632e8fa1d560ee4906ada2b60f7a98c8a9cbdfbabd80f81af8f5b3c24b01"
     },
     {
       "path": "NEW_AGENT_PROMPT.md",
@@ -146,8 +146,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 28990,
-      "sha256": "0a0e23f6fd9a60f7aec2573f0ce115ef1b73a8bc7bbe3fddd06b57577488da5e"
+      "bytes": 29421,
+      "sha256": "9c9ff65e32f2bba58f7343e8aef822c53c259e38e34ed9322c486ca6354fb939"
     },
     {
       "path": "VERSION",
@@ -231,8 +231,8 @@
     },
     {
       "path": "crates/rust-swift-codegen/src/lib.rs",
-      "bytes": 110055,
-      "sha256": "21a67ee52d15e70f16eb6c0b4c2142cb103e1b132f837e3f9f645d2e658a60f5"
+      "bytes": 121362,
+      "sha256": "f9fb34c84801e39b3c9e1a30f576e6d3415f6da02b0d796e789b3b77a513e160"
     },
     {
       "path": "crates/rust-swift-frontend/Cargo.toml",
@@ -251,8 +251,8 @@
     },
     {
       "path": "crates/rust-swift-frontend/src/lib.rs",
-      "bytes": 107396,
-      "sha256": "ba7729aaac3d7c5c075e2dac8243e54548679f8bc39bedeec7933a684a8a56e7"
+      "bytes": 115349,
+      "sha256": "50e14865b89bcefe18f2de5709c11f131f3abfb13cef38ac55456e43c9075dcd"
     },
     {
       "path": "crates/rust-swift-ir/Cargo.toml",
@@ -266,8 +266,8 @@
     },
     {
       "path": "crates/rust-swift-ir/src/lib.rs",
-      "bytes": 31512,
-      "sha256": "a441b4210df02359bd6b098318c26a087ce02b02d3475a315d4de1552c78211e"
+      "bytes": 34247,
+      "sha256": "b417aca82a25302efe8da89a2f6c0107418e4749efea0408cf8c36b259e7b58a"
     },
     {
       "path": "crates/rust-swift-mcp/Cargo.toml",
@@ -365,6 +365,11 @@
       "sha256": "1fbebfce1ad7088908d4e06dd917c84fd2ffd03c07ffb8ed20bd85e90f74f5ab"
     },
     {
+      "path": "docs/08-platform-architecture-matrix.md",
+      "bytes": 11479,
+      "sha256": "a2dd713f5634b89d8b2e7d81e76928b6355504ec8de79b95ae27d393d92e6b7d"
+    },
+    {
       "path": "docs/ACP_INTEGRATION.md",
       "bytes": 15964,
       "sha256": "8b5bf32e3040581e842718942f52cfd0f00ce1c37f6cc76498b127e4f5f449d9"
@@ -448,6 +453,11 @@
       "path": "docs/PROTOCOL_ADAPTERS.md",
       "bytes": 2229,
       "sha256": "1b546812abd66d29217fb8b11370201760ad43769f5e9c1f5e685625a7bb40aa"
+    },
+    {
+      "path": "docs/README.md",
+      "bytes": 3613,
+      "sha256": "7e1ca5fc3da81d4d7ef1c422e63c7690d7b31c7a015675bfb5c1d2dedcd314e6"
     },
     {
       "path": "docs/RECOVERY.md",
@@ -751,8 +761,8 @@
     },
     {
       "path": "examples/PluginDemoApp/.build/out/Intermediates.noindex/PluginDemoApp.build/Debug/PluginDemoApp-p.build/Objects-normal/arm64/PluginDemoApp-dependencies-1.json",
-      "bytes": 21247,
-      "sha256": "3ffb3f2e581cdbda5f9277a7332ca6edcbf45ebd2cf525c8ab4612f8d1154fc6"
+      "bytes": 21245,
+      "sha256": "d6382c1615ebbfb113a8d6af93480bf9809c6e4b74f07506ec2c616f25052c7e"
     },
     {
       "path": "examples/PluginDemoApp/.build/out/Intermediates.noindex/PluginDemoApp.build/Debug/PluginDemoApp-p.build/Objects-normal/arm64/PluginDemoApp.abi.json",
@@ -836,8 +846,8 @@
     },
     {
       "path": "examples/PluginDemoApp/.build/plugins/cache/RustSwiftPlugin-state.json",
-      "bytes": 11025,
-      "sha256": "56729d65de617b44bb001e2bdbeab3b7a1f1b1e363e384cb3f156128897c14e3"
+      "bytes": 10579,
+      "sha256": "43adaaccf19357a9b1e6a85e17dc5f7c5d48debc21f3d48c8b2868533ed80057"
     },
     {
       "path": "examples/PluginDemoApp/.build/plugins/cache/RustSwiftPlugin.dSYM/Contents/Resources/Relocations/aarch64/RustSwiftPlugin.yml",

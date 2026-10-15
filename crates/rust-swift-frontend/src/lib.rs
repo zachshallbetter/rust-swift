@@ -66,6 +66,26 @@ impl Frontend {
         ));
     }
 
+    pub fn extract_doc_comments(attrs: &[syn::Attribute]) -> Vec<String> {
+        let mut docs = Vec::new();
+        for attr in attrs {
+            if attr.path().is_ident("doc") {
+                if let syn::Meta::NameValue(meta) = &attr.meta {
+                    if let syn::Expr::Lit(syn::ExprLit {
+                        lit: syn::Lit::Str(s),
+                        ..
+                    }) = &meta.value
+                    {
+                        let val = s.value();
+                        let clean = val.strip_prefix(' ').unwrap_or(&val);
+                        docs.push(clean.to_string());
+                    }
+                }
+            }
+        }
+        docs
+    }
+
     pub fn parse_and_lower(&mut self, source: &str) -> Result<Module, Vec<Diagnostic>> {
         let syn_file = match syn::parse_str::<syn::File>(source) {
             Ok(file) => file,
@@ -161,6 +181,8 @@ impl Frontend {
             syn::Item::Fn(item_fn) => self.lower_fn(item_fn).map(IrItem::Function),
             syn::Item::Struct(item_struct) => self.lower_struct(item_struct).map(IrItem::Struct),
             syn::Item::Enum(item_enum) => self.lower_enum(item_enum).map(IrItem::Enum),
+            syn::Item::Const(item_const) => self.lower_const(item_const).map(IrItem::Constant),
+            syn::Item::Type(item_type) => self.lower_type_alias(item_type).map(IrItem::TypeAlias),
             syn::Item::Macro(m) => {
                 self.reject(
                     DiagnosticCode::MacroRejected,
@@ -332,6 +354,7 @@ impl Frontend {
             return_type,
             body,
             is_public,
+            doc_comments: Self::extract_doc_comments(&item_fn.attrs),
             span: self.make_span(item_fn),
         })
     }
@@ -389,6 +412,7 @@ impl Frontend {
             return_type,
             body,
             is_public,
+            doc_comments: Self::extract_doc_comments(&method.attrs),
             span: self.make_span(method),
         })
     }
@@ -398,12 +422,44 @@ impl Frontend {
         let ty = self.lower_type(&item_const.ty);
         let value = self.lower_expr(&item_const.expr);
         let is_public = matches!(item_const.vis, syn::Visibility::Public(_));
+        let doc_comments = Self::extract_doc_comments(&item_const.attrs);
         Some(ConstantDef {
             name,
             ty,
             value,
             is_public,
+            doc_comments,
             span: self.make_span(item_const),
+        })
+    }
+
+    fn lower_const(&mut self, item_const: &syn::ItemConst) -> Option<ConstantDef> {
+        let name = item_const.ident.to_string();
+        let ty = self.lower_type(&item_const.ty);
+        let value = self.lower_expr(&item_const.expr);
+        let is_public = matches!(item_const.vis, syn::Visibility::Public(_));
+        let doc_comments = Self::extract_doc_comments(&item_const.attrs);
+        Some(ConstantDef {
+            name,
+            ty,
+            value,
+            is_public,
+            doc_comments,
+            span: self.make_span(item_const),
+        })
+    }
+
+    fn lower_type_alias(&mut self, item_type: &syn::ItemType) -> Option<TypeAlias> {
+        let name = item_type.ident.to_string();
+        let target = self.lower_type(&item_type.ty);
+        let is_public = matches!(item_type.vis, syn::Visibility::Public(_));
+        let doc_comments = Self::extract_doc_comments(&item_type.attrs);
+        Some(TypeAlias {
+            name,
+            target,
+            is_public,
+            doc_comments,
+            span: self.make_span(item_type),
         })
     }
 
@@ -453,6 +509,7 @@ impl Frontend {
             associated_types,
             methods,
             is_public,
+            doc_comments: Self::extract_doc_comments(&item_trait.attrs),
             span: self.make_span(item_trait),
         })
     }
@@ -508,6 +565,7 @@ impl Frontend {
             params,
             return_type,
             default_body,
+            doc_comments: Self::extract_doc_comments(&method.attrs),
             span: self.make_span(method),
         })
     }
@@ -535,9 +593,12 @@ impl Frontend {
                 syn::ImplItem::Type(t) => {
                     let name = t.ident.to_string();
                     let target = self.lower_type(&t.ty);
+                    let doc_comments = Self::extract_doc_comments(&t.attrs);
                     type_aliases.push(TypeAlias {
                         name,
                         target,
+                        is_public: true,
+                        doc_comments,
                         span: self.make_span(t),
                     });
                 }
@@ -1095,10 +1156,12 @@ impl Frontend {
                     let field_name = field.ident.as_ref().map(|i| i.to_string()).unwrap();
                     let ty = self.lower_type(&field.ty);
                     let field_pub = matches!(field.vis, syn::Visibility::Public(_));
+                    let doc_comments = Self::extract_doc_comments(&field.attrs);
                     fields.push(FieldDef {
                         name: field_name,
                         ty,
                         is_public: field_pub,
+                        doc_comments,
                     });
                 }
             }
@@ -1117,6 +1180,7 @@ impl Frontend {
         let is_observable =
             self.default_observable || Self::has_observable_attr(&item_struct.attrs);
         let is_bitflags = Self::has_bitflags_attr(&item_struct.attrs);
+        let doc_comments = Self::extract_doc_comments(&item_struct.attrs);
 
         Some(StructDef {
             name,
@@ -1125,6 +1189,7 @@ impl Frontend {
             is_codable,
             is_observable,
             is_bitflags,
+            doc_comments,
             span: self.make_span(item_struct),
         })
     }
@@ -1154,29 +1219,35 @@ impl Frontend {
                             let fname = f.ident.as_ref().map(|i| i.to_string()).unwrap_or_default();
                             let ty = self.lower_type(&f.ty);
                             let field_pub = matches!(f.vis, syn::Visibility::Public(_));
+                            let doc_comments = Self::extract_doc_comments(&f.attrs);
                             FieldDef {
                                 name: fname,
                                 ty,
                                 is_public: field_pub,
+                                doc_comments,
                             }
                         })
                         .collect();
                     VariantPayload::Struct(fields)
                 }
             };
+            let v_doc = Self::extract_doc_comments(&variant.attrs);
             variants.push(EnumVariant {
                 name: v_name,
                 payload,
+                doc_comments: v_doc,
             });
         }
 
         let is_codable = self.default_codable || Self::has_codable_derive(&item_enum.attrs);
+        let doc_comments = Self::extract_doc_comments(&item_enum.attrs);
 
         Some(EnumDef {
             name,
             variants,
             is_public,
             is_codable,
+            doc_comments,
             span: self.make_span(item_enum),
         })
     }
@@ -2048,12 +2119,18 @@ impl Frontend {
                 };
                 Some(Stmt::Panic { message })
             }
+            "format" => {
+                let expr = self.lower_macro_expr(mac);
+                Some(Stmt::Expr(expr))
+            }
             _ => {
                 self.reject(
                     DiagnosticCode::MacroRejected,
                     format!("Macro '{macro_name}!' is rejected in v0.1"),
                     mac,
-                    Some("Only assert!, debug_assert!, assert_eq!, and panic! are admitted"),
+                    Some(
+                        "Only assert!, debug_assert!, assert_eq!, panic!, and format! are admitted",
+                    ),
                 );
                 None
             }
@@ -2095,12 +2172,42 @@ impl Frontend {
                     },
                 )
             }
+            "format" => {
+                let parser = Punctuated::<syn::Expr, Token![,]>::parse_terminated;
+                match parser.parse2(mac.tokens.clone()) {
+                    Ok(args) if !args.is_empty() => {
+                        let template =
+                            Self::extract_macro_str_literal(&args[0]).unwrap_or_default();
+                        let ir_args: Vec<Expr> =
+                            args.iter().skip(1).map(|a| self.lower_expr(a)).collect();
+                        Expr::new(
+                            ExprKind::StringFormat {
+                                template,
+                                args: ir_args,
+                            },
+                            Type::String,
+                        )
+                    }
+                    _ => {
+                        self.reject(
+                            DiagnosticCode::SyntaxError,
+                            "format! macro expects a format string literal",
+                            mac,
+                            Some("format!(\"template\", args...)"),
+                        );
+                        Expr::new(
+                            ExprKind::Literal(Literal::String(String::new())),
+                            Type::String,
+                        )
+                    }
+                }
+            }
             _ => {
                 self.reject(
                     DiagnosticCode::MacroRejected,
                     format!("Macro '{macro_name}!' in expression position is rejected in v0.1"),
                     mac,
-                    Some("Only panic! and vec! are admitted in expression position"),
+                    Some("Only panic!, vec!, and format! are admitted in expression position"),
                 );
                 Expr::new(ExprKind::Literal(Literal::Unit), Type::Unit)
             }
@@ -2791,6 +2898,101 @@ mod tests {
             assert_eq!(imp.constants[1].name, "WRITE");
         } else {
             panic!("Expected Item::Impl");
+        }
+    }
+
+    #[test]
+    fn test_file_scope_constants_and_type_aliases_lowering() {
+        let src = r#"
+            /// Maximum retry count.
+            pub const MAX_RETRIES: u32 = 5;
+
+            /// Unique identifier alias.
+            pub type Identifier = u64;
+        "#;
+        let mut fe = Frontend::new("constants.rs");
+        let module = fe.parse_and_lower(src).expect("lowering failed");
+
+        assert_eq!(module.items.len(), 2);
+        if let IrItem::Constant(c) = &module.items[0] {
+            assert_eq!(c.name, "MAX_RETRIES");
+            assert_eq!(c.ty, Type::U32);
+            assert!(c.is_public);
+            assert_eq!(c.doc_comments, vec!["Maximum retry count."]);
+        } else {
+            panic!("Expected Item::Constant");
+        }
+
+        if let IrItem::TypeAlias(ta) = &module.items[1] {
+            assert_eq!(ta.name, "Identifier");
+            assert_eq!(ta.target, Type::U64);
+            assert!(ta.is_public);
+            assert_eq!(ta.doc_comments, vec!["Unique identifier alias."]);
+        } else {
+            panic!("Expected Item::TypeAlias");
+        }
+    }
+
+    #[test]
+    fn test_format_macro_lowering() {
+        let src = r#"
+            pub fn greet(name: &str, count: i32) -> String {
+                format!("Hello {}, count is {}", name, count)
+            }
+        "#;
+        let mut fe = Frontend::new("format.rs");
+        let module = fe.parse_and_lower(src).expect("lowering failed");
+
+        assert_eq!(module.items.len(), 1);
+        if let IrItem::Function(f) = &module.items[0] {
+            assert_eq!(f.name, "greet");
+            let inner_kind = match &f.body.kind {
+                ExprKind::Block { expr: Some(e), .. } => &e.kind,
+                other => other,
+            };
+            if let ExprKind::StringFormat { template, args } = inner_kind {
+                assert_eq!(template, "Hello {}, count is {}");
+                assert_eq!(args.len(), 2);
+            } else {
+                panic!("Expected ExprKind::StringFormat, got {:?}", f.body.kind);
+            }
+        } else {
+            panic!("Expected Item::Function");
+        }
+    }
+
+    #[test]
+    fn test_doc_comments_extraction_on_structs_and_enums() {
+        let src = r#"
+            /// Top-level struct documentation.
+            pub struct User {
+                /// The user's numeric ID.
+                pub id: u64,
+            }
+
+            /// Status representation.
+            pub enum Status {
+                /// System is operational.
+                Ready,
+            }
+        "#;
+        let mut fe = Frontend::new("docs.rs");
+        let module = fe.parse_and_lower(src).expect("lowering failed");
+
+        if let IrItem::Struct(s) = &module.items[0] {
+            assert_eq!(s.name, "User");
+            assert_eq!(s.doc_comments, vec!["Top-level struct documentation."]);
+            assert_eq!(s.fields[0].doc_comments, vec!["The user's numeric ID."]);
+        } else {
+            panic!("Expected Item::Struct");
+        }
+
+        if let IrItem::Enum(e) = &module.items[1] {
+            assert_eq!(e.name, "Status");
+            assert_eq!(e.doc_comments, vec!["Status representation."]);
+            assert_eq!(e.variants[0].doc_comments, vec!["System is operational."]);
+        } else {
+            panic!("Expected Item::Enum");
         }
     }
 }

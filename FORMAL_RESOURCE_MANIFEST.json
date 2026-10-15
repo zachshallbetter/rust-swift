@@ -18,7 +18,8 @@
         "docs/04-language-matrix.md",
         "docs/05-validation.md",
         "docs/06-implementation-plan.md",
-        "docs/07-rfc.md"
+        "docs/07-rfc.md",
+        "docs/08-platform-architecture-matrix.md"
       ]
     },
     {
