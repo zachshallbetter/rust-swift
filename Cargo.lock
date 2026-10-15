@@ -371,6 +371,7 @@ dependencies = [
  "rust-swift-codegen",
  "rust-swift-frontend",
  "rust-swift-ir",
+ "rust-swift-mcp",
  "rust-swift-qualification",
  "serde",
  "serde_json",
@@ -407,6 +408,19 @@ dependencies = [
  "reflective-rust-protocol",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "rust-swift-mcp"
+version = "0.1.0"
+dependencies = [
+ "rust-swift-codegen",
+ "rust-swift-frontend",
+ "rust-swift-ir",
+ "rust-swift-qualification",
+ "serde",
+ "serde_json",
+ "sha2",
 ]
 
 [[package]]

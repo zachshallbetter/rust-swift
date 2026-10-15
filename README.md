@@ -90,35 +90,40 @@ The compiler operates under a strict, formally specified admission boundary. Adm
 | `assert!`, `debug_assert!` | `precondition`, `assert` | Runtime contract verification |
 | Source locations | `#sourceLocation(file:line:)` | Debugger source mapping ([`contracts/source-mapping.yaml`](contracts/source-mapping.yaml)) |
 
-### Rejection Policy (E0001..E0012)
+### Rejection Policy (E0001..E0015)
 
 Constructs outside the verified boundary are rejected at parse time with stable, actionable diagnostic codes:
 - **`E0001_UNSAFE_REJECTED`**: `unsafe` blocks and functions are forbidden.
-- **`E0002_ASYNC_REJECTED`**: Asynchronous execution requires explicit runtime adapters.
+- **`E0002_ASYNC_REJECTED`**: Asynchronous execution requires explicit runtime adapters or FSM modeling.
 - **`E0003_RAW_POINTER_REJECTED`**: Raw pointers (`*const T`, `*mut T`) are rejected.
-- **`E0004_MACRO_REJECTED`**: Unadmitted macro invocations.
-- **`E0005_DYN_TRAIT_REJECTED`**: Dynamic trait objects (`dyn Trait`).
-- **`E0006_TRAIT_IMPL_REJECTED`**: Complex or aliased trait implementations.
-- **`E0007_CUSTOM_DROP_REJECTED`**: Custom `Drop` implementations.
-- **`E0008_UNION_REJECTED`**: Untagged unions.
-- **`E0009_SYNTAX_ERROR`**: Rust syntax errors.
-- **`E0010_INT128_REJECTED`**: 128-bit integers without native 64-bit target equivalents.
-- **`E0011_GENERICS_REJECTED`**: Unbounded generics.
-- **`E0012_INTERIOR_MUTABILITY_REJECTED`**: `Cell` and `RefCell` types.
+- **`E0004_MACRO_REJECTED`**: Unadmitted procedural or complex macro invocations.
+- **`E0005_DYNAMIC_DISPATCH_REJECTED`**: Dynamic trait objects (`dyn Trait`).
+- **`E0006_COMPLEX_TRAIT_REJECTED`**: Complex trait bounds, higher-ranked bounds (`for<'a>`), or unmappable traits.
+- **`E0007_CLOSURE_BORROW_REJECTED`**: Escaping closures capturing mutable environment.
+- **`E0008_UNSUPPORTED_TYPE_REJECTED`**: Types lacking direct 1:1 Swift value semantic mapping.
+- **`E0009_SYNTAX_ERROR`**: Rust syntax grammar errors.
+- **`E0010_ALIASED_MUTATION_REJECTED`**: Overlapping mutable borrows violating Swift exclusivity.
+- **`E0011_UNSPECIALIZABLE_GENERIC_REJECTED`**: Unbounded or unmonomorphizable generic parameters.
+- **`E0012_INTERIOR_MUTABILITY_REJECTED`**: `Cell<T>`, `RefCell<T>`, and `Mutex<T>`.
+- **`E0013_SHARED_REFERENCE_REJECTED`**: Escaping shared references across struct fields.
+- **`E0014_CUSTOM_DROP_REJECTED`**: Custom `impl Drop` definitions.
+- **`E0015_INT128_UNSUPPORTED_REJECTED`**: 128-bit integer operations without explicit 64-bit target lowering.
 
 ---
 
 ## Workspace Structure
 
-The project is organized as a Cargo workspace containing five modular crates and comprehensive examples:
+The project is organized as a Cargo workspace containing modular crates, MCP server, SPM plugin, and comprehensive examples:
 
-- **[`crates/rust-swift-frontend/`](crates/rust-swift-frontend/)**: Syn AST parser, language admission checks, and diagnostic engine (`E0001`..`E0012`).
+- **[`crates/rust-swift-frontend/`](crates/rust-swift-frontend/)**: Syn AST parser, language admission checks, and diagnostic engine (`E0001`..`E0015`).
 - **[`crates/rust-swift-ir/`](crates/rust-swift-ir/)**: Target-neutral semantic IR and Compiler Semantic Graph (CSG) projection.
 - **[`crates/rust-swift-codegen/`](crates/rust-swift-codegen/)**: Swift AST lowerer, SwiftUI view tree synthesizer, and `Package.swift` emitter.
 - **[`crates/rust-swift-qualification/`](crates/rust-swift-qualification/)**: 16-suite differential qualification harness, failure injection, benchmarks, sync engine, and proof verifier.
+- **[`crates/rust-swift-mcp/`](crates/rust-swift-mcp/)**: Native Model Context Protocol (MCP) server over stdio for AI agent orchestration.
 - **[`crates/rust-swift-cli/`](crates/rust-swift-cli/)**: Unified command-line interface (`rust-swift`).
 - **[`examples/`](examples/)**: Working example applications, including [`PlayerApp`](examples/PlayerApp/), [`PeelInspectorApp`](examples/PeelInspectorApp/), [`PluginDemoApp`](examples/PluginDemoApp/), and [`SwiftUIDemoApp`](examples/SwiftUIDemoApp/).
 - **[`Plugins/RustSwiftPlugin/`](Plugins/RustSwiftPlugin/)**: Native Swift Package Manager Build Tool Plugin.
+- **[`.agents/skills/rust-to-swift/`](.agents/skills/rust-to-swift/)**: Portable AI Agent Skill specification for autonomous coding assistants.
 
 ---
 
@@ -390,6 +395,67 @@ python3 scripts/asc-token.py --test
 # 3. Dry-run package signing, sandboxing, and notarization
 ./scripts/apple-notarize.sh --app target/debug/rust-swift --dry-run
 ```
+
+### 10. AI Agent & MCP Integration (Claude, Codex, Cursor, Antigravity)
+
+`rust-swift` features first-class support for autonomous coding agents and LLM assistants via the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) and machine-readable CLI interfaces:
+
+#### Desktop & IDE MCP Configuration
+
+Add `rust-swift` to your Claude Desktop configuration (`claude_desktop_config.json`), Cursor MCP settings, or Agent environment:
+
+```json
+{
+  "mcpServers": {
+    "rust-swift": {
+      "command": "rust-swift",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+Or run the MCP server directly via cargo:
+```bash
+cargo run -p rust-swift-cli -- mcp
+```
+
+#### Available MCP Tools
+
+| Tool | Purpose | Key Parameters |
+|---|---|---|
+| **`rust_swift_check`** | Fast in-memory syntax & Language Matrix validation without touching disk | `source: string`, `codable?: bool`, `observable?: bool` |
+| **`rust_swift_compile`** | Lowers Rust snippet into standalone Swift package source | `source: string`, `module_name?: string` |
+| **`rust_swift_proof`** | Evaluates formal invariants and certifies an epistemic proof dossier | `source: string` |
+| **`rust_swift_explain`** | Explains diagnostic codes (`E0001`..`E0015`) with auto-remediation guidance | `code: string` (e.g. `"E0001_UNSAFE_REJECTED"`) |
+
+#### Agent-Friendly Pre-flight Checks (`--format json`)
+
+Agents can perform sub-millisecond pre-flight checks before modifying or generating code:
+
+```bash
+rust-swift check path/to/source.rs --format json
+```
+
+Output:
+```json
+{
+  "status": "rejected",
+  "file": "path/to/source.rs",
+  "diagnostics": [
+    {
+      "code": "E0001_UNSAFE_REJECTED",
+      "message": "Unsafe blocks and functions are rejected in v0.1",
+      "file": "path/to/source.rs",
+      "start_line": 12,
+      "end_line": 14,
+      "suggested_remedy": "Replace with safe Rust value semantics or indexing"
+    }
+  ]
+}
+```
+
+Agents can immediately read the `suggested_remedy`, apply the fix in-memory, and converge autonomously without user intervention. Full agent patterns and remediation recipes are documented in [`.agents/skills/rust-to-swift/SKILL.md`](.agents/skills/rust-to-swift/SKILL.md).
 
 ---
 

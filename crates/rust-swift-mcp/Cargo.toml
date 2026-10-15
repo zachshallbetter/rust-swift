@@ -1,0 +1,21 @@
+[package]
+name = "rust-swift-mcp"
+description = "Model Context Protocol (MCP) server for the rust-swift compiler"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "rust-swift-mcp"
+path = "src/main.rs"
+
+[dependencies]
+rust-swift-ir = { path = "../rust-swift-ir" }
+rust-swift-frontend = { path = "../rust-swift-frontend" }
+rust-swift-codegen = { path = "../rust-swift-codegen" }
+rust-swift-qualification = { path = "../rust-swift-qualification" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
