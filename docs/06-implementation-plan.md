@@ -14,8 +14,30 @@ Rust → Swift Compiler | Milestone Status & Implementation Plan | 14 October 20
 | **M7 - Distribution & Apps** | SwiftUI `@Observable`, App Store Connect API, automated notarization | **COMPLETE** | `PlayerApp`, `PeelCoreKit`, `asc-token.py`, `apple-notarize.sh` |
 | **M8 - Companion Systems** | SPM Build Tool Plugin, declarative SwiftUI view synthesis, proof dossiers, CSG delta synchronizer | **COMPLETE** | `RustSwiftPlugin` fixture, SwiftUI differential, `proof-receipt.json`, CSG delta skipping |
 
-## Next Phase Horizons
+## Next Phase Horizons & Phased Roadmap
 
-- **Associated Types**: Elaborate multi-parameter trait associated types and where-clause projection.
-- **Async Runtime Adapters**: Formalize async-to-Swift-concurrency bridging for admitted event loops.
-- **Expanded Application Portfolio**: End-to-end integration of translated core engines into enterprise macOS and iOS apps.
+Following the completion of Milestones M0 through M8, the forward compiler roadmap proceeds across five sequential phases (detailed in [`09-apple-ecosystem-capabilities-and-kits.md`](09-apple-ecosystem-capabilities-and-kits.md)):
+
+### Phase 1: Trait Associated Types & Type Projections (`v0.3.0`)
+- **Associated Types**: Elaborate multi-parameter trait associated types (`type Item;`) and where-clause projections into native Swift `associatedtype` declarations.
+- **Protocol Conformance**: Generate explicit `typealias` bindings in conforming structs and classes.
+- **Verification**: Extend protocol qualification suite with differential conformance checks.
+
+### Phase 2: Structured Concurrency & Event Loops (`v0.3.5`)
+- **Admitted Async Grammar**: Relax `E0002_ASYNC_REJECTED` for admitted, cooperative asynchronous functions.
+- **Native Swift Concurrency**: Lower Rust futures directly into Swift `async/await`, structured `TaskGroup`, and native actor isolation without intermediate C-ABI wrappers.
+- **Verification**: Differential async execution tests comparing Rust poll state machines with Swift concurrency tasks.
+
+### Phase 3: Apple Framework ("Kit") Adapters & Synthesizers (`v0.4.0`)
+- **AppKit & Document Models**: Attribute-driven synthesis of `FileDocument` / `ReferenceFileDocument` for macOS multi-window document apps.
+- **FSKit & FileProvider**: Turnkey delegate adapters (`FSVolumeOperations`) allowing safe Rust file system engines to run zero-FFI inside macOS 15+ FSKit user-space daemons and FileProvider extensions.
+- **RealityKit & WidgetKit**: Automatic `RealityKit.Component` protocol conformance and `WidgetKit.TimelineProvider` scheduling.
+
+### Phase 4: Security, Entitlements & Packaging Verification (`v0.5.0`)
+- **Automated Entitlements**: Synthesize `.entitlements` property lists directly from Rust capabilities and CSG permissions.
+- **Pre-Flight Packaging Verifier**: Add `rust-swift verify-packaging` CLI subcommand to audit Hardened Runtime flags, codesigning identities, and notarization readiness.
+
+### Phase 5: CloudKit & Distributed CSG State Synchronization (`v0.6.0`)
+- **Reflective Rust CSG to CloudKit**: Map Compiler Semantic Graphs and Operational State Graphs (OSG) directly into `CKRecord` hierarchies.
+- **Deterministic Peer Replication**: Multi-device state replication for collaborative creative and document applications.
+

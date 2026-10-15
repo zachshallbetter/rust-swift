@@ -5,8 +5,8 @@
   "validityBasis": "aggregate-source-digest",
   "selectedPaths": [],
   "sourceSelection": {
-    "includedCount": 215,
-    "includedBytes": 3697741,
+    "includedCount": 216,
+    "includedBytes": 3711649,
     "excludedCounts": {
       "excluded-directory": 54538,
       "excluded-path": 1,
@@ -20,14 +20,14 @@
     "repositories": [
       {
         "path": ".",
-        "commit": "a33ec8cd3b7b9b3056ad40ff20b4f478cd3eb031",
+        "commit": "0fad5be9db028f79bbc23cf198067d75ba1fdf8f",
         "branch": "main",
         "dirty": true,
         "remote": "https://github.com/zachshallbetter/rust-swift.git"
       }
     ]
   },
-  "aggregateSourceDigest": "9ca80fc10dd1624e250e9f872ba1af75c9fe6164dd33ed58ca66ce9b0d8f3175",
+  "aggregateSourceDigest": "97b671def2725bfd69dbd8aab2594a44fd42589f08c1cf8ead41b69c3f54b2a2",
   "sources": [
     {
       "path": ".agents/AGENTS.md",
@@ -356,8 +356,8 @@
     },
     {
       "path": "docs/06-implementation-plan.md",
-      "bytes": 2281,
-      "sha256": "f9835fd29d456153e7859097ba5daa379ae48afea2fdffc3c9d226cf075454e7"
+      "bytes": 4348,
+      "sha256": "604a06716cde8fcb147afdfbd9ea7e4498d2c5c37b77cac295d38103f40b2164"
     },
     {
       "path": "docs/07-rfc.md",
@@ -368,6 +368,11 @@
       "path": "docs/08-platform-architecture-matrix.md",
       "bytes": 11479,
       "sha256": "a2dd713f5634b89d8b2e7d81e76928b6355504ec8de79b95ae27d393d92e6b7d"
+    },
+    {
+      "path": "docs/09-apple-ecosystem-capabilities-and-kits.md",
+      "bytes": 11545,
+      "sha256": "95dfa0b1cdf046637f2808a887c3d54e62f42407929ecfffa7a81d185a31fced"
     },
     {
       "path": "docs/ACP_INTEGRATION.md",
@@ -456,8 +461,8 @@
     },
     {
       "path": "docs/README.md",
-      "bytes": 3613,
-      "sha256": "7e1ca5fc3da81d4d7ef1c422e63c7690d7b31c7a015675bfb5c1d2dedcd314e6"
+      "bytes": 3909,
+      "sha256": "9f1cd25f6c36486f7fe077ba4110b5ead9f4c43f1b54bba24d9a0422a0475164"
     },
     {
       "path": "docs/RECOVERY.md",

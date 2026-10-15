@@ -18,6 +18,7 @@ The core compiler design and platform strategy follow a sequential, canonical se
 | **[`06-implementation-plan.md`](06-implementation-plan.md)** | Implementation Plan | Phased delivery roadmap, crate boundaries, and verification milestones. |
 | **[`07-rfc.md`](07-rfc.md)** | Zero-FFI Source Translation RFC | Foundational RFC establishing pure ahead-of-time source-to-source translation without C-ABI wrappers. |
 | **[`08-platform-architecture-matrix.md`](08-platform-architecture-matrix.md)** | Multi-Platform Architecture Decision Matrix | Comparative evaluation across **iOS, macOS, tvOS, watchOS, visionOS, and Android** vs. UniFFI, egui, and Tauri. |
+| **[`09-apple-ecosystem-capabilities-and-kits.md`](09-apple-ecosystem-capabilities-and-kits.md)** | Apple Ecosystem Capabilities & Kits | In-depth architecture covering Apple signing identities, sandbox/entitlements, and system frameworks (AppKit, FSKit, RealityKit, WidgetKit, FileProvider). |
 
 ---
 
