@@ -54,12 +54,13 @@ Agents modifying compiler behavior must understand which crate owns each stage o
 
 | Crate / Directory | Architectural Role | Key Responsibilities |
 |---|---|---|
+| [`crates/rust-swift/`](../crates/rust-swift/) | **Library facade** | Public `compile_file` / `check_file` API for agents, MCP, and mobile bridges. Depend on this crate, not the stage crates directly. |
 | [`crates/rust-swift-frontend/`](../crates/rust-swift-frontend/) | **Frontend & Parser** | `syn` AST lowering, Language Matrix policy enforcement, stable diagnostic emission (`E0001`..`E0015`). |
 | [`crates/rust-swift-ir/`](../crates/rust-swift-ir/) | **Semantic IR & CSG** | Target-neutral typed intermediate representation (`Module`, `Item`, `Type`, `Expr`), `to_csg()` projection. |
 | [`crates/rust-swift-codegen/`](../crates/rust-swift-codegen/) | **Swift Code Generator** | AST lowering to Swift 5.9+ source, `@Observable` synthesis, `Codable` synthesis, `#sourceLocation` directives, `Package.swift`. |
 | [`crates/rust-swift-qualification/`](../crates/rust-swift-qualification/) | **Qualification & Verification** | 16 differential test suites, failure mutation injection, runtime parity benchmarks, CSG delta watcher sync engine, and epistemic proof verifier. |
 | [`crates/rust-swift-mcp/`](../crates/rust-swift-mcp/) | **Model Context Protocol** | Native stdio JSON-RPC 2.0 server exposing `rust_swift_check`, `rust_swift_compile`, `rust_swift_proof`, and `rust_swift_explain`. |
-| [`crates/rust-swift-cli/`](../crates/rust-swift-cli/) | **Unified CLI** | Subcommands: `compile`, `check`, `diff-test`, `eval`, `bench`, `proof`, `sync`, `mcp`, `manifest`. |
+| [`crates/rust-swift-cli/`](../crates/rust-swift-cli/) | **Unified CLI** | Thin CLI over the facade: `compile`, `check`, `diff-test`, `eval`, `bench`, `proof`, `sync`, `mcp`, `manifest`. |
 | [`Plugins/RustSwiftPlugin/`](../Plugins/RustSwiftPlugin/) | **SPM Build Tool Plugin** | Native Swift Package Manager build tool plugin for automatic compilation of `.rs` files during `swift build` passes. |
 | [`.agents/skills/rust-to-swift/`](skills/rust-to-swift/) | **Portable Agent Skill** | Canonical skill definition for autonomous assistants. |
 

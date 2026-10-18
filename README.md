@@ -49,12 +49,13 @@ Most cross-language bridging stories either rely on fragile C-FFI pointer gymnas
 
 | Crate | Architectural Role | Responsibilities |
 |---|---|---|
+| **[`rust-swift`](crates/rust-swift/)** | **Library facade** | Public `compile_file` / `check_file` API for agents, MCP, and mobile bridges. Depend on this crate rather than stage crates directly. |
 | **[`rust-swift-frontend`](crates/rust-swift-frontend/)** | Frontend & Admission Engine | `syn` AST parsing, Language Matrix policy enforcement, deterministic diagnostic emission (`E0001`..`E0015`). |
 | **[`rust-swift-ir`](crates/rust-swift-ir/)** | Semantic IR & CSG Projection | Target-neutral typed intermediate representation (`Module`, `Item`, `Type`, `Expr`), Compiler Semantic Graph (`rr-csg-0.1`). |
 | **[`rust-swift-codegen`](crates/rust-swift-codegen/)** | Swift Code Generator | Swift 5.9+ AST lowerer, SwiftUI view tree synthesizer, `@Observable` synthesis, `Codable` support, `#sourceLocation` directives, `Package.swift`. |
 | **[`rust-swift-qualification`](crates/rust-swift-qualification/)** | Qualification & Verification Harness | 16-suite differential runner, failure mutation injection, runtime parity benchmarks, CSG delta watcher sync engine, and epistemic proof verifier. |
 | **[`rust-swift-mcp`](crates/rust-swift-mcp/)** | Model Context Protocol Server | Native stdio JSON-RPC 2.0 server exposing `rust_swift_check`, `rust_swift_compile`, `rust_swift_proof`, and `rust_swift_explain`. |
-| **[`rust-swift-cli`](crates/rust-swift-cli/)** | Unified CLI | Command-line interface (`rust-swift`): `compile`, `check`, `diff-test`, `eval`, `bench`, `proof`, `sync`, `mcp`, `manifest`. |
+| **[`rust-swift-cli`](crates/rust-swift-cli/)** | Unified CLI | Thin CLI over the facade (`rust-swift`): `compile`, `check`, `diff-test`, `eval`, `bench`, `proof`, `sync`, `mcp`, `manifest`. |
 
 ---
 

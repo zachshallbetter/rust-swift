@@ -310,7 +310,7 @@ Procedure: `.agents/skills/authorize-protected-effect/SKILL.md`. Binding: `docs/
 ## 19. Domain operating profile: rust-swift
 
 Autonomous agents modifying the `rust-swift` compiler workspace must follow the domain-specific contract in [`.agents/AGENTS.md`](.agents/AGENTS.md) and portable skill in [`.agents/skills/rust-to-swift/SKILL.md`](.agents/skills/rust-to-swift/SKILL.md):
-- **Crate Topography**: Changes to parsing belong in `rust-swift-frontend`; IR and CSG projections belong in `rust-swift-ir`; Swift generation in `rust-swift-codegen`; qualification in `rust-swift-qualification`; and MCP tools in `rust-swift-mcp`.
+- **Crate Topography**: Downstream dependents use the facade crate `rust-swift` (`compile_file` / `check_file`). Stage work: parsing in `rust-swift-frontend`; IR/CSG in `rust-swift-ir`; Swift generation in `rust-swift-codegen`; qualification in `rust-swift-qualification`; MCP in `rust-swift-mcp`; thin CLI in `rust-swift-cli`.
 - **Diagnostic Matrix**: Rejections must map to stable codes `E0001` through `E0015` with actionable remediation guidance.
 - **Zero-FFI Invariant**: Never introduce C headers, C-ABI shims, or unsafe memory bridging.
 - **Verification Gate**: Before landing, run `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace`, and differential qualification suites (`diff-test`, `eval`, `bench`).

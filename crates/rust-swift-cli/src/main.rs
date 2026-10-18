@@ -1,14 +1,12 @@
 //! CLI interface for the Rust-to-Swift compiler.
 
 use clap::{Parser, Subcommand};
-use rust_swift_codegen::SwiftGenerator;
-use rust_swift_frontend::Frontend;
+use rust_swift::{check_file, compile_file, CompileError, CompileRequest, Frontend};
 use rust_swift_qualification::benchmark::BenchmarkRunner;
 use rust_swift_qualification::differential::DifferentialRunner;
 use rust_swift_qualification::evals::AdversarialRunner;
 use rust_swift_qualification::mutation::MutationRunner;
 use serde_json::json;
-use sha2::{Digest, Sha256};
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -270,6 +268,41 @@ struct CompileOptions<'a> {
     admit_async: bool,
 }
 
+fn print_rejected(format: &str, input: &Path, diags: &[rust_swift::diagnostic::Diagnostic]) {
+    if format == "json" {
+        let diag_json: Vec<_> = diags
+            .iter()
+            .map(|d| {
+                json!({
+                    "code": d.code.as_str(),
+                    "message": d.message,
+                    "file": d.span.file,
+                    "start_line": d.span.start_line,
+                    "end_line": d.span.end_line,
+                    "suggested_remedy": d.suggested_alternative,
+                })
+            })
+            .collect();
+        println!(
+            "{}",
+            json!({
+                "status": "rejected",
+                "file": input.display().to_string(),
+                "diagnostics": diag_json,
+            })
+        );
+    } else {
+        eprintln!(
+            "[REJECTED] Input '{}' violates the Language Matrix boundary with {} diagnostics:",
+            input.display(),
+            diags.len()
+        );
+        for d in diags {
+            eprintln!("  {d}");
+        }
+    }
+}
+
 fn check_command(
     input: &Path,
     format: &str,
@@ -277,55 +310,17 @@ fn check_command(
     observable: bool,
     admit_async: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    if !input.exists() {
-        if format == "json" {
-            println!(
-                "{}",
-                json!({
-                    "status": "error",
-                    "file": input.display().to_string(),
-                    "message": format!("Input file does not exist: {}", input.display())
-                })
-            );
-        } else {
-            eprintln!("Error: Input file does not exist: {}", input.display());
-        }
-        std::process::exit(1);
-    }
-
-    let source = fs::read_to_string(input)?;
-    let mut frontend = Frontend::new(input.to_string_lossy().to_string())
-        .with_default_codable(codable)
-        .with_default_observable(observable)
-        .with_admit_async(admit_async);
-
-    match frontend.parse_and_lower(&source) {
-        Ok(module) => {
-            let type_count = module
-                .items
-                .iter()
-                .filter(|i| {
-                    matches!(
-                        i,
-                        rust_swift_ir::Item::Struct(_) | rust_swift_ir::Item::Enum(_)
-                    )
-                })
-                .count();
-            let function_count = module
-                .items
-                .iter()
-                .filter(|i| matches!(i, rust_swift_ir::Item::Function(_)))
-                .count();
-
+    match check_file(input, codable, observable, admit_async) {
+        Ok(result) => {
             if format == "json" {
                 println!(
                     "{}",
                     json!({
                         "status": "admitted",
                         "file": input.display().to_string(),
-                        "module_name": module.name,
-                        "type_count": type_count,
-                        "function_count": function_count,
+                        "module_name": result.module_name,
+                        "type_count": result.type_count,
+                        "function_count": result.function_count,
                         "diagnostics": []
                     })
                 );
@@ -334,189 +329,106 @@ fn check_command(
                     "[OK] Input '{}' satisfies the Language Matrix boundary.",
                     input.display()
                 );
-                println!("  Module:    {}", module.name);
-                println!("  Types:     {}", type_count);
-                println!("  Functions: {}", function_count);
+                println!("  Module:    {}", result.module_name);
+                println!("  Types:     {}", result.type_count);
+                println!("  Functions: {}", result.function_count);
             }
             Ok(())
         }
-        Err(diags) => {
+        Err(CompileError::MissingInput(path)) => {
             if format == "json" {
-                let diag_json: Vec<_> = diags
-                    .iter()
-                    .map(|d| {
-                        json!({
-                            "code": d.code.as_str(),
-                            "message": d.message,
-                            "file": d.span.file,
-                            "start_line": d.span.start_line,
-                            "end_line": d.span.end_line,
-                            "suggested_remedy": d.suggested_alternative,
-                        })
-                    })
-                    .collect();
                 println!(
                     "{}",
                     json!({
-                        "status": "rejected",
-                        "file": input.display().to_string(),
-                        "diagnostics": diag_json,
+                        "status": "error",
+                        "file": path.display().to_string(),
+                        "message": format!("Input file does not exist: {}", path.display())
                     })
                 );
             } else {
-                eprintln!(
-                    "[REJECTED] Input '{}' violates the Language Matrix boundary with {} diagnostics:",
-                    input.display(),
-                    diags.len()
-                );
-                for d in &diags {
-                    eprintln!("  {}", d);
-                }
+                eprintln!("Error: Input file does not exist: {}", path.display());
             }
             std::process::exit(1);
         }
+        Err(CompileError::Rejected(diags)) => {
+            print_rejected(format, input, &diags);
+            std::process::exit(1);
+        }
+        Err(err) => Err(err.into()),
     }
 }
 
 fn compile_command(opts: CompileOptions<'_>) -> Result<(), Box<dyn std::error::Error>> {
     let input = opts.input;
     let output_dir = opts.output_dir;
-    let package_name = opts.package_name;
     let format = opts.format;
-    let emit_csg = opts.emit_csg;
-    let emit_ir = opts.emit_ir;
-    let source_locations = opts.source_locations;
-    let spm = opts.spm;
-    let codable = opts.codable;
-    let observable = opts.observable;
-    let admit_async = opts.admit_async;
 
-    if !input.exists() {
-        if format == "json" {
-            println!(
-                "{}",
-                json!({
-                    "status": "error",
-                    "file": input.display().to_string(),
-                    "message": format!("Input file does not exist: {}", input.display())
-                })
-            );
-        } else {
-            eprintln!("Error: Input file does not exist: {}", input.display());
-        }
-        std::process::exit(1);
-    }
-
-    let source = fs::read_to_string(input)?;
-    let mut hasher = Sha256::new();
-    hasher.update(source.as_bytes());
-    let source_hash = format!("{:x}", hasher.finalize());
-
-    let file_stem = input
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("Module");
-    let pkg_name = package_name.unwrap_or(file_stem);
-
-    let mut frontend = Frontend::new(input.to_string_lossy().to_string())
-        .with_default_codable(codable)
-        .with_default_observable(observable)
-        .with_admit_async(admit_async);
-    let module = match frontend.parse_and_lower(&source) {
-        Ok(m) => m,
-        Err(diags) => {
+    match compile_file(CompileRequest {
+        input,
+        output_dir,
+        package_name: opts.package_name,
+        emit_ir: opts.emit_ir,
+        emit_csg: opts.emit_csg,
+        source_locations: opts.source_locations,
+        spm: opts.spm,
+        codable: opts.codable,
+        observable: opts.observable,
+        admit_async: opts.admit_async,
+    }) {
+        Ok(result) => {
             if format == "json" {
-                let diag_json: Vec<_> = diags
-                    .iter()
-                    .map(|d| {
-                        json!({
-                            "code": d.code.as_str(),
-                            "message": d.message,
-                            "file": d.span.file,
-                            "start_line": d.span.start_line,
-                            "end_line": d.span.end_line,
-                            "suggested_remedy": d.suggested_alternative,
-                        })
-                    })
-                    .collect();
                 println!(
                     "{}",
                     json!({
-                        "status": "rejected",
+                        "status": "success",
                         "file": input.display().to_string(),
-                        "diagnostics": diag_json,
+                        "package_name": result.package_name,
+                        "output_dir": result.output_dir.display().to_string(),
+                        "generated_files": result.generated_files,
+                        "source_hash": format!("sha256:{}", result.source_hash),
+                        "symbols_count": result.symbols_count
                     })
                 );
             } else {
+                println!(
+                    "Successfully compiled {} to Swift package at {}",
+                    input.display(),
+                    result.output_dir.display()
+                );
+                println!("  Package name: {}", result.package_name);
+                println!("  Generated files: {}", result.generated_files.join(", "));
+                println!("  Source hash: sha256:{}", result.source_hash);
+            }
+            Ok(())
+        }
+        Err(CompileError::MissingInput(path)) => {
+            if format == "json" {
+                println!(
+                    "{}",
+                    json!({
+                        "status": "error",
+                        "file": path.display().to_string(),
+                        "message": format!("Input file does not exist: {}", path.display())
+                    })
+                );
+            } else {
+                eprintln!("Error: Input file does not exist: {}", path.display());
+            }
+            std::process::exit(1);
+        }
+        Err(CompileError::Rejected(diags)) => {
+            if format == "json" {
+                print_rejected(format, input, &diags);
+            } else {
                 eprintln!("Compilation failed with {} diagnostics:", diags.len());
                 for d in &diags {
-                    eprintln!("  {}", d);
+                    eprintln!("  {d}");
                 }
             }
             std::process::exit(1);
         }
-    };
-
-    let mut generator = SwiftGenerator::new()
-        .with_source_locations(source_locations)
-        .with_observable(observable);
-    let manifest = if spm {
-        generator.emit_package(&module, output_dir, pkg_name)?
-    } else {
-        let (swift_code, symbols) = generator.generate_module(&module);
-        fs::create_dir_all(output_dir)?;
-        let file_path = output_dir.join(format!("{}.swift", module.name));
-        fs::write(&file_path, &swift_code)?;
-        rust_swift_codegen::PackageManifest {
-            package_name: pkg_name.to_string(),
-            swift_tools_version: "5.9".into(),
-            platforms: vec![],
-            generated_files: vec![format!("{}.swift", module.name)],
-            symbols,
-            source_locations_enabled: source_locations,
-            test_target_generated: false,
-        }
-    };
-
-    if emit_ir {
-        let ir_json = serde_json::to_string_pretty(&module)?;
-        fs::write(output_dir.join("ir.json"), ir_json)?;
+        Err(err) => Err(err.into()),
     }
-
-    if emit_csg {
-        let csg = module.to_csg(&source_hash);
-        if let Err(e) = csg.validate() {
-            eprintln!("Warning: CSG validation warning: {}", e);
-        }
-        let csg_json = csg.to_json()?;
-        fs::write(output_dir.join("csg.json"), csg_json)?;
-    }
-
-    if format == "json" {
-        println!(
-            "{}",
-            json!({
-                "status": "success",
-                "file": input.display().to_string(),
-                "package_name": manifest.package_name,
-                "output_dir": output_dir.display().to_string(),
-                "generated_files": manifest.generated_files,
-                "source_hash": format!("sha256:{}", source_hash),
-                "symbols_count": manifest.symbols.len()
-            })
-        );
-    } else {
-        println!(
-            "Successfully compiled {} to Swift package at {}",
-            input.display(),
-            output_dir.display()
-        );
-        println!("  Package name: {}", manifest.package_name);
-        println!("  Generated files: {}", manifest.generated_files.join(", "));
-        println!("  Source hash: sha256:{}", source_hash);
-    }
-
-    Ok(())
 }
 
 fn diff_test_command(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {

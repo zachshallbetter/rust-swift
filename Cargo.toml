@@ -3,6 +3,7 @@ members = [
     "crates/rust-swift-ir",
     "crates/rust-swift-frontend",
     "crates/rust-swift-codegen",
+    "crates/rust-swift",
     "crates/rust-swift-cli",
     "crates/rust-swift-qualification",
     "crates/rust-swift-mcp",
