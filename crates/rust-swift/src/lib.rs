@@ -28,7 +28,6 @@
 
 use rust_swift_codegen::{PackageManifest, SwiftGenerator};
 use rust_swift_frontend::diagnostic::Diagnostic;
-use rust_swift_frontend::Frontend;
 use rust_swift_ir::Module;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
