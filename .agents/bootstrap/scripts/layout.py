@@ -184,6 +184,8 @@ SHIPPED_SCHEMAS = ("agent-message.schema.json", "context-lock.schema.json", "con
                    "protocol-adapter.schema.json", "qualification-record.schema.json",
                    "recipient-contract.schema.json", "interaction-contract.schema.json",
                    "external-state-instance.schema.json", "semantic-surface.schema.json", "local-work-item.schema.json")
+# Protocol profiles bootstrap ships; a project's own profiles/ (target or build profiles) stays where it is.
+SHIPPED_PROFILES = ("commercialization", "eqp", "esp-rcp", "icp", "iepe", "ses-sps")
 
 
 def text_rewrites() -> list[tuple[str, str]]:
@@ -232,10 +234,41 @@ def rewrite_paths(text: str, extra: tuple[tuple[str, str], ...] = ()) -> tuple[s
     import re
     count = 0
     for old, new in sorted((*text_rewrites(), *extra), key=lambda pair: -len(pair[0])):
-        # Not part of a longer path, and not already the contained form.
-        pattern = re.compile(r"(?<![\w./-])" + re.escape(old) + r"(?![\w-])")
+        # Not part of a longer path, and not already the contained form. A path is still rooted at the
+        # project after ../ (a relative link), $(VAR)/ or ${VAR}/ (make and shell), or an upper-case VAR/.
+        pattern = re.compile(r"(?:(?<![\w./-])|(?<=\.\./)|(?<=[)}]/)|(?<=[A-Z_]/))" + re.escape(old) + r"(?![\w-])")
         text, n = pattern.subn(new, text)
         count += n
+    return text, count
+
+
+def rewrite_split_paths(text: str) -> tuple[str, int]:
+    """Legacy paths built from quoted parts: `ROOT / "records" / "evidence.jsonl"`,
+    `os.path.join(ROOT, "scripts", "gen-context.py")` or `root.join("records").join("evidence.jsonl")`;
+    (new text, replacements). Used to report references, never to edit project code."""
+    import re
+    count = 0
+    original = text
+    for old, new in text_rewrites():
+        if " " in old or old.endswith("/") or "/" not in old:
+            continue
+        parts = old.split("/")
+        quote = r"([\"'])"
+        joint = r"\1(\s*[/,]\s*|\)\s*\.join\(\s*)\1"          # a / b, a, b and Rust's .join(a).join(b)
+        pattern = re.compile(r"(?<![\w.-])" + quote + joint.join(re.escape(part) for part in parts) + r"\1")
+
+        added = new.split("/")[:-len(parts)] if new.endswith("/" + old) else []
+
+        def replace(match: "re.Match[str]") -> str:
+            q, sep = match.group(1), match.group(2)
+            before = match.string[:match.start()]
+            if added and re.search(q + re.escape(added[-1]) + q + r"(\s*[/,]\s*|\)\s*\.join\(\s*)$", before):
+                return match.group(0)                 # already the contained form
+            return q + (q + sep + q).join(new.split("/")) + q
+
+        text, n = pattern.subn(replace, text)
+        count += n if text != original else 0
+        original = text
     return text, count
 
 
@@ -265,7 +298,7 @@ def contained_path(legacy_rel: str) -> str | None:
         return f".agents/project/contracts/{tail}"
     if legacy_rel.startswith(".agents/rules/"):
         return ".agents/project/rules/" + legacy_rel[len(".agents/rules/"):]
-    if head == "profiles" and tail:
+    if head == "profiles" and tail.partition("/")[0] in SHIPPED_PROFILES and "/" in tail:
         return f".agents/bootstrap/profiles/{tail}"
     return None
 

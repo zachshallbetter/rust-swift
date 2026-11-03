@@ -26,7 +26,7 @@ sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from layout import (  # noqa: E402
     LEGACY_DIRECTORIES, PATHS, PROJECT_OWNED_DIRS, RECORD_FILES, TEMPLATES, Layout, contained_path,
-    find_project_root, release_machinery, rewrite_paths, text_rewrites,
+    find_project_root, release_machinery, rewrite_paths, rewrite_split_paths, text_rewrites,
 )
 
 ROOT = find_project_root(Path(__file__).resolve().parent)
@@ -39,8 +39,6 @@ REWRITE_SCOPE = ("AGENTS.md", ".agents/project/")
 
 def rewritable(rel: str) -> bool:
     return rel == "AGENTS.md" or rel.startswith(REWRITE_SCOPE[1])
-TEXT_SUFFIXES = (".md", ".txt", ".json", ".yaml", ".yml", ".toml", ".sh", ".py", ".mjs", ".js", ".ts", ".cfg",
-                 ".ini", ".env", "")
 
 
 class UpgradeError(RuntimeError):
@@ -259,16 +257,21 @@ def external_references(project: Path, owned: set[str]) -> list[dict]:
         if rel in owned or rel.startswith((".agents/",)) or contained_path(rel):
             continue
         path = project / rel
-        if not path.is_file() or path.suffix not in TEXT_SUFFIXES or path.stat().st_size > 1_000_000:
+        # Any text file: Rust, Go, Makefiles and workflow files quote paths as readily as Python does.
+        if not path.is_file() or path.is_symlink() or path.stat().st_size > 1_000_000:
             continue
         try:
-            lines = path.read_text(encoding="utf-8").splitlines()
+            data = path.read_bytes()
+            if b"\0" in data[:8192]:
+                continue
+            lines = data.decode("utf-8").splitlines()
         except (OSError, UnicodeDecodeError):
             continue
         for number, line in enumerate(lines, 1):
             new_line, count = rewrite_paths(line)
-            if count:
-                hits = [old for old, _ in olds if old in line]
+            new_line, split = rewrite_split_paths(new_line)
+            if count or split:
+                hits = [old for old, _ in olds if old in line or all(part in line for part in old.split("/"))]
                 findings.append({"path": rel, "line": number, "quotes": hits[:3], "replacement": new_line.strip()[:240]})
     if hooks.returncode == 0 and hooks.stdout.strip():
         findings.append({"path": f"core.hooksPath={hooks.stdout.strip()}", "line": 0, "quotes": [],

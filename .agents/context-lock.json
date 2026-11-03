@@ -1,12 +1,12 @@
 {
   "format": "2",
-  "generatorVersion": "0.7.2",
+  "generatorVersion": "0.7.3",
   "root": ".",
   "validityBasis": "aggregate-source-digest",
   "selectedPaths": [],
   "sourceSelection": {
     "includedCount": 199,
-    "includedBytes": 1776280,
+    "includedBytes": 1779811,
     "excludedCounts": {
       "extension": 42
     }
@@ -17,14 +17,14 @@
     "repositories": [
       {
         "path": ".",
-        "commit": "450c2d72972803c12fe2303a86fb4d2fece3451c",
-        "branch": "chore/bootstrap-0.7.2",
+        "commit": "83804ded97ce18aef51c9abddba7060a08228e54",
+        "branch": "chore/bootstrap-0.7.3",
         "dirty": true,
         "remote": "https://github.com/zachshallbetter/rust-swift.git"
       }
     ]
   },
-  "aggregateSourceDigest": "d3c1ed18c8f150e25b27a84352517e45c20beb1f304710b8df569d85e4164c2d",
+  "aggregateSourceDigest": "f56e423291d9089dd32fa5ff36913b7cbc20d18dde54c10bd42821043c352bc2",
   "sources": [
     {
       "path": ".agents/AGENTS.md",
@@ -48,8 +48,8 @@
     },
     {
       "path": ".agents/acp/lib/acp_commands.py",
-      "bytes": 36693,
-      "sha256": "36220f99c00c74435bdf2ad9b20f40fe3295703b818aee7dc92a12b0cb9a4df2"
+      "bytes": 37660,
+      "sha256": "b203a79cacddcac4caac948bcc9950a8323585e0356f15e748c87b84f4499739"
     },
     {
       "path": ".agents/acp/lib/acp_endpoint_registry.py",
@@ -84,7 +84,7 @@
     {
       "path": ".agents/bootstrap/RELEASE.json",
       "bytes": 15368,
-      "sha256": "3a46f1b04a6cc6155d75596467b1747a05efe54dce5c9730011211cb7c792e5a"
+      "sha256": "408a1b489a03be0380c72ec52d144def28515d1064dce5140dc6a76b8ce3d315"
     },
     {
       "path": ".agents/bootstrap/docs/AGENT_CAPABILITIES.md",
@@ -318,8 +318,8 @@
     },
     {
       "path": ".agents/bootstrap/scripts/gen-context.py",
-      "bytes": 22049,
-      "sha256": "06d7b44469116af4a8589e07031cab56190d2bc2ba3623358f168e11b4023388"
+      "bytes": 22621,
+      "sha256": "a10d0f824e7e4c110c48540f586afcd337399d76a45d1434c7a150bb7cbe32be"
     },
     {
       "path": ".agents/bootstrap/scripts/iepe-adopt.py",
@@ -328,8 +328,8 @@
     },
     {
       "path": ".agents/bootstrap/scripts/layout.py",
-      "bytes": 15303,
-      "sha256": "6a7d25d61942f5533bb3a8d9259241dfaaef29c37fa65e1fd8eb04a78219fe2e"
+      "bytes": 17130,
+      "sha256": "879f3684449338142a778946c8488e4cdfde377f175dd0470f369853d28c251e"
     },
     {
       "path": ".agents/bootstrap/scripts/recipient-status.py",
@@ -343,8 +343,8 @@
     },
     {
       "path": ".agents/bootstrap/scripts/upgrade-project.py",
-      "bytes": 30539,
-      "sha256": "594a43c8298941f6e67c2d4023d2a14ba2088eae91186418d7c970bf934cdeed"
+      "bytes": 30704,
+      "sha256": "de17326fa8875824e4eee9a22b6f7629d240b72f9fd62e299f08a50f974883f1"
     },
     {
       "path": ".agents/bootstrap/scripts/validate-bootstrap.py",
@@ -509,7 +509,7 @@
     {
       "path": ".agents/project/installation.json",
       "bytes": 448,
-      "sha256": "c6cf8502f3632cf5be929a1d9e1795a1e6309996ee96c861825a71b0663321aa"
+      "sha256": "2ed25e92ecadef7314c9df942bb659e3a98b0b5a8276077edbf5a0bef838e146"
     },
     {
       "path": ".agents/project/intent.md",

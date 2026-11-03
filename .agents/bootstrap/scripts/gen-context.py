@@ -510,29 +510,39 @@ def main() -> int:
         return 2
 
     if args.check:
-        lock_path = AGENTS / "context-lock.json"
-        if not lock_path.exists():
-            print("STALE: context lock missing", file=sys.stderr)
+        # With --staged the comparison is against the staged lock: what the commit would carry.
+        def committed(name: str) -> bytes | None:
+            path = AGENTS / name
+            if not args.staged:
+                return path.read_bytes() if path.exists() else None
+            shown = subprocess.run(["git", "-C", str(ROOT), "show", f":{path.relative_to(ROOT).as_posix()}"],
+                                   capture_output=True)
+            return shown.stdout if shown.returncode == 0 else None
+
+        where = "staged " if args.staged else ""
+        raw_lock = committed("context-lock.json")
+        if raw_lock is None:
+            print(f"STALE: {where}context lock missing", file=sys.stderr)
             return 2
         try:
-            current = json.loads(lock_path.read_text(encoding="utf-8"))
-        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
-            print(f"STALE: context lock is unreadable: {exc}", file=sys.stderr)
+            current = json.loads(raw_lock.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            print(f"STALE: {where}context lock is unreadable: {exc}", file=sys.stderr)
             return 2
         if current.get("aggregateSourceDigest") != lock["aggregateSourceDigest"]:
-            print("STALE: source digest differs", file=sys.stderr)
+            print(f"STALE: {where}source digest differs", file=sys.stderr)
             return 2
         if current.get("generatorVersion") != lock["generatorVersion"]:
-            print("STALE: generator version differs", file=sys.stderr)
+            print(f"STALE: {where}generator version differs", file=sys.stderr)
             return 2
         for key in ("format", "root", "validityBasis", "selectedPaths", "sourceSelection", "sources"):
             if current.get(key) != lock[key]:
-                print(f"STALE: context lock field differs: {key}", file=sys.stderr)
+                print(f"STALE: {where}context lock field differs: {key}", file=sys.stderr)
                 return 2
         for name, expected in (("llms.txt", index), ("llms-full.txt", full)):
-            output = AGENTS / name
-            if output.exists() and output.read_bytes() != expected.encode("utf-8"):
-                print(f"STALE: {name} differs", file=sys.stderr)
+            output = committed(name)
+            if output is not None and output != expected.encode("utf-8"):
+                print(f"STALE: {where}{name} differs", file=sys.stderr)
                 return 2
         print(f"OK {lock['aggregateSourceDigest']} (generated exports absent or current)")
         return 0

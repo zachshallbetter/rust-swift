@@ -139,11 +139,22 @@ def cmd_status(args, cfg) -> int:
     if context_tool.exists():
         check = subprocess.run([sys.executable, str(context_tool), "--check"], cwd=project,
                                capture_output=True, text=True)
-        if check.returncode == 0:
-            report.add("S013", "context", "OK", "compiled context is current")
-        else:
+        staged = subprocess.run(["git", "-C", str(project), "diff", "--cached", "--quiet"], capture_output=True)
+        staged_check = None
+        if staged.returncode == 1:                      # something is staged: the lock it would commit matters
+            staged_check = subprocess.run([sys.executable, str(context_tool), "--check", "--staged"], cwd=project,
+                                          capture_output=True, text=True)
+        if check.returncode == 0 and (staged_check is None or staged_check.returncode == 0):
+            report.add("S013", "context", "OK",
+                       "compiled context is current" + (" (working tree and staged)" if staged_check else ""))
+        elif check.returncode != 0:
             reason = next((line for line in check.stderr.splitlines() if line.startswith(("STALE", "ERROR"))), "stale")
             report.add("S013", "context", "WARN", reason, ".agents/bootstrap/bootstrap context")
+        else:
+            reason = next((line for line in staged_check.stderr.splitlines()
+                           if line.startswith(("STALE", "ERROR"))), "staged lock is stale")
+            report.add("S013", "context", "WARN", reason,
+                       ".agents/bootstrap/bootstrap context --staged, then stage .agents/context-lock.json and llms*.txt")
 
     version = acp_paths.client_version()
     client_digest = file_digest(acp_paths.CLIENT_HOME / "lib" / "acp.py")
