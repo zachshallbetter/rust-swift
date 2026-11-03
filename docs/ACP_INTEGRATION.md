@@ -154,6 +154,18 @@ An `ALLOW` with `policy_effect: NOT_GOVERNED` is ACP declining jurisdiction, not
 
 The project may raise the minimum governed class (for example to `E1` for a project whose isolated workspaces are shared) but must not lower it below what the authority model declares as protected.
 
+### Refs that deploy automatically
+
+When a hosting integration deploys a branch on every push, updating that ref is also a production deploy. Declare it in the profile:
+
+```json
+"authorizationProvider": {
+  "autoDeploy": [{"ref": "refs/heads/main", "environment": "production"}]
+}
+```
+
+Then `acp.py authorize --action git.protected_ref.update --ref refs/heads/main` also requests `production.deploy` for the same old and new SHA. It prints both decisions, `deploy_decision` beside the ref decision, and exits non-zero unless both are `ALLOW`. Where the owner has decided that the merge is the deploy decision, add `"decision": "merge"` and the client asks once. An undeclared repository with `vercel.json`, `.vercel/project.json` or `netlify.toml` gets a warning when `main` or `master` is updated, never a refusal.
+
 ## Decisions and the required disposition
 
 | ACP decision | Code | Agent disposition |

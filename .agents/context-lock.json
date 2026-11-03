@@ -1,12 +1,12 @@
 {
   "format": "2",
-  "generatorVersion": "0.6.2",
+  "generatorVersion": "0.6.3",
   "root": ".",
   "validityBasis": "aggregate-source-digest",
   "selectedPaths": [],
   "sourceSelection": {
     "includedCount": 171,
-    "includedBytes": 1565538,
+    "includedBytes": 1576329,
     "excludedCounts": {
       "excluded-path": 1,
       "extension": 37
@@ -18,14 +18,14 @@
     "repositories": [
       {
         "path": ".",
-        "commit": "1feaa6e36adeb0d16d83b649afcf34fb160c72bc",
+        "commit": "21f33274bcae6e4a3af5964ec62ed23a015df13b",
         "branch": "main",
         "dirty": true,
         "remote": "https://github.com/zachshallbetter/rust-swift.git"
       }
     ]
   },
-  "aggregateSourceDigest": "0753839edaa39ecbbbb4d26e8dcd1eac2d0f98eac628783c0aa80d98a73f9e13",
+  "aggregateSourceDigest": "837c01640193f992f5e30c3b0038a8649e6716b31ca62aa7d02a5976feaa7097",
   "sources": [
     {
       "path": ".agents/AGENTS.md",
@@ -235,7 +235,7 @@
     {
       "path": ".formal-bootstrap.json",
       "bytes": 373,
-      "sha256": "5bd2d9524f80e0f82e2568cb4d7820aedf3806cc9c527eef438aea000da5a508"
+      "sha256": "4565de8a0f546e7dc457a8d502e6e7ebb5d871c532057b345886618b6201a1b4"
     },
     {
       "path": ".github/workflows/ci.yml",
@@ -284,8 +284,8 @@
     },
     {
       "path": "PROJECT_PROFILE.json",
-      "bytes": 3343,
-      "sha256": "75860387c8e5528457adc72daf5bd40180f07a497d353c48679b842fe34e959f"
+      "bytes": 3365,
+      "sha256": "50520f86c98e26a1d46f068b0ef4d3f95b539f66f824c921ba05d2ee7f4c9e35"
     },
     {
       "path": "README.md",
@@ -295,7 +295,7 @@
     {
       "path": "VERSION",
       "bytes": 6,
-      "sha256": "a466ef209f5c3aee5ff0c702e2e9d5cced4783d2a655e8ab66330f21a5557b3f"
+      "sha256": "c9f56eb9348cbc8345bdaea7ca24c9f960e1598af05472794760a2682ff07a8c"
     },
     {
       "path": "bindings/PROJECT_BINDINGS.yaml",
@@ -529,8 +529,8 @@
     },
     {
       "path": "docs/ACP_INTEGRATION.md",
-      "bytes": 29258,
-      "sha256": "a42d94a1a771e2f7e258e3583deb9bcf3f5c065f77ddd99c404fa8a46ec26591"
+      "bytes": 30075,
+      "sha256": "eb889285bf82813f8c36f0c301cea37526e6a7f6bc5dbccc4e4dfb528958d7ae"
     },
     {
       "path": "docs/AGENT_CAPABILITIES.md",
@@ -559,8 +559,8 @@
     },
     {
       "path": "docs/CONTEXT_COMPILATION.md",
-      "bytes": 2906,
-      "sha256": "f4340c5afdba5aacf3d912af1ff9edcef21a1caf5bc4256975d23bf603740ed6"
+      "bytes": 3821,
+      "sha256": "0309f7f0e4ed9f4bc0fc8624a25197503a793e3e769c559c4e5f2f5a5651cbe8"
     },
     {
       "path": "docs/EVIDENCE_METHOD.md",
@@ -719,8 +719,8 @@
     },
     {
       "path": "schemas/acp-decision.schema.json",
-      "bytes": 5605,
-      "sha256": "2a870190e4a3d208b765054b04de35819570770639e93e16ebb52d4365e8c76c"
+      "bytes": 5822,
+      "sha256": "14104b5c057c8e09bcb8ab1f132f9c9e7266e50d8c7b7f4f6973adafb0b02641"
     },
     {
       "path": "schemas/acp-endpoint-registry.schema.json",
@@ -789,8 +789,8 @@
     },
     {
       "path": "scripts/acp.py",
-      "bytes": 59939,
-      "sha256": "438ae9b3e8cba6a8adca3bd4079a488342a1d939f7971e4ad06f80cdeb4e010d"
+      "bytes": 62581,
+      "sha256": "c9610122272b702b81df1a3c27cc3baf127421776d547e96fac2613238035c61"
     },
     {
       "path": "scripts/acp_endpoint_registry.py",
@@ -829,8 +829,8 @@
     },
     {
       "path": "scripts/gen-context.py",
-      "bytes": 14390,
-      "sha256": "1cecc3bc593ef0c89cc24692db223c5a29a5e434561e0ebf4c36bf9464799c1b"
+      "bytes": 20568,
+      "sha256": "a0fcab49f586f036d70c8d572f1f031054750ea9bb51a28fb94c80e5fc0e99f2"
     },
     {
       "path": "scripts/iepe-adopt.py",

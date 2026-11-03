@@ -1,7 +1,7 @@
 {
   "projectId": "rust-swift",
   "projectName": "Rust to Swift Compiler",
-  "profileVersion": "0.6.2",
+  "profileVersion": "0.6.3",
   "profileStatus": "provisional",
   "intentRef": "PROJECT_INTENT.md",
   "authorityRef": "docs/AUTHORITY_MODEL.md",
@@ -34,7 +34,8 @@
     "reportOnSessionStart": true,
     "reportBeforeProtectedEffect": true,
     "checkScript": "scripts/acp-check.py",
-    "clientScript": "scripts/acp.py"
+    "clientScript": "scripts/acp.py",
+    "autoDeploy": []
   },
   "serviceOperations": [
     {

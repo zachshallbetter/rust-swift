@@ -224,6 +224,10 @@
         "string",
         "null"
       ]
+    },
+    "deploy_decision": {
+      "type": "object",
+      "description": "The production.deploy decision the client also obtained because the updated ref deploys automatically (authorizationProvider.autoDeploy)."
     }
   },
   "allOf": [

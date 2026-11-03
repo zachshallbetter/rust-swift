@@ -258,7 +258,28 @@ def settings() -> dict:
         "project_id": profile.get("projectId"),
         "project_root": str(PROJECT_ROOT),
         "branch": git("symbolic-ref", "--quiet", "--short", "HEAD"),
+        "auto_deploy": auto_deploy_rules(acp),
     }
+
+
+# Files that show a hosting integration deploys this repository on push.
+DEPLOY_INDICATORS = ("vercel.json", ".vercel/project.json", "netlify.toml")
+
+
+def auto_deploy_rules(acp: dict) -> list[dict]:
+    """authorizationProvider.autoDeploy: refs whose update also deploys an environment.
+
+    Each entry is {"ref": "refs/heads/main", "environment": "production"}, plus
+    "decision": "merge" where the owner has decided that the ref update is the
+    deploy decision; otherwise the client also asks for production.deploy.
+    """
+    rules = []
+    for entry in acp.get("autoDeploy") or []:
+        if not isinstance(entry, dict) or not str(entry.get("ref", "")).startswith("refs/"):
+            continue
+        rules.append({"ref": entry["ref"], "environment": entry.get("environment", "production"),
+                      "decision": "merge" if entry.get("decision") == "merge" else "separate"})
+    return rules
 
 
 def scrub(text: str, cfg: dict) -> str:
@@ -585,13 +606,13 @@ def cmd_authorize(args, cfg) -> int:
         context["recovery_authorization_id"] = args.recovery_authorization_id
     if args.owner_override_id:
         context["owner_override_id"] = args.owner_override_id
-    if problem:
-        decision = synthetic(args.action, "GATEWAY_UNAVAILABLE", problem, local_setup=True)
-    else:
+    def decide(action: str, context: dict) -> dict:
+        if problem:
+            return synthetic(action, "GATEWAY_UNAVAILABLE", problem, local_setup=True)
         claim = {k: v for k, v in (("owner", cfg["owner"]), ("name", cfg["name"]),
                                    ("remote_url", cfg["remote"]),
                                    ("head_sha", git("rev-parse", "HEAD"))) if v}
-        request = {"action": args.action, "agent_id": cfg["agent_id"], "repository_claim": claim,
+        request = {"action": action, "agent_id": cfg["agent_id"], "repository_claim": claim,
                    "context": context,
                    "principal": {k: v for k, v in principal(cfg).items()
                                  if k in ("client_type", "client_version")}}
@@ -601,14 +622,15 @@ def cmd_authorize(args, cfg) -> int:
         if args.summary:
             request["request_provenance"] = {"source": args.provenance, "request_summary": args.summary}
         try:
-            if admin_action:
+            if action in ADMIN_ACTIONS:
                 status, body = call_admin(cfg, "/internal/authorize", request, args.timeout)
             else:
                 status, body = call(cfg, "POST", "/internal/authorize", request, timeout=args.timeout)
-            decision = dispose(args.action, context, status, body, cfg["fail_closed"])
+            return dispose(action, context, status, body, cfg["fail_closed"])
         except Unreachable as exc:
-            decision = synthetic(args.action, "GATEWAY_UNAVAILABLE", f"unreachable: {exc}")
-    if args.record:
+            return synthetic(action, "GATEWAY_UNAVAILABLE", f"unreachable: {exc}")
+
+    def record(decision: dict, context: dict) -> None:
         record_evidence({"gate": "acp-decision", "type": "acp_authorization", "disposition": "Observed",
                          "observedAt": datetime.now(timezone.utc).isoformat(),
                          "workItem": args.work_item, "context": context,
@@ -617,10 +639,33 @@ def cmd_authorize(args, cfg) -> int:
                          **{k: decision.get(k) for k in ("decision", "code", "reason", "action", "request_id",
                                                          "policy_id", "policy_version", "repository_trust",
                                                          "authorization_state", "incident_id", "synthetic")}})
+
+    decision = decide(args.action, context)
+    if args.record:
+        record(decision, context)
+    exit_code = 2 if problem else EXIT.get(decision["decision"], 11)
+    if args.action == "git.protected_ref.update" and decision["decision"] == "ALLOW":
+        rule = next((r for r in cfg["auto_deploy"] if r["ref"] == args.ref), None)
+        if rule and rule["decision"] == "separate":
+            # Moving this ref deploys production, so the update is only safe
+            # to perform when the deploy is authorized too.
+            deploy_context = {k: v for k, v in context.items() if k in ("ref", "old_sha", "new_sha")}
+            deploy = decide("production.deploy", deploy_context)
+            if args.record:
+                record(deploy, deploy_context)
+            decision = {**decision, "deploy_decision": deploy}
+            if deploy["decision"] != "ALLOW":
+                print(f"{args.ref} deploys {rule['environment']} automatically, and production.deploy was "
+                      f"{deploy['decision']} ({deploy.get('reason')}): do not update the ref.", file=sys.stderr)
+                exit_code = EXIT.get(deploy["decision"], 11)
+        elif not rule:
+            found = [name for name in DEPLOY_INDICATORS if (PROJECT_ROOT / name).exists()]
+            if found and args.ref in ("refs/heads/main", "refs/heads/master"):
+                print(f"warning: {', '.join(found)} suggests {args.ref} deploys automatically, so updating it "
+                      "may also deploy production. Declare authorizationProvider.autoDeploy in "
+                      "PROJECT_PROFILE.json so the client asks for production.deploy too.", file=sys.stderr)
     emit(decision, cfg)
-    if problem:
-        return 2
-    return EXIT.get(decision["decision"], 11)
+    return exit_code
 
 
 # ------------------------------------------------------------------ others

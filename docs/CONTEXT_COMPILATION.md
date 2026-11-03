@@ -35,7 +35,13 @@ python3 scripts/gen-context.py
 python3 scripts/gen-context.py --check
 # Optional bounded compilation:
 python3 scripts/gen-context.py --path docs --path scripts/gen-context.py
+# Compile the commit being made rather than the working tree:
+python3 scripts/gen-context.py --staged
+# Do that on every commit, and stage the lock with it:
+python3 scripts/gen-context.py --install-hook
 ```
+
+In a Git work tree the compiler reads only files Git tracks or would add, so ignored local files never reach the corpus. It still reads their working-tree content, so an uncommitted edit to a tracked file changes the lock. `--staged` reads membership and content from the index instead. The lock it writes is what a clean checkout of the resulting commit computes, whatever else is uncommitted. `--install-hook` writes a pre-commit hook that runs `--staged` and stages `.agents/context-lock.json`, plus the corpus exports where they are tracked. It never replaces a pre-commit hook it did not write, and it refuses a `core.hooksPath` outside the repository. Bypass it for one commit with `SKIP_CONTEXT_HOOK=1`.
 
 The source policy may add `excludePatterns` for project-specific sensitive files. The compiler always excludes common build/cache/temp directories, generated LLM exports, bytecode, temporary files, environment variants, private-key/certificate containers, and common credentials/secrets JSON files. Canonical sources remain authoritative; repair stale context by correcting the source and regenerating it.
 

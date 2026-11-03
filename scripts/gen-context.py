@@ -184,8 +184,70 @@ def candidate_paths() -> list[Path]:
     return [ROOT / name for name in sorted(names)]
 
 
+# Index entry modes that carry file text. Symlinks (120000) and submodule
+# gitlinks (160000) are not file contents.
+BLOB_MODES = {"100644", "100755"}
+
+
+def git_bytes(args: list[str], data: bytes | None = None) -> bytes:
+    try:
+        return subprocess.run(["git", "-C", str(ROOT), *args], input=data,
+                              capture_output=True, check=True).stdout
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise ContextError(f"--staged needs a Git work tree: git {args[0]} failed") from exc
+
+
+def staged_entries() -> dict[str, str]:
+    """Path -> blob id for every regular file in the index.
+
+    `--staged` reads membership and content from the index, so the lock written
+    for a commit is the one a clean checkout of that commit computes, whatever
+    else is uncommitted in the working tree.
+    """
+    entries: dict[str, str] = {}
+    for record in git_bytes(["ls-files", "-s", "-z", "--cached"]).decode("utf-8", "surrogateescape").split("\0"):
+        if not record:
+            continue
+        meta, _, rel = record.partition("\t")
+        mode, blob, stage = (meta.split() + ["", "", ""])[:3]
+        if stage != "0":
+            raise ContextError(f"the index has unresolved conflicts at {rel}; resolve them before --staged")
+        if mode in BLOB_MODES:
+            entries[rel] = blob
+    return entries
+
+
+def blob_sizes(blobs: list[str]) -> list[int]:
+    if not blobs:
+        return []
+    out = git_bytes(["cat-file", "--batch-check=%(objectsize)"], ("\n".join(blobs) + "\n").encode())
+    return [int(line) if line.strip().isdigit() else -1 for line in out.decode().splitlines()]
+
+
+def read_blobs(blobs: list[str]) -> list[bytes]:
+    if not blobs:
+        return []
+    data = git_bytes(["cat-file", "--batch"], ("\n".join(blobs) + "\n").encode())
+    result, pos = [], 0
+    for blob in blobs:
+        end = data.index(b"\n", pos)
+        header = data[pos:end].decode().split()
+        pos = end + 1
+        if len(header) < 3 or header[1] != "blob":
+            raise ContextError(f"staged blob {blob} is missing from the object store")
+        size = int(header[2])
+        result.append(data[pos:pos + size])
+        pos += size + 1
+    return result
+
+
+def staged_version() -> str:
+    blob = staged_entries().get("VERSION")
+    return read_blobs([blob])[0].decode("utf-8").strip() if blob else VERSION
+
+
 def source_files(
-    policy: dict, path_filters: tuple[str, ...] = ()
+    policy: dict, path_filters: tuple[str, ...] = (), staged: bool = False
 ) -> tuple[list[tuple[str, bytes]], dict[str, int]]:
     ex_dirs = set(policy["excludeDirectories"]) | DEFAULT_EXCLUDED_DIRS
     ex_paths = set(policy["excludePaths"]) | DEFAULT_EXCLUDED_PATHS
@@ -205,11 +267,14 @@ def source_files(
     skipped: dict[str, int] = {}
     total_bytes = 0
 
-    for path in candidate_paths():
-        if path.is_symlink():
+    index = staged_entries() if staged else {}
+    sizes = dict(zip(index, blob_sizes(list(index.values())))) if staged else {}
+    pending: list[tuple[str, str]] = []
+    for path in ([ROOT / rel for rel in sorted(index)] if staged else candidate_paths()):
+        if not staged and path.is_symlink():
             skipped["symlink"] = skipped.get("symlink", 0) + 1
             continue
-        if not path.is_file():
+        if not staged and not path.is_file():
             continue
         rel = path.relative_to(ROOT).as_posix()
         parts = rel.split("/")
@@ -237,6 +302,12 @@ def source_files(
         if rel not in include_files and path.suffix.lower() not in exts:
             skipped["extension"] = skipped.get("extension", 0) + 1
             continue
+        if staged:
+            if sizes[rel] > max_bytes:
+                skipped["size"] = skipped.get("size", 0) + 1
+            else:
+                pending.append((rel, index[rel]))
+            continue
         try:
             before = path.stat()
         except OSError as exc:
@@ -261,6 +332,16 @@ def source_files(
         result.append((rel, data))
         total_bytes += len(data)
 
+    for (rel, _), data in zip(pending, read_blobs([blob for _, blob in pending])):
+        try:
+            data.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise ContextError(f"cannot read eligible source {rel}: {exc}") from exc
+        if max_total_bytes is not None and total_bytes + len(data) > max_total_bytes:
+            raise ContextError(f"context source total exceeds maxTotalBytes at {rel}")
+        result.append((rel, data))
+        total_bytes += len(data)
+
     if skipped:
         print(
             "excluded " + ", ".join(f"{key}={value}" for key, value in sorted(skipped.items())),
@@ -269,9 +350,10 @@ def source_files(
     return sorted(result, key=lambda item: item[0]), skipped
 
 
-def build(path_filters: tuple[str, ...] = ()) -> tuple[dict, str, str]:
+def build(path_filters: tuple[str, ...] = (), staged: bool = False) -> tuple[dict, str, str]:
     policy = load_policy()
-    sources, skipped = source_files(policy, path_filters)
+    sources, skipped = source_files(policy, path_filters, staged)
+    version = staged_version() if staged else VERSION
     entries = [
         {"path": rel, "bytes": len(data), "sha256": sha(data)} for rel, data in sources
     ]
@@ -281,7 +363,7 @@ def build(path_filters: tuple[str, ...] = ()) -> tuple[dict, str, str]:
     repos = repository_state()
     lock = {
         "format": "2",
-        "generatorVersion": VERSION,
+        "generatorVersion": version,
         "root": ".",
         "validityBasis": "aggregate-source-digest",
         "selectedPaths": list(path_filters),
@@ -297,7 +379,7 @@ def build(path_filters: tuple[str, ...] = ()) -> tuple[dict, str, str]:
 
     index = [
         "# Project Context Index",
-        f"> Generator: {VERSION}",
+        f"> Generator: {version}",
         f"> Source digest: `{aggregate}`",
         "",
         "> Generated projection. Canonical sources remain authoritative.",
@@ -305,7 +387,7 @@ def build(path_filters: tuple[str, ...] = ()) -> tuple[dict, str, str]:
     ]
     full = [
         "# PROJECT COMPILED CONTEXT",
-        f"Generator: {VERSION}",
+        f"Generator: {version}",
         f"Source digest: {aggregate}",
         "",
         "> Generated projection. Canonical sources remain authoritative.",
@@ -320,9 +402,61 @@ def build(path_filters: tuple[str, ...] = ()) -> tuple[dict, str, str]:
     return lock, "\n".join(index) + "\n", "\n".join(full) + "\n"
 
 
+HOOK_MARKER = "# formal-project-bootstrap: compile context from the staged tree"
+HOOK = f"""#!/bin/sh
+{HOOK_MARKER}
+# Installed by scripts/gen-context.py --install-hook. Bypass: SKIP_CONTEXT_HOOK=1 git commit ...
+[ "${{SKIP_CONTEXT_HOOK:-0}}" = "1" ] && exit 0
+root=$(git rev-parse --show-toplevel) || exit 1
+cd "$root" || exit 1
+[ -f scripts/gen-context.py ] || exit 0
+git rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1 && exit 0
+python3 scripts/gen-context.py --staged >/dev/null || {{
+    echo "pre-commit: gen-context.py --staged failed; commit aborted (bypass: SKIP_CONTEXT_HOOK=1)." >&2
+    exit 1
+}}
+for generated in .agents/context-lock.json .agents/llms.txt .agents/llms-full.txt; do
+    if git ls-files --error-unmatch "$generated" >/dev/null 2>&1 || [ "$generated" = .agents/context-lock.json ]; then
+        git add -- "$generated"
+    fi
+done
+"""
+
+
+def install_hook() -> int:
+    """Write the pre-commit hook into this repository's hooks directory."""
+    hooks = run_git(ROOT, ["rev-parse", "--git-path", "hooks"])
+    if not hooks:
+        print("ERROR: --install-hook needs a Git work tree", file=sys.stderr)
+        return 2
+    directory = (Path(hooks) if Path(hooks).is_absolute() else ROOT / hooks).resolve()
+    common = run_git(ROOT, ["rev-parse", "--git-common-dir"]) or ".git"
+    common_dir = (Path(common) if Path(common).is_absolute() else ROOT / common).resolve()
+    if not (directory.is_relative_to(ROOT.resolve()) or directory.is_relative_to(common_dir)):
+        print(f"ERROR: core.hooksPath points outside this repository ({directory}); a hook there would "
+              "run in every repository that shares it. Add `python3 scripts/gen-context.py --staged` and "
+              "`git add .agents/context-lock.json` to that hook yourself.", file=sys.stderr)
+        return 2
+    hook = directory / "pre-commit"
+    if hook.exists() and HOOK_MARKER not in hook.read_text(encoding="utf-8", errors="replace"):
+        print(f"ERROR: {hook} already exists and is not this hook; add `python3 scripts/gen-context.py "
+              "--staged` and `git add .agents/context-lock.json` to it instead", file=sys.stderr)
+        return 2
+    hook.parent.mkdir(parents=True, exist_ok=True)
+    hook.write_text(HOOK, encoding="utf-8")
+    hook.chmod(0o755)
+    print(f"installed {hook}")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--check", action="store_true")
+    parser.add_argument(
+        "--staged",
+        action="store_true",
+        help="read sources from the Git index, so the lock matches the commit being made",
+    )
     parser.add_argument(
         "--path",
         action="append",
@@ -330,10 +464,14 @@ def main() -> int:
         default=[],
         help="compile only this relative file or directory (repeatable)",
     )
+    parser.add_argument("--install-hook", action="store_true",
+                        help="install a pre-commit hook that runs --staged and stages the lock")
     args = parser.parse_args()
+    if args.install_hook:
+        return install_hook()
     try:
         path_filters = normalize_path_filters(args.path_filters)
-        lock, index, full = build(path_filters)
+        lock, index, full = build(path_filters, args.staged)
     except ContextError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2
@@ -351,7 +489,7 @@ def main() -> int:
         if current.get("aggregateSourceDigest") != lock["aggregateSourceDigest"]:
             print("STALE: source digest differs", file=sys.stderr)
             return 2
-        if current.get("generatorVersion") != VERSION:
+        if current.get("generatorVersion") != lock["generatorVersion"]:
             print("STALE: generator version differs", file=sys.stderr)
             return 2
         for key in ("format", "root", "validityBasis", "selectedPaths", "sourceSelection", "sources"):
