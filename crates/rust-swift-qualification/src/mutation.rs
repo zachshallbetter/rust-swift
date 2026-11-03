@@ -100,7 +100,8 @@ impl MutationRunner {
         // Append to .agents/records/negative-results.jsonl (formal-project-bootstrap 0.7)
         let neg_results_path = if self.repo_root.join(".agents").join("records").exists() {
             self.repo_root
-                .join(".agents").join("records")
+                .join(".agents")
+                .join("records")
                 .join("negative-results.jsonl")
         } else if Path::new("../../.agents/records").exists() {
             PathBuf::from("../../.agents/records/negative-results.jsonl")
@@ -108,7 +109,8 @@ impl MutationRunner {
             PathBuf::from("../.agents/records/negative-results.jsonl")
         } else {
             self.repo_root
-                .join(".agents").join("records")
+                .join(".agents")
+                .join("records")
                 .join("negative-results.jsonl")
         };
         if let Ok(mut file) = OpenOptions::new()

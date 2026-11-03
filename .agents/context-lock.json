@@ -6,7 +6,7 @@
   "selectedPaths": [],
   "sourceSelection": {
     "includedCount": 199,
-    "includedBytes": 1779811,
+    "includedBytes": 1779947,
     "excludedCounts": {
       "extension": 42
     }
@@ -17,14 +17,14 @@
     "repositories": [
       {
         "path": ".",
-        "commit": "83804ded97ce18aef51c9abddba7060a08228e54",
+        "commit": "c007d8027289f5e12a4ccad239f4db8326e9e40d",
         "branch": "chore/bootstrap-0.7.3",
         "dirty": true,
         "remote": "https://github.com/zachshallbetter/rust-swift.git"
       }
     ]
   },
-  "aggregateSourceDigest": "f56e423291d9089dd32fa5ff36913b7cbc20d18dde54c10bd42821043c352bc2",
+  "aggregateSourceDigest": "8c1390b6b1290fad69a937f8fd3dee1f6a9516bdd2d49b7ae1caa86fa21bdcc7",
   "sources": [
     {
       "path": ".agents/AGENTS.md",
@@ -853,8 +853,8 @@
     },
     {
       "path": "crates/rust-swift-qualification/src/evals.rs",
-      "bytes": 22158,
-      "sha256": "6e559bd63caba6b94e4d64a6c19266456df84030c385c7112a5a8ba6e210d6c3"
+      "bytes": 22260,
+      "sha256": "68d21771aafd824bb9d7fe3e2113e49ae78ba87fbca26c06486304424e9e6151"
     },
     {
       "path": "crates/rust-swift-qualification/src/lib.rs",
@@ -863,8 +863,8 @@
     },
     {
       "path": "crates/rust-swift-qualification/src/mutation.rs",
-      "bytes": 18623,
-      "sha256": "35cf90f91bb6c6a93feffc9bdfa9a5b38b6ed337e2921dd2da62a76b961d7601"
+      "bytes": 18657,
+      "sha256": "ec61c65d1e494f90ad59c3adf89601859de12dbe2b8ed3b015518066922bb10a"
     },
     {
       "path": "crates/rust-swift-qualification/src/proof.rs",
