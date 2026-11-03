@@ -1,0 +1,12 @@
+{
+  "format": "1",
+  "adapterId": "icp",
+  "protocol": {"id":"icp","version":"0.1.0","revisionOrDigest":"git:f1892e4","canonicalSource":"interaction-contract-protocol"},
+  "supportedBootstrap": "0.7.x",
+  "authority": {"role":"interaction-contract","sourceOfTruth":"ICP contract for the consequential interaction","promotionBoundary":"ACP decision is required before protected effect execution"},
+  "mappings": {"imports":["intent","participants","boundary","state","actions","checks","verification","transition","effects","invariants","outcome","recovery","receipt","closure"],"projects":["effect->ACP protected effect", "recovery->FPB recovery record", "receipt->audit/evidence record"],"lifecycle":["declared","validated","authorized","executing","observed","verified","closed","recovered"],"evidence":["input validation","consequence-derived verification","receipt","trace","closure"]},
+  "unsupported": ["an exposed operation is not permission or execution", "ICP does not replace provider-specific API schemas"],
+  "compatibility": {"syntax":"adapter-defined","schema":"ICP contract fields remain inspectable","behavior":"transitions are concurrency-safe and typed","semantics":"available, authorized, enabled, and exposed remain distinct","authority":"ACP supplies protected-effect authorization","evidence":"receipt and closure are mandatory for consequential effects"},
+  "checks": ["contract declares boundary and participants", "protected effect has ACP decision", "idempotency key is present", "typed receipt and recovery path exist", "closure is explicit"],
+  "migration": {"adopt":"wrap existing protected effects with a declared contract before execution", "repin":"revalidate contracts against new ICP revision", "deviation":"record provider-specific deviations without weakening ACP"}
+}

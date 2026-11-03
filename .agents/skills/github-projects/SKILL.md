@@ -86,11 +86,11 @@ permissions authorize that exact effect.
 ## Reading through ACP
 
 A formal-bootstrap project with `authorizationProvider.gatewayEndpointSet`
-routes board reads through `scripts/acp.py`. That shared client resolves the
+routes board reads through `.agents/acp/lib/acp.py`. That shared client resolves the
 machine-local ordered endpoint set, uses a distinct bearer for each endpoint,
 checks shared-state identity, and fails over only under its documented GET
 rules. Do not put a gateway URL or token in the repository or `.env.local`.
-Configure the endpoint set once with `python3 scripts/acp.py endpoints configure`.
+Configure the endpoint set once with `.agents/acp/acp endpoints configure`.
 
 The `snapshot.sh`, `project-ids.sh`, `claims.sh`, and `project.sh list` read
 paths use ACP when the profile selects an endpoint set. ACP remains pull-only:
@@ -191,7 +191,7 @@ scripts/set-field.sh --owner example-org --project 2 --item "$ITEM" --field Stat
 
 | Goal | How |
 |------|-----|
-| List an owner's projects | `scripts/acp.py projects --owner <o>` for a bound ACP project; otherwise `gh project list --owner <o>` |
+| List an owner's projects | `.agents/acp/lib/acp.py projects --owner <o>` for a bound ACP project; otherwise `gh project list --owner <o>` |
 | View a project / its fields | `gh project view <n> --owner <o> [--format json]` |
 | Create / edit / close a project | `gh project create\|edit\|close <n> --owner <o> …` |
 | List items (raise the limit!) | `gh project item-list <n> --owner <o> --limit 500 --format json` |

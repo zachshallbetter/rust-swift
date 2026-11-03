@@ -1,0 +1,18 @@
+profile_id: "commercialization"
+version: "0.2.0"
+adds:
+  protocols:
+    - "calp"
+    - "pgp"
+  domain_authorities:
+    - asset_registration
+    - ownership_assertion
+    - commercial_evaluation
+    - pilot_commitment
+    - publication
+    - pricing
+    - contract
+    - portfolio_allocation
+    - scale
+    - retirement
+rule: "Bind only the authorities/effects actually used by the project."

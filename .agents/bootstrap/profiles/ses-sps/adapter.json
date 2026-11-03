@@ -1,0 +1,12 @@
+{
+  "format": "1",
+  "adapterId": "ses-sps",
+  "protocol": {"id":"ses","version":"1.0.0","revisionOrDigest":"git:f1892e4","canonicalSource":"semantic-expression-system"},
+  "supportedBootstrap": "0.7.x",
+  "authority": {"role":"semantic-publication","sourceOfTruth":"SES/SSS/SPS canonical semantic and publication records","promotionBoundary":"publication remains an explicit protected effect"},
+  "mappings": {"imports":["meaning","expression","surface","situation","access projection","publication truth","presentation"],"projects":["intent->semantic purpose","surface->context projection","publication->protected effect contract"],"lifecycle":["canonical","resolved","rendered","reviewed","published","superseded"],"evidence":["resolution trace","dependency fingerprint","schema conformance","publication receipt"]},
+  "unsupported": ["SSS does not decide domain truth","generated context is not canonical semantic state","publication adapters remain domain-owned"],
+  "compatibility": {"syntax":"adapter-defined","schema":"semantic records remain renderer-neutral","behavior":"surface resolution is read-only over canonical state","semantics":"meaning, surface, expression, and publication remain separated","authority":"domain truth stays with its owning system","evidence":"resolution traces and publication receipts remain recoverable"},
+  "checks": ["access projection cannot widen visibility","unknown and withheld states remain distinct","surface resolution has trace and dependencies","publication requires explicit contract and receipt"],
+  "migration": {"adopt":"bind existing semantic sources without copying their authority","repin":"recompute affected surfaces after protocol changes","deviation":"record renderer or domain deviations explicitly"}
+}

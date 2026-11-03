@@ -1,0 +1,11 @@
+{
+  "format": "1",
+  "projectId": "<PROJECT_ID>",
+  "resources": [],
+  "integrityPolicy": {
+    "requireCanonicalSource": true,
+    "preferImmutableRevisionOrDigest": true,
+    "rejectRemoteLatestForRequiredResources": true,
+    "rejectGeneratedContextAsAuthority": true
+  }
+}

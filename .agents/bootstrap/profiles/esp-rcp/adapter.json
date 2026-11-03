@@ -1,0 +1,12 @@
+{
+  "format": "1",
+  "adapterId": "esp-rcp",
+  "protocol": {"id":"esp","version":"0.3.0","revisionOrDigest":"git:f1892e4","canonicalSource":"external-state-protocol "},
+  "supportedBootstrap": "0.7.x",
+  "authority": {"role":"external-state-governance","sourceOfTruth":"ESP instance and campaign records, with RCP obligations where enabled","promotionBoundary":"commitment and promotion require explicit authority and qualified evidence"},
+  "mappings": {"imports":["external-state-instance","campaign","outcome","claim","evidence","relationship","opportunity","pursuit","interaction","commitment","receipt"],"projects":["instance->project identity","campaign->epic/work graph","commitment->contract/authority record","receipt->evidence record","recipient->RCP record"],"lifecycle":["bootstrap","discover","define","contract","baseline","prepare","execute","observe","qualify","decide","commit","promote","measure","learn"],"evidence":["receipt","qualified evidence","state update","measurement","negative result"]},
+  "unsupported": ["relationship is not pursuit","interaction is not commitment","receipt is not the underlying event","stale context is not external-state truth"],
+  "compatibility": {"syntax":"adapter-defined","schema":"ESP entities remain domain records","behavior":"external dependencies produce typed waiting states","semantics":"external state remains distinct from project intent","authority":"commitment and promotion authorities remain explicit","evidence":"state transitions require receipts and qualification"},
+  "checks": ["external-state instance has owner and authority","commitments have counterparties and closure","external blockers are typed","receipts are preserved","RCP status is derived when enabled"],
+  "migration": {"adopt":"initialize a read-only instance map before creating work","repin":"reassess lifecycle and entity mappings on ESP revision change","deviation":"record local domain extensions as bounded deviations"}
+}

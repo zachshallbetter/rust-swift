@@ -1,0 +1,27 @@
+#!/usr/bin/env python3
+"""bootstrap -- the Formal Project Bootstrap command for this project.
+
+    .agents/bootstrap/bootstrap validate         structure and context lock
+    .agents/bootstrap/bootstrap context [--staged | --install-hook | --check]
+    .agents/bootstrap/bootstrap upgrade [--to vX.Y.Z] [--commit]
+                                                 fetch, verify and apply a release
+    .agents/bootstrap/bootstrap repair           restore edited machinery to the installed release
+    .agents/bootstrap/bootstrap uninstall [--apply] [--export DIR]
+    .agents/bootstrap/bootstrap reconcile        read-only adoption report
+    .agents/bootstrap/bootstrap version
+
+Standard library only; Python 3.11 or newer.
+"""
+import sys
+
+if sys.version_info < (3, 11):
+    sys.exit(f"bootstrap needs Python 3.11 or newer; this is {sys.version.split()[0]}")
+
+from pathlib import Path
+
+sys.dont_write_bytecode = True
+
+sys.path.insert(0, str(Path(__file__).resolve().parent / "scripts"))
+import bootstrap_cli  # noqa: E402
+
+raise SystemExit(bootstrap_cli.main())

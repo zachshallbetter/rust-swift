@@ -1,0 +1,16 @@
+{
+  "format": "3",
+  "bootstrap": "formal-project-bootstrap",
+  "bootstrapVersion": "0.7.2",
+  "projectId": "rust-swift",
+  "projectName": "Rust to Swift Compiler",
+  "mode": "existing",
+  "profiles": [],
+  "createdAt": "2026-10-13T20:46:42.699085+00:00",
+  "unresolvedBootstrapCollisions": [],
+  "lastUpgrade": {
+    "fromVersion": "0.6.3",
+    "toVersion": "0.7.2"
+  },
+  "source": "https://github.com/zachshallbetter/formal-project-bootstrap"
+}

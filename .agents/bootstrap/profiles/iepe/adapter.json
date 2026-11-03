@@ -1,0 +1,17 @@
+{
+  "format": "1",
+  "adapterId": "iepe",
+  "protocol": {"id":"iepe","version":"0.2.0","revisionOrDigest":"git:f1892e4","canonicalSource":"intent-evidence-project-engine"},
+  "supportedBootstrap": "0.7.x",
+  "authority": {"role":"operating-governance","sourceOfTruth":"IEPE canonical intent, authority, and work-graph records","promotionBoundary":"IEPE promotion authority plus FPB/ACP protected-effect authorization"},
+  "mappings": {
+    "imports": ["intent", "authority", "epic", "issue", "artifact", "evaluation", "evidence", "qualification", "promotion"],
+    "projects": ["intent->.agents/project/intent.md", "authority->.agents/project/profile.json", "issue->work record", "artifact->artifact record", "evidence->.agents/records/evidence.jsonl"],
+    "lifecycle": ["intent", "ready", "claimed", "executing", "evaluating", "qualifying", "promoting", "released"],
+    "evidence": ["evaluation", "evidence", "qualification", "negative result", "promotion decision"]
+  },
+  "unsupported": ["FPB does not replace IEPE canonical documents", "FPB does not self-promote a worker result"],
+  "compatibility": {"syntax":"adapter-defined","schema":"FPB records preserve IEPE identifiers","behavior":"bounded worker and promotion separation preserved","semantics":"IEPE remains authoritative for operating governance","authority":"promotion requires declared IEPE authority and ACP where protected","evidence":"qualification remains separate from promotion"},
+  "checks": ["intent and authority references exist", "work items have owner, acceptance, evidence, and stop conditions", "worker cannot self-promote", "promotion has qualification lineage"],
+  "migration": {"adopt":"inspect existing IEPE records read-only and bind them by reference", "repin":"record protocol revision and re-evaluate affected mappings", "deviation":"record a bounded deviation before local semantic changes"}
+}

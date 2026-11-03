@@ -1,0 +1,12 @@
+{
+  "format": "1",
+  "adapterId": "eqp",
+  "protocol": {"id":"eqp","version":"0.1.0","revisionOrDigest":"git:f1892e4","canonicalSource":"evidence-qualification-protocol"},
+  "supportedBootstrap": "0.7.x",
+  "authority": {"role":"evidence-qualification","sourceOfTruth":"EQP qualification record and evidence obligations","promotionBoundary":"EQP qualifies claims; FPB or ACP separately authorizes promotion"},
+  "mappings": {"imports":["candidate","claim","context","profile","obligation","evidence","evaluator","authority","disposition"],"projects":["candidate->artifact", "claim->claim record", "evidence->evidence record", "disposition->qualification record"],"lifecycle":["unassessed","qualified","not-qualified","blocked","superseded"],"evidence":["identity binding","relevance","provenance","freshness","reproducibility","integrity","supersession"]},
+  "unsupported": ["qualification does not authorize deployment, publication, spending, or promotion"],
+  "compatibility": {"syntax":"adapter-defined","schema":"qualification record preserves EQP fields","behavior":"fail closed on missing required evidence","semantics":"qualification is contextual, never unary","authority":"evaluator and qualification authority remain explicit","evidence":"contradictory and out-of-scope evidence remain visible"},
+  "checks": ["all obligations are typed", "every evidence item is consumed, rejected, contradictory, or out-of-scope", "QUALIFIED requires complete valid evidence", "promotion is a separate decision"],
+  "migration": {"adopt":"import existing evidence without changing its qualification status", "repin":"re-qualify when dependency, context, evaluator, or assumptions change", "deviation":"record any local qualification rule as a deviation"}
+}

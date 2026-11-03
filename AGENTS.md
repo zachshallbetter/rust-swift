@@ -180,7 +180,7 @@ Record durable service mutations as evidence/receipts.
 
 Do not create credentials, widen permissions, change billing, or bypass a service boundary unless explicitly authorized.
 
-Where `PROJECT_PROFILE.json` binds an `authorizationProvider`, "explicitly authorized" for a governed effect means an `ALLOW` decision from that provider for that exact action. See §17.
+Where `.agents/project/profile.json` binds an `authorizationProvider`, "explicitly authorized" for a governed effect means an `ALLOW` decision from that provider for that exact action. See §17.
 
 ## 10. Human override / deviation
 
@@ -245,17 +245,17 @@ claim release state
 
 ## 13. Evidence, negative knowledge, and landing
 
-Use `docs/EVIDENCE_METHOD.md` for evidence dispositions and provenance. Persist material failures in `records/negative-results.jsonl` rather than rediscovering them.
+Use `.agents/bootstrap/docs/EVIDENCE_METHOD.md` for evidence dispositions and provenance. Persist material failures in `.agents/records/negative-results.jsonl` rather than rediscovering them.
 
-When integration occurs, follow `docs/LANDING_AND_PROMOTION.md`; candidate verification, landing, landed-state verification, evidence closure, and promotion remain separate states.
+When integration occurs, follow `.agents/bootstrap/docs/LANDING_AND_PROMOTION.md`; candidate verification, landing, landed-state verification, evidence closure, and promotion remain separate states.
 
 ## 14. Recovery
 
-When context, claims, branches, provider state, or worker ownership becomes stale or inconsistent, stop unsafe mutation and use `docs/RECOVERY.md`. Preserve useful WIP and reconstruct from canonical state. Hidden conversational memory is not a recovery mechanism.
+When context, claims, branches, provider state, or worker ownership becomes stale or inconsistent, stop unsafe mutation and use `.agents/bootstrap/docs/RECOVERY.md`. Preserve useful WIP and reconstruct from canonical state. Hidden conversational memory is not a recovery mechanism.
 
 ## 15. Formal resources
 
-`FORMAL_RESOURCE_MANIFEST.json` records only resources that materially constrain this project. Importance does not imply authority. Missing companions remain missing. See `docs/FORMAL_RESOURCES.md`.
+`.agents/project/formal-resources.json` records only resources that materially constrain this project. Importance does not imply authority. Missing companions remain missing. See `.agents/bootstrap/docs/FORMAL_RESOURCES.md`.
 
 ## 16. Anti-bloat rule
 
@@ -275,12 +275,12 @@ Only an irreducible distinction earns a new canonical concept.
 
 ## 17. External authorization authority (ACP)
 
-When the profile binds `authorizationProvider.name: acp-gateway`, ACP is the authoritative policy decision service for every governed effect (`contracts/acp-protected-effects.yaml`; effect classes at or above `authorizedEffectClassesMinimum`).
+When the profile binds `authorizationProvider.name: acp-gateway`, ACP is the authoritative policy decision service for every governed effect (`.agents/project/contracts/acp-protected-effects.yaml`; effect classes at or above `authorizedEffectClassesMinimum`).
 
 ```text
 before a governed effect:
   identify provider/account/repository/ref/current SHA/requested effect
-  → POST /internal/authorize with the repository claim as evidence   (scripts/acp.py authorize)
+  → POST /internal/authorize with the repository claim as evidence   (.agents/acp/lib/acp.py authorize)
   → read decision + reason
   → ALLOW: perform exactly authorized_action, once, within the capability TTL
   → anything else: do not perform it; record; release/park; continue lawful unrelated work
@@ -292,13 +292,13 @@ Rules:
 - `ALLOW` permits only the exact authorized action, ref and SHA pair. `DENY`, `REVERIFY_REQUIRED`, `QUARANTINE`, `LOCKED` and `VERIFY_RECOVERY` prohibit the effect. `RECOVERY_AUTHORIZED` permits only the one described recovery transition, once, and its outcome is reported back. `AUTH_REQUIRED` requires completing the ACP-designated flow before one retry.
 - If ACP cannot be reached or a valid decision cannot be obtained, governed effects **fail closed**. Classify the provider failure once; do not poll; continue E0/E1 work.
 - An `ALLOW` with `policy_effect: NOT_GOVERNED` means no ACP policy names this repository. It is not an authorization; while the profile is `failClosed` it is a setup blocker.
-- At session start and resume, and before committing, pushing, merging or deploying, report the checkpoint and the observed state of the protected artifacts to ACP (`scripts/acp.py report`, `scripts/acp.py snapshot`); report observed control-plane changes as they are noticed. Reporting is not authorization.
+- At session start and resume, and before committing, pushing, merging or deploying, report the checkpoint and the observed state of the protected artifacts to ACP (`.agents/acp/lib/acp.py report`, `.agents/acp/lib/acp.py snapshot`); report observed control-plane changes as they are noticed. Reporting is not authorization.
 - Board reads go through ACP (`/internal/project-context`). A `BOARD_READ_CONTAINED` refusal is a containment signal, not a credential problem; surface the gateway's `error`/`detail`/`remedy` verbatim.
 - Never request, disclose, reproduce, transfer, or substitute ACP, GitHub, Railway, provider, or policy-signing secrets as a replacement for authorization. Never compile `.env.local` or the gateway token into context, evidence, or records.
-- Record `decision`, `reason`, `request_id`, `policy_id`, `policy_version` and `repository_trust` in the work disposition and `records/evidence.jsonl`.
+- Record `decision`, `reason`, `request_id`, `policy_id`, `policy_version` and `repository_trust` in the work disposition and `.agents/records/evidence.jsonl`.
 - Routine authorization and integrity checks are quiet. Surface them when human action is required or when they change the outcome of the requested operation.
 
-Procedure: `.agents/skills/authorize-protected-effect/SKILL.md`. Binding: `docs/ACP_INTEGRATION.md`.
+Procedure: `.agents/skills/authorize-protected-effect/SKILL.md`. Binding: `.agents/acp/README.md`.
 
 ## 18. Specialized engineering rules
 

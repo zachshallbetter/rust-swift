@@ -1,0 +1,122 @@
+{
+  "projectId": "<PROJECT_ID>",
+  "projectName": "<PROJECT_NAME>",
+  "profileFormat": 3,
+  "profileStatus": "provisional",
+  "intentRef": ".agents/project/intent.md",
+  "authorityRef": ".agents/bootstrap/docs/AUTHORITY_MODEL.md",
+  "bindingsRef": ".agents/project/bindings.yaml",
+  "contextSourcesRef": ".agents/project/context-sources.json",
+  "operatingMode": "new|existing",
+  "executionProvider": {
+    "name": "<PROVIDER_NAME>",
+    "workGraph": "github-projects-v2",
+    "repository": "github",
+    "dispatch": "<ADAPTER_OR_SYSTEM>",
+    "verification": "<ADAPTER_OR_SYSTEM>",
+    "protection": "acp-gateway",
+    "observability": "acp-gateway:/internal/report"
+  },
+  "authorizationProvider": {
+    "name": "acp-gateway",
+    "status": "declared|bound",
+    "integrationRef": ".agents/acp/README.md",
+    "decisionSchema": ".agents/acp/schemas/acp-decision.schema.json",
+    "actionMap": ".agents/project/contracts/acp-protected-effects.yaml",
+    "gatewayEndpointSet": "production",
+    "boardEnvFile": ".agents/board.env",
+    "board": {
+      "owner": null,
+      "number": null
+    },
+    "authorizedEffectClassesMinimum": "E2",
+    "failClosed": true,
+    "reportOnSessionStart": true,
+    "reportBeforeProtectedEffect": true,
+    "clientScript": ".agents/acp/acp",
+    "autoDeploy": []
+  },
+  "serviceOperations": [
+    {
+      "service": "acp-gateway",
+      "interface": "official-api",
+      "allowedEnvironments": [
+        "local",
+        "staging",
+        "production"
+      ],
+      "allowedEffects": [
+        "read",
+        "authorize",
+        "report",
+        "verify-capability",
+        "integrity-snapshot",
+        "recovery-complete",
+        "board-discovery",
+        "board-context"
+      ],
+      "protectedEffects": [
+        "policy.modify",
+        "credential.modify"
+      ]
+    },
+    {
+      "service": "github",
+      "interface": "official-cli",
+      "allowedEnvironments": [
+        "local"
+      ],
+      "allowedEffects": [
+        "read",
+        "reversible-write"
+      ],
+      "protectedEffects": [
+        "git.protected_ref.update",
+        "git.history.rewrite",
+        "git.default_branch.change",
+        "repository.transfer"
+      ]
+    },
+    {
+      "service": "<SERVICE>",
+      "interface": "official-cli|official-api|connector",
+      "allowedEnvironments": [
+        "local",
+        "staging"
+      ],
+      "allowedEffects": [
+        "read",
+        "reversible-write"
+      ],
+      "protectedEffects": [
+        "production-deploy",
+        "credential-create",
+        "billing-change"
+      ]
+    }
+  ],
+  "authorityBindings": {
+    "projectMutation": "<ACTOR_OR_ROLE>",
+    "qualification": "<ACTOR_OR_ROLE>",
+    "promotion": "acp-gateway:decision",
+    "productionOperation": "acp-gateway:decision",
+    "deviation": "<ACTOR_OR_ROLE>",
+    "recovery": "acp-gateway:recovery-authorization"
+  },
+  "autonomy": {
+    "frontierReselection": true,
+    "continueOnLocalizedBlocker": true,
+    "maxConcurrentMutationClaims": 2,
+    "humanEscalation": "decision-boundaries-only",
+    "protectedEffectsRequireAcpDecision": true
+  },
+  "contextPolicy": {
+    "compiledContextRequired": true,
+    "generatedContextNormative": false,
+    "requireContextLock": true,
+    "refreshOnMaterialSourceChange": true
+  },
+  "protocolAdapters": [],
+  "profiles": [],
+  "formalResourceManifest": ".agents/project/formal-resources.json"
+}

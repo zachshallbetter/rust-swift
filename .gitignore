@@ -80,3 +80,7 @@ __pycache__/
 *.p8
 credentials.json
 auth.json
+
+# formal-project-bootstrap: per-machine ACP state and upgrade backups
+.agents/records/local/
+.agents/.upgrades/

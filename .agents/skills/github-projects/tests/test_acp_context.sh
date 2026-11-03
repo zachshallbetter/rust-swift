@@ -69,7 +69,7 @@ stub_curl '{"installations":[{"login":"testorg"},{"login":"testowner"}]}' 200
 err="$(OWNER="" PROJECT="" GH_PROJECT_OWNER="" GH_PROJECT_NUMBER="" GH_PROJECT_CONFIG=/nonexistent bash -c '. "$1"; gp_resolve; gp_require_target' _ "$LIB_PATH" 2>&1)"
 check "missing target lists owners" "the owner hint"     "$err" "--owner testowner"
 
-# 6. a named endpoint-set profile routes board reads through scripts/acp.py.
+# 6. a named endpoint-set profile routes board reads through .agents/acp/lib/acp.py.
 PROJECT_ROOT="$STUB/project"; mkdir -p "$PROJECT_ROOT/scripts" "$PROJECT_ROOT/.agents"
 git -C "$PROJECT_ROOT" init -q
 printf '{"authorizationProvider":{"gatewayEndpointSet":"production"}}\n' > "$PROJECT_ROOT/PROJECT_PROFILE.json"

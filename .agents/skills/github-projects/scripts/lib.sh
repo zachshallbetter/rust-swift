@@ -9,7 +9,14 @@
 
 GP_CONFIG="${GH_PROJECT_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/github-projects/current}"
 GP_ACP_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
-GP_ACP_CLIENT="$GP_ACP_ROOT/scripts/acp.py"
+# The contained client (bootstrap 0.7+) is preferred; a legacy scripts/acp.py still works.
+if [ -f "$GP_ACP_ROOT/.agents/acp/lib/acp.py" ]; then
+  GP_ACP_CLIENT="$GP_ACP_ROOT/.agents/acp/lib/acp.py"
+  GP_ACP_PROFILE="$GP_ACP_ROOT/.agents/project/profile.json"
+else
+  GP_ACP_CLIENT="$GP_ACP_ROOT/scripts/acp.py"
+  GP_ACP_PROFILE="$GP_ACP_ROOT/PROJECT_PROFILE.json"
+fi
 
 # ── Per-repository board profile ────────────────────────────────────────────────
 # <git-root>/.agents/board.env, when present, binds this repository to its board
@@ -75,9 +82,9 @@ fi
 # single-URL projects stay recognizable during migration, but never override
 # the shared client when a named endpoint set is present.
 gp_shared_acp_enabled() {
-  [ -f "$GP_ACP_CLIENT" ] && [ -f "$GP_ACP_ROOT/PROJECT_PROFILE.json" ] \
+  [ -f "$GP_ACP_CLIENT" ] && [ -f "$GP_ACP_PROFILE" ] \
     && jq -e '.authorizationProvider.gatewayEndpointSet | type == "string" and length > 0' \
-      "$GP_ACP_ROOT/PROJECT_PROFILE.json" >/dev/null 2>&1
+      "$GP_ACP_PROFILE" >/dev/null 2>&1
 }
 
 gp_acp_enabled() {
