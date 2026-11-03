@@ -41,7 +41,7 @@ jobs:
         run: cargo run -p rust-swift-cli -- bench
 
       - name: Validate Formal Bootstrap
-        run: python3 scripts/validate-bootstrap.py
+        run: python3 .agents/bootstrap/scripts/validate-bootstrap.py
 
       - name: Validate Epistemic Proof Dossier (rust-swift-proof)
         run: |

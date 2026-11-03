@@ -451,7 +451,7 @@ cargo run -p rust-swift-cli -- eval
 cargo run -p rust-swift-cli -- bench
 
 # 7. Validate Formal Bootstrap
-python3 scripts/validate-bootstrap.py
+python3 .agents/bootstrap/scripts/validate-bootstrap.py
 ```
 
 ### The 16 Differential Qualification Suites

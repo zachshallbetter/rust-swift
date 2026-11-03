@@ -155,16 +155,16 @@ impl AdversarialRunner {
             "ADVERSARIAL_EVALS_FAILED".to_string()
         };
 
-        // Append receipt to records/evidence.jsonl
+        // Append receipt to .agents/records/evidence.jsonl (formal-project-bootstrap 0.7)
         let (rustc_ver, swift_ver) = Self::toolchain_versions();
-        let evidence_path = if self.repo_root.join("records").exists() {
-            self.repo_root.join("records").join("evidence.jsonl")
-        } else if Path::new("../../records").exists() {
-            PathBuf::from("../../records/evidence.jsonl")
-        } else if Path::new("../records").exists() {
-            PathBuf::from("../records/evidence.jsonl")
+        let evidence_path = if self.repo_root.join(".agents").join("records").exists() {
+            self.repo_root.join(".agents").join("records").join("evidence.jsonl")
+        } else if Path::new("../../.agents/records").exists() {
+            PathBuf::from("../../.agents/records/evidence.jsonl")
+        } else if Path::new("../.agents/records").exists() {
+            PathBuf::from("../.agents/records/evidence.jsonl")
         } else {
-            self.repo_root.join("records").join("evidence.jsonl")
+            self.repo_root.join(".agents").join("records").join("evidence.jsonl")
         };
 
         #[derive(Serialize)]

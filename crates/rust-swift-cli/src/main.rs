@@ -798,8 +798,8 @@ fn diff_test_command(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>
         }
     }
 
-    // Record evidence in records/evidence.jsonl
-    let evidence_path = Path::new("records/evidence.jsonl");
+    // Record evidence in .agents/records/evidence.jsonl (formal-project-bootstrap 0.7)
+    let evidence_path = Path::new(".agents/records/evidence.jsonl");
     if let Ok(mut file) = OpenOptions::new()
         .create(true)
         .append(true)
@@ -822,7 +822,7 @@ fn diff_test_command(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>
             let _ = writeln!(file, "{}", record);
         }
         println!(
-            "\nAppended {} qualification receipt(s) to records/evidence.jsonl",
+            "\nAppended {} qualification receipt(s) to .agents/records/evidence.jsonl",
             reports.len()
         );
     }
@@ -939,7 +939,7 @@ fn eval_command(
         }
 
         println!("\nSuccess: All simulated defects were deterministically detected by qualification gates.");
-        println!("Appended failure receipts to records/negative-results.jsonl");
+        println!("Appended failure receipts to .agents/records/negative-results.jsonl");
     }
 
     if adversarial {
@@ -981,7 +981,7 @@ fn eval_command(
         println!(
             "\nSuccess: All adversarial stress evaluations passed with full assertion telemetry."
         );
-        println!("Appended evaluation receipt to records/evidence.jsonl");
+        println!("Appended evaluation receipt to .agents/records/evidence.jsonl");
     }
 
     Ok(())

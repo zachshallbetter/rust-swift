@@ -6,7 +6,7 @@
   "selectedPaths": [],
   "sourceSelection": {
     "includedCount": 199,
-    "includedBytes": 1775919,
+    "includedBytes": 1776280,
     "excludedCounts": {
       "extension": 42
     }
@@ -17,14 +17,14 @@
     "repositories": [
       {
         "path": ".",
-        "commit": "ee3193cc40c244146ff191ce6f30bed3ee04e06c",
+        "commit": "450c2d72972803c12fe2303a86fb4d2fece3451c",
         "branch": "chore/bootstrap-0.7.2",
         "dirty": true,
         "remote": "https://github.com/zachshallbetter/rust-swift.git"
       }
     ]
   },
-  "aggregateSourceDigest": "96fd4625ec639858fd31cfe8662e2842a03c4d252904ae8ffeb53a993e2efdb0",
+  "aggregateSourceDigest": "d3c1ed18c8f150e25b27a84352517e45c20beb1f304710b8df569d85e4164c2d",
   "sources": [
     {
       "path": ".agents/AGENTS.md",
@@ -723,8 +723,8 @@
     },
     {
       "path": ".github/workflows/ci.yml",
-      "bytes": 2140,
-      "sha256": "1b6d8482c625999bd7578ffd0d215b99a4d32d723aeb01b69ac6190c12757577"
+      "bytes": 2158,
+      "sha256": "674111b30a0d13128e37b6719b37dfcd5f94410e36b639998d023d7a3133dbf6"
     },
     {
       "path": ".github/workflows/release.yml",
@@ -748,8 +748,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 29623,
-      "sha256": "fa6313bb9082632e0571b42c580d9d23371679ce017e1e5fda89b824ba687aec"
+      "bytes": 29641,
+      "sha256": "e71be190cac894a1a76213f9e77c9c07befdb6f34186be18526c7a6a4fd0591b"
     },
     {
       "path": "crates/rust-swift-cli/Cargo.toml",
@@ -763,8 +763,8 @@
     },
     {
       "path": "crates/rust-swift-cli/src/main.rs",
-      "bytes": 44734,
-      "sha256": "23092e7718c1ec68cca9a2c5d8cdbc24340e856f92215223ec54ebc11214d8f2"
+      "bytes": 44805,
+      "sha256": "e2b06e8afe62f952de23e86fa929b755c4fe9c6fcf189f1863c8e693dbdc51c0"
     },
     {
       "path": "crates/rust-swift-codegen/Cargo.toml",
@@ -853,8 +853,8 @@
     },
     {
       "path": "crates/rust-swift-qualification/src/evals.rs",
-      "bytes": 22039,
-      "sha256": "f0aed394a6dcd456dd649b09852c0fd52971abcae9140fc16c4d4f79f2da0045"
+      "bytes": 22158,
+      "sha256": "6e559bd63caba6b94e4d64a6c19266456df84030c385c7112a5a8ba6e210d6c3"
     },
     {
       "path": "crates/rust-swift-qualification/src/lib.rs",
@@ -863,8 +863,8 @@
     },
     {
       "path": "crates/rust-swift-qualification/src/mutation.rs",
-      "bytes": 18504,
-      "sha256": "e4d32b44081ec66eb2b09c7ab95bc50ffb85763757d17c4995550b23351badd5"
+      "bytes": 18623,
+      "sha256": "35cf90f91bb6c6a93feffc9bdfa9a5b38b6ed337e2921dd2da62a76b961d7601"
     },
     {
       "path": "crates/rust-swift-qualification/src/proof.rs",
@@ -908,8 +908,8 @@
     },
     {
       "path": "docs/05-validation.md",
-      "bytes": 3356,
-      "sha256": "bd090e23c4199487c5d5b874a27cfd2a1fb0280a436e2e3e4e8fe7e2adb58f0f"
+      "bytes": 3372,
+      "sha256": "d6d20c1615a6a2d04151a8cd32bfcc58699466e162044ef951e36981846cfedd"
     },
     {
       "path": "docs/06-implementation-plan.md",

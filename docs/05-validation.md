@@ -30,7 +30,7 @@ Executes parallel reference binaries (`rustc` and `swiftc`) across identical inp
 ### 2. Failure Injection & Mutation Matrix (`rust-swift eval --mutations`)
 Enforces the **"Gates That Cannot Fail"** doctrine:
 - Synthesizes 6 distinct defect classes (`MUT-001` through `MUT-006` covering operator inversions, FSM transition corruption, invariant violations, schema drift, observable state suppression, and off-by-one loops).
-- Confirms that every qualification gate fails closed as expected and records receipts permanently in `records/negative-results.jsonl`.
+- Confirms that every qualification gate fails closed as expected and records receipts permanently in `.agents/records/negative-results.jsonl`.
 
 ### 3. Differential Performance Benchmarking (`rust-swift bench`)
 - **Compiler Throughput**: Measures syn parsing, CSG IR lowering, and Swift emission rates (lines/sec, KB/sec).
@@ -40,4 +40,4 @@ Enforces the **"Gates That Cannot Fail"** doctrine:
 ### 4. Adversarial Stress & No-Op Protection (`rust-swift eval --adversarial`)
 - Stress tests 32 levels of recursive AST expression nesting, extreme Unicode (ZWJ clusters, multi-script UTF-8), and integer bounds (`i64::MIN/MAX`, `u64::MAX`).
 - Enforces **No-Op Protection**: CI workflows verify that at least 20+ assertions execute, preventing skipped or false-green CI executions.
-- Structured receipts are logged to `records/evidence.jsonl`.
+- Structured receipts are logged to `.agents/records/evidence.jsonl`.
