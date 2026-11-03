@@ -21,6 +21,8 @@ Files fall into two kinds:
 - **Project-owned:** `AGENTS.md`, `PROJECT_INTENT.md`, `CONTEXT_SOURCES.json`, `FORMAL_RESOURCE_MANIFEST.json`, `bindings/PROJECT_BINDINGS.yaml`, `.agents/rules/` and `contracts/`. A project specialises these after adoption. A file still identical to the base is updated. A file the project changed is kept, and the release copy is staged under `candidates/` for review.
 - **Bootstrap machinery:** everything else the release ships, such as `scripts/`, `schemas/`, `.agents/skills/` and the copied docs. These are replaced. If the project had edited one, the plan names it under `replacedLocalEdits` and its previous copy stays in the backup.
 
+A project that has deliberately taken over a machinery file lists it in `PROJECT_PROFILE.json`, for example `"bootstrapOverrides": ["scripts/gen-context.py"]`. Upgrades then treat that file as project-owned: it is kept and the release copy is staged for review.
+
 `PROJECT_PROFILE.json` is merged: the release's new defaults are added and every existing project value is kept.
 
 ## Apply

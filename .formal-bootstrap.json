@@ -1,7 +1,7 @@
 {
   "format": "2",
   "bootstrap": "formal-project-bootstrap",
-  "bootstrapVersion": "0.6.1",
+  "bootstrapVersion": "0.6.2",
   "projectId": "rust-swift",
   "projectName": "Rust to Swift Compiler",
   "mode": "existing",
@@ -9,7 +9,7 @@
   "createdAt": "2026-10-13T20:46:42.699085+00:00",
   "unresolvedBootstrapCollisions": [],
   "lastUpgrade": {
-    "fromVersion": "0.6.0",
-    "toVersion": "0.6.1"
+    "fromVersion": "0.6.1",
+    "toVersion": "0.6.2"
   }
 }

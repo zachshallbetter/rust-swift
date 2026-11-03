@@ -141,11 +141,24 @@ def source_map(
     return result
 
 
-def project_owned(rel: str) -> bool:
-    return rel in PROJECT_OWNED or rel.startswith(PROJECT_OWNED_PREFIXES)
+def project_owned(rel: str, overrides: frozenset[str] = frozenset()) -> bool:
+    return rel in PROJECT_OWNED or rel in overrides or rel.startswith(PROJECT_OWNED_PREFIXES)
+
+
+def project_overrides(project: Path) -> frozenset[str]:
+    """Machinery a project has taken over: PROJECT_PROFILE.json `bootstrapOverrides`."""
+    try:
+        profile = json.loads((project / "PROJECT_PROFILE.json").read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return frozenset()
+    value = profile.get("bootstrapOverrides") or []
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        raise UpgradeError("PROJECT_PROFILE.json bootstrapOverrides must be a list of relative paths")
+    return frozenset(value)
 
 
 def classify(project: Path, target: dict[str, bytes], base: dict[str, bytes] | None) -> dict:
+    overrides = project_overrides(project)
     safe: list[str] = []
     conflicts: list[str] = []
     unchanged: list[str] = []
@@ -173,7 +186,7 @@ def classify(project: Path, target: dict[str, bytes], base: dict[str, bytes] | N
         if original is not None and original == desired:
             preserved.append(rel)
             continue
-        if project_owned(rel):
+        if project_owned(rel, overrides):
             conflicts.append(rel)
             continue
         safe.append(rel)

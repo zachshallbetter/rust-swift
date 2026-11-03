@@ -1,17 +1,15 @@
 {
   "format": "2",
-  "generatorVersion": "0.6.1",
+  "generatorVersion": "0.6.2",
   "root": ".",
   "validityBasis": "aggregate-source-digest",
   "selectedPaths": [],
   "sourceSelection": {
-    "includedCount": 182,
-    "includedBytes": 1613866,
+    "includedCount": 171,
+    "includedBytes": 1565538,
     "excludedCounts": {
-      "excluded-directory": 9019,
       "excluded-path": 1,
-      "extension": 78,
-      "symlink": 4
+      "extension": 37
     }
   },
   "repositoryState": {
@@ -20,14 +18,14 @@
     "repositories": [
       {
         "path": ".",
-        "commit": "f4e6ce7a1230baa6b15c4cf4825f5e4f339507bd",
+        "commit": "1feaa6e36adeb0d16d83b649afcf34fb160c72bc",
         "branch": "main",
         "dirty": true,
         "remote": "https://github.com/zachshallbetter/rust-swift.git"
       }
     ]
   },
-  "aggregateSourceDigest": "83eea7a8dc8f17a1be80d5faa102d0d89d847d130206e3fe2103d527a7eb9f9c",
+  "aggregateSourceDigest": "0753839edaa39ecbbbb4d26e8dcd1eac2d0f98eac628783c0aa80d98a73f9e13",
   "sources": [
     {
       "path": ".agents/AGENTS.md",
@@ -237,7 +235,7 @@
     {
       "path": ".formal-bootstrap.json",
       "bytes": 373,
-      "sha256": "9f30b0a2811f44274f23f67c0848d6871eef848354c0436a9466030f54f22545"
+      "sha256": "5bd2d9524f80e0f82e2568cb4d7820aedf3806cc9c527eef438aea000da5a508"
     },
     {
       "path": ".github/workflows/ci.yml",
@@ -287,7 +285,7 @@
     {
       "path": "PROJECT_PROFILE.json",
       "bytes": 3343,
-      "sha256": "c12f7b133ab5560217498a318083d7c8d66506a034a94764fc4f2ddec67e6a09"
+      "sha256": "75860387c8e5528457adc72daf5bd40180f07a497d353c48679b842fe34e959f"
     },
     {
       "path": "README.md",
@@ -297,7 +295,7 @@
     {
       "path": "VERSION",
       "bytes": 6,
-      "sha256": "87b241b275c591694846560e9879f50c9da3150f854efdabd782c539772f3033"
+      "sha256": "a466ef209f5c3aee5ff0c702e2e9d5cced4783d2a655e8ab66330f21a5557b3f"
     },
     {
       "path": "bindings/PROJECT_BINDINGS.yaml",
@@ -636,18 +634,13 @@
     },
     {
       "path": "docs/UPGRADING.md",
-      "bytes": 3050,
-      "sha256": "5d68f584e31904d26097f04721b509bbfc02a04be6816eff182c8456f9f0a9c7"
+      "bytes": 3313,
+      "sha256": "b9877ed333f89244c8e55b4cf563e6df27d2af5ecdb8b87fad04b902a850944d"
     },
     {
       "path": "docs/WORK_GRAPH.md",
       "bytes": 2838,
       "sha256": "b7d32fb78d272a75d0f4c6561bafdb75e9e12010f858daa0813f562f6af0766b"
-    },
-    {
-      "path": "examples/GeneratedFSM/.build/workspace-state.json",
-      "bytes": 125,
-      "sha256": "ec16aca52867cd83a5331c6d05a2cc3d930ab25179f77469715c144773e9d5c6"
     },
     {
       "path": "examples/GeneratedFSM/csg.json",
@@ -663,11 +656,6 @@
       "path": "examples/GeneratedFSM/manifest.json",
       "bytes": 932,
       "sha256": "34090c2688e8469624b69a2117da3f8c3ac0898fcf792092e4330c9398689c3c"
-    },
-    {
-      "path": "examples/PeelCoreKit/.build/workspace-state.json",
-      "bytes": 125,
-      "sha256": "ec16aca52867cd83a5331c6d05a2cc3d930ab25179f77469715c144773e9d5c6"
     },
     {
       "path": "examples/PeelCoreKit/csg.json",
@@ -695,26 +683,6 @@
       "sha256": "9e04f61cdfa9570c7fde62ad90b4ebdd64651248dda9d1ba2404c17cd4763a5d"
     },
     {
-      "path": "examples/PluginDemoApp/.build/plugins/cache/RustSwiftPlugin-state.json",
-      "bytes": 9035,
-      "sha256": "4b1d3df38c68315a373832af749cf149646253347f932f68e2ee86769a9e1040"
-    },
-    {
-      "path": "examples/PluginDemoApp/.build/plugins/cache/RustSwiftPlugin.dSYM/Contents/Resources/Relocations/aarch64/RustSwiftPlugin.yml",
-      "bytes": 11853,
-      "sha256": "75c987a15ee003095f6cd582d4fdca2721e005988980c459e3a7f6d716303ce7"
-    },
-    {
-      "path": "examples/PluginDemoApp/.build/plugins/outputs/plugindemoapp/PluginDemoApp/destination/RustSwiftPlugin/manifest.json",
-      "bytes": 958,
-      "sha256": "0f188d32894cc1bf293d7dae0b8c95a132a93505403ad1f7d81decd9aae7c860"
-    },
-    {
-      "path": "examples/PluginDemoApp/.build/workspace-state.json",
-      "bytes": 534,
-      "sha256": "67da73d9fddaa46d5ff2211789036be3f5418f1f5b5dd54f8547265b70ee2fea"
-    },
-    {
       "path": "examples/PluginDemoApp/README.md",
       "bytes": 1070,
       "sha256": "b7d8c4ec61c17fd0632b9ba8f23cd2e3e0e79ea7e5c3cabc2c610eb69518f710"
@@ -728,26 +696,6 @@
       "path": "examples/README.md",
       "bytes": 2394,
       "sha256": "4f5eae02cb842217fa1ac4f4566506bdbabd469dd2da915ac9a6f3b8215bb2e4"
-    },
-    {
-      "path": "examples/SwiftUIDemoApp/.build/plugins/cache/RustSwiftPlugin-state.json",
-      "bytes": 9175,
-      "sha256": "d2df6d9f7c870327ae0d0bc9bbeebab9206628b36e26174c38578b45eb66edc3"
-    },
-    {
-      "path": "examples/SwiftUIDemoApp/.build/plugins/cache/RustSwiftPlugin.dSYM/Contents/Resources/Relocations/aarch64/RustSwiftPlugin.yml",
-      "bytes": 10723,
-      "sha256": "4c43af22920c72150cc70b84e570d3ab92caf54b509fe40bf0ac52763df75f08"
-    },
-    {
-      "path": "examples/SwiftUIDemoApp/.build/plugins/outputs/swiftuidemoapp/SwiftUIDemoApp/destination/RustSwiftPlugin/manifest.json",
-      "bytes": 1776,
-      "sha256": "076e6c021e459aaece56d2d0ddd4611d39e5ac25c4704c4292ed42a4b7d2c15f"
-    },
-    {
-      "path": "examples/SwiftUIDemoApp/.build/workspace-state.json",
-      "bytes": 534,
-      "sha256": "67da73d9fddaa46d5ff2211789036be3f5418f1f5b5dd54f8547265b70ee2fea"
     },
     {
       "path": "examples/SwiftUIDemoApp/README.md",
@@ -768,11 +716,6 @@
       "path": "examples/peel_core.rs",
       "bytes": 9619,
       "sha256": "87f058b441eea1fb8f10c5384d596e8d4cee16d5a042f75788513225796b50ab"
-    },
-    {
-      "path": "policy-proposals/zachshallbetter-rust-swift-v1.json",
-      "bytes": 5140,
-      "sha256": "5a47bca524c8d0115e8be2f63fbbcb0110b26d4d0651a13651517e936638338e"
     },
     {
       "path": "schemas/acp-decision.schema.json",
@@ -886,8 +829,8 @@
     },
     {
       "path": "scripts/gen-context.py",
-      "bytes": 13729,
-      "sha256": "0c951731c9b7596de1eb2241a31cbb84723ece20ed830db3af76aa929a112627"
+      "bytes": 14390,
+      "sha256": "1cecc3bc593ef0c89cc24692db223c5a29a5e434561e0ebf4c36bf9464799c1b"
     },
     {
       "path": "scripts/iepe-adopt.py",
@@ -906,8 +849,8 @@
     },
     {
       "path": "scripts/upgrade-project.py",
-      "bytes": 18113,
-      "sha256": "47b68d85e61f64d9ea1febdac5b617484d5a7fe91c2b604aabd2f22c2e8e3ad7"
+      "bytes": 18839,
+      "sha256": "0b4ae27bc0fdf0dbc8fa1553ecdc47de9cab79be4d5a26ac18677aee9f3b6230"
     },
     {
       "path": "scripts/validate-bootstrap.py",

@@ -168,6 +168,22 @@ def load_policy() -> dict:
     return policy
 
 
+def candidate_paths() -> list[Path]:
+    """Every file Git tracks or would add, so ignored local files never reach the corpus.
+
+    A context lock has to match what a clean checkout of the same commit
+    computes. Outside a Git work tree every file is a candidate.
+    """
+    listed = subprocess.run(
+        ["git", "-C", str(ROOT), "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+        capture_output=True,
+    )
+    if listed.returncode != 0:
+        return sorted(ROOT.rglob("*"))
+    names = {name for name in listed.stdout.decode("utf-8", "surrogateescape").split("\0") if name}
+    return [ROOT / name for name in sorted(names)]
+
+
 def source_files(
     policy: dict, path_filters: tuple[str, ...] = ()
 ) -> tuple[list[tuple[str, bytes]], dict[str, int]]:
@@ -189,7 +205,7 @@ def source_files(
     skipped: dict[str, int] = {}
     total_bytes = 0
 
-    for path in ROOT.rglob("*"):
+    for path in candidate_paths():
         if path.is_symlink():
             skipped["symlink"] = skipped.get("symlink", 0) + 1
             continue
