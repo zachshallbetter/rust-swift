@@ -1,7 +1,7 @@
 {
   "projectId": "rust-swift",
   "projectName": "Rust to Swift Compiler",
-  "profileVersion": "0.1.0",
+  "profileVersion": "0.6.1",
   "profileStatus": "provisional",
   "intentRef": "PROJECT_INTENT.md",
   "authorityRef": "docs/AUTHORITY_MODEL.md",
@@ -23,8 +23,7 @@
     "integrationRef": "docs/ACP_INTEGRATION.md",
     "decisionSchema": "schemas/acp-decision.schema.json",
     "actionMap": "contracts/acp-protected-effects.yaml",
-    "gatewayUrlEnv": "ACP_GATEWAY_URL",
-    "gatewayTokenEnv": "ACP_GATEWAY_TOKEN",
+    "gatewayEndpointSet": "production",
     "boardEnvFile": ".agents/board.env",
     "board": {
       "owner": null,

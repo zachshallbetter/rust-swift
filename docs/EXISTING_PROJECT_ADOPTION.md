@@ -34,6 +34,7 @@ Before consequential mutation, reconstruct from live project state where availab
 - architecture, PRDs, schemas, design/token systems, policies, research, benchmarks;
 - existing agent instructions and execution conventions;
 - tests, CI, release/deployment surfaces and provider boundaries;
+- existing ACP clients, gateway bindings, protected-effect maps, policy-registration steps, and enforcement points; use `reconcile-project.py`'s `acpIntegration` finding as a path-based discovery hint, then verify the actual authority and live policy;
 - work graph, claims, evidence, negative results, known limitations and rejected approaches.
 
 Do not infer authority from filenames alone. Do not repair findings during discovery.
@@ -71,6 +72,7 @@ If the project lacks a normalized `PROJECT_INTENT.md`, synthesize one from the s
 Introduce only missing operating primitives. Examples:
 
 - existing issue workflow → bind it;
+- existing legacy ACP client → preserve its active controls, map its exact actions and bindings, then plan a controlled migration to the Formal Project Bootstrap client; do not create a second authorization authority;
 - existing CI/test gates → register them;
 - existing evidence ledger → retain it;
 - existing agent rules → reconcile them;

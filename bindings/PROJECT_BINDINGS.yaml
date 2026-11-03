@@ -68,8 +68,7 @@ provider_bindings:
   telemetry: "acp-gateway"
 
 acp:
-  gateway_url_env: "ACP_GATEWAY_URL"
-  gateway_token_env: "ACP_GATEWAY_TOKEN"
+  gateway_endpoint_set: "production"
   board_env_file: ".agents/board.env"
   integration: "docs/ACP_INTEGRATION.md"
   action_map: "contracts/acp-protected-effects.yaml"

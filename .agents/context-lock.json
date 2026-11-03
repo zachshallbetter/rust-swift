@@ -1,17 +1,17 @@
 {
   "format": "2",
-  "generatorVersion": "0.1.0",
+  "generatorVersion": "0.6.1",
   "root": ".",
   "validityBasis": "aggregate-source-digest",
   "selectedPaths": [],
   "sourceSelection": {
-    "includedCount": 216,
-    "includedBytes": 3772710,
+    "includedCount": 182,
+    "includedBytes": 1613866,
     "excludedCounts": {
-      "excluded-directory": 60620,
+      "excluded-directory": 9019,
       "excluded-path": 1,
-      "extension": 8235,
-      "symlink": 5
+      "extension": 78,
+      "symlink": 4
     }
   },
   "repositoryState": {
@@ -20,24 +20,29 @@
     "repositories": [
       {
         "path": ".",
-        "commit": "6cda4f228ea4e3af4e9754cb895922539876a63b",
+        "commit": "f4e6ce7a1230baa6b15c4cf4825f5e4f339507bd",
         "branch": "main",
         "dirty": true,
         "remote": "https://github.com/zachshallbetter/rust-swift.git"
       }
     ]
   },
-  "aggregateSourceDigest": "94775d82402e7129f372cc0fd9ed4f1606be33e95b86d782f96f3e86bfb2b2b7",
+  "aggregateSourceDigest": "83eea7a8dc8f17a1be80d5faa102d0d89d847d130206e3fe2103d527a7eb9f9c",
   "sources": [
     {
       "path": ".agents/AGENTS.md",
-      "bytes": 11715,
-      "sha256": "c969aa7e673b2a891e0eba3610dca6c3a03f307295c835a43a88fa46d4ee5967"
+      "bytes": 11932,
+      "sha256": "63fd745414ac5c2a14a503ee1ae7b32a46596ae1ba4fbe3c8004848d71d35820"
     },
     {
       "path": ".agents/rules/ci.md",
       "bytes": 1139,
       "sha256": "04f63a639bb87b537b2d059b6f252cfef0e648d392ec105e091e86ee2af3a2df"
+    },
+    {
+      "path": ".agents/rules/codestyle.md",
+      "bytes": 3139,
+      "sha256": "62923830e444431d07e29e990168c4dba13026ed0ef6c530ed783daf500d720e"
     },
     {
       "path": ".agents/rules/governance.md",
@@ -55,29 +60,169 @@
       "sha256": "2dbf08cffb7497e349c61917f8620caab78a48773149cbc3204f3146b5f35a00"
     },
     {
+      "path": ".agents/rules/types.md",
+      "bytes": 3209,
+      "sha256": "15ebec204bb08ff126397aa0b5fdd5f941f88143efb07ebfd187a9e8405203d5"
+    },
+    {
+      "path": ".agents/rules/workflow.md",
+      "bytes": 7678,
+      "sha256": "ea83934293589cdcee7e720e83b6b2d14814636c5bb264ba948bec8f9f6dafc7"
+    },
+    {
       "path": ".agents/skills/authorize-protected-effect/SKILL.md",
-      "bytes": 2758,
-      "sha256": "480ffefc42bc4d9d744484149f26a86ddb9b19a8d6adb63053720f5fc0c7865f"
+      "bytes": 3954,
+      "sha256": "f57f61b168c168ca6d97eebae96f29d12a6266e39a9b08cdd3b1564709916cd3"
     },
     {
       "path": ".agents/skills/compile-context/SKILL.md",
-      "bytes": 561,
-      "sha256": "10c8156d05da083eddb606769183d8cabf4f924c241a3e3b462ef76f7aecf28d"
+      "bytes": 1156,
+      "sha256": "83e4e984f67d99aad8a733a1bafa419a5c32f2800d65d6e627f1652d2e928ea8"
     },
     {
       "path": ".agents/skills/coordinate-workers/SKILL.md",
-      "bytes": 593,
-      "sha256": "6be105841accc1f67dc11e12541b3b343fa2029a0ff6e5085c907b36381ba57b"
+      "bytes": 1488,
+      "sha256": "b9d8766ae870785be0fbbcb356fde17497ed1ff0b069c5bc9ce5e95d6218df0b"
+    },
+    {
+      "path": ".agents/skills/github-projects/SKILL.md",
+      "bytes": 20835,
+      "sha256": "18b1a5b8cd3b07c4b03717a97b197eac2c2273afae6687605f7f143d1d0c2f9b"
+    },
+    {
+      "path": ".agents/skills/github-projects/assets/roles/resolver.md",
+      "bytes": 1524,
+      "sha256": "5997cbcc50c7825f46e686b0f60c3d0d91ef38076c348132d33d9ebadda0c21f"
+    },
+    {
+      "path": ".agents/skills/github-projects/assets/roles/triager.md",
+      "bytes": 813,
+      "sha256": "436a8fc2ddcf90131d846e186fd7567f1d84e03592682cfd8297ad9d244051c4"
+    },
+    {
+      "path": ".agents/skills/github-projects/assets/roles/verifier.md",
+      "bytes": 710,
+      "sha256": "7a4e1145f353d8e6707070db23b19e4f5e695eaa4e1d92d38d4f43e7c99fce6a"
+    },
+    {
+      "path": ".agents/skills/github-projects/references/cli.md",
+      "bytes": 7339,
+      "sha256": "5e7ff18948919caf0161638f990eb28f8a48b8f500afcfa88b840b14be49751b"
+    },
+    {
+      "path": ".agents/skills/github-projects/references/conventions.md",
+      "bytes": 6734,
+      "sha256": "7eccf778c74e7075a280b946ba9967fd0e297f785f08a1728c1afb2f88f7d083"
+    },
+    {
+      "path": ".agents/skills/github-projects/references/coordinator.md",
+      "bytes": 7854,
+      "sha256": "ec44682ed3a71873a5575d73d10a44136c2f71274a708ed904712ff9b8edc3dc"
+    },
+    {
+      "path": ".agents/skills/github-projects/references/gotchas.md",
+      "bytes": 8489,
+      "sha256": "80f04b7a0258b08530dc2b766bdfc882c5699367f4a9eec5a5023b3fdf5b53cd"
+    },
+    {
+      "path": ".agents/skills/github-projects/references/graphql.md",
+      "bytes": 11606,
+      "sha256": "ed8864ffa957aa6c3a519c0abbccf9e7a0c3a1440e9ba9fd0b1026a63693abb4"
+    },
+    {
+      "path": ".agents/skills/github-projects/references/recipes.md",
+      "bytes": 6158,
+      "sha256": "28f30cb4e79f3b915a2c98ea6cc0c9ddd5b77d78d6f186fd098ecfae592a5e22"
+    },
+    {
+      "path": ".agents/skills/github-projects/scripts/add-item.sh",
+      "bytes": 1396,
+      "sha256": "43d55a90f1aef4364811ba14fb569eb290983dea2ee37c74cca49cbb8a458f86"
+    },
+    {
+      "path": ".agents/skills/github-projects/scripts/claim.sh",
+      "bytes": 3534,
+      "sha256": "4d2715aff9f8d11bcd7526980655b17afc1d9097bed945e7eb8271426fb6c156"
+    },
+    {
+      "path": ".agents/skills/github-projects/scripts/claims.sh",
+      "bytes": 3189,
+      "sha256": "adc007c8479e8a802e90bf5690bd878d3fc10a1f12d2b467c984d852d04de911"
+    },
+    {
+      "path": ".agents/skills/github-projects/scripts/coord.sh",
+      "bytes": 3741,
+      "sha256": "d467b230831ee2b64a50e9ec9a448c6d3ccce50d5df18bb7379845bd8d8b70cf"
+    },
+    {
+      "path": ".agents/skills/github-projects/scripts/coordinator.sh",
+      "bytes": 11844,
+      "sha256": "9cb6815731dad06f33156d629456a695e171cae7503bc7ff528968b3b370c3b6"
+    },
+    {
+      "path": ".agents/skills/github-projects/scripts/lib.sh",
+      "bytes": 11132,
+      "sha256": "46c6b85a26a76f10c8fbcfff6dbb33b0dd2c0a13ca4907254ef7a4943ca0d6c0"
+    },
+    {
+      "path": ".agents/skills/github-projects/scripts/new-item.sh",
+      "bytes": 2876,
+      "sha256": "2f51893ffbfe6409085b207ce7b182f2c64df905398ffdd6f0501169f51ee692"
+    },
+    {
+      "path": ".agents/skills/github-projects/scripts/project-ids.sh",
+      "bytes": 3253,
+      "sha256": "377059b5ccee0da7946d24b85a97acaeb43b7e9d89518649a694a9bf5678f74b"
+    },
+    {
+      "path": ".agents/skills/github-projects/scripts/project.sh",
+      "bytes": 3281,
+      "sha256": "86af44ab19da84ec1d0a7a095192a345281ad14574c1f412f73d8b03754640ad"
+    },
+    {
+      "path": ".agents/skills/github-projects/scripts/protect.sh",
+      "bytes": 1624,
+      "sha256": "6dadbc8f6a460619419a4bdc62e794155669ed01d0b9088571550f7b0027ff04"
+    },
+    {
+      "path": ".agents/skills/github-projects/scripts/release.sh",
+      "bytes": 1161,
+      "sha256": "1b31ae119f85717b3c4b8d61cf736e8bc6fa3c4f0e8c1cf02dbd87c4629873fd"
+    },
+    {
+      "path": ".agents/skills/github-projects/scripts/repo-map.sh",
+      "bytes": 3814,
+      "sha256": "73238acc3510cfeb3c8601132c0b9a949d377723a7f97bc02165f58b40d39677"
+    },
+    {
+      "path": ".agents/skills/github-projects/scripts/set-field.sh",
+      "bytes": 6016,
+      "sha256": "515b4cf985c2014d6de2cbeb0d590a0628827be195021f6cde9ec58ffbadc62a"
+    },
+    {
+      "path": ".agents/skills/github-projects/scripts/snapshot.sh",
+      "bytes": 6161,
+      "sha256": "28f82ef1bba6e62dd6652d5e2f857907cc1d9daed1260a72808b66c920cba029"
+    },
+    {
+      "path": ".agents/skills/github-projects/scripts/spawn.sh",
+      "bytes": 3809,
+      "sha256": "fdcdfc51393912c85b554834e35eddcacbec64020847520c6432446714a38271"
+    },
+    {
+      "path": ".agents/skills/github-projects/tests/test_acp_context.sh",
+      "bytes": 4918,
+      "sha256": "cc36abb57c3e9ae71c8f2cb291794513aa88b1379f20e7bd2dda137dfd33ef34"
     },
     {
       "path": ".agents/skills/operate-frontier/SKILL.md",
-      "bytes": 1006,
-      "sha256": "96cb68e6961b5b043603ff3c08f3984f504d5075a6b7db64dfbaee6b0fd96c71"
+      "bytes": 2497,
+      "sha256": "f650f747d70ecf22a800d380bc5d2efcbe19d3e48d7e1bd85e2143333922c4e0"
     },
     {
       "path": ".agents/skills/reconcile-project/SKILL.md",
-      "bytes": 1161,
-      "sha256": "59f47ea393b477949a5e046a021e95032c3e3bf395842f82388c05ddde6d5c66"
+      "bytes": 1945,
+      "sha256": "8e671f9b635f206d78be6fec73d67be5b6e8d8a4b9f125f1f0cc9d9157ea1894"
     },
     {
       "path": ".agents/skills/rust-to-swift/SKILL.md",
@@ -86,13 +231,13 @@
     },
     {
       "path": ".agents/skills/verify-outcome/SKILL.md",
-      "bytes": 599,
-      "sha256": "331bcc9c5179eef021d9edf48e76bedcaaef6fed17f97e91c6d20a20f1199117"
+      "bytes": 1309,
+      "sha256": "daa4c70bc8011c38b079c8c5a3773361c45b1dad268758d878beba4f4941a7a1"
     },
     {
       "path": ".formal-bootstrap.json",
-      "bytes": 296,
-      "sha256": "19eb168cc988e074ab77b6ab34fc562ac6ab956a0c1f9a663e8b56ff40025b75"
+      "bytes": 373,
+      "sha256": "9f30b0a2811f44274f23f67c0848d6871eef848354c0436a9466030f54f22545"
     },
     {
       "path": ".github/workflows/ci.yml",
@@ -106,8 +251,8 @@
     },
     {
       "path": "AGENTS.md",
-      "bytes": 11600,
-      "sha256": "484ac2707bd04e054b630eff45660fd68012bbdae35b862602f56a1ce52770a7"
+      "bytes": 11680,
+      "sha256": "834c1094e20999690def364f8ff65b85634857db0a952619006d97e805b58dfd"
     },
     {
       "path": "CHANGELOG.md",
@@ -116,13 +261,13 @@
     },
     {
       "path": "CONTEXT_SOURCES.json",
-      "bytes": 1213,
-      "sha256": "111b1b77d9c3aba3b78fe973b002d9356ce313d60d2cbc69c902a678a949e9b7"
+      "bytes": 1619,
+      "sha256": "0bb9aa2ff8bfcba454fa5216156064720a8311dcd1c216151401880285ce2694"
     },
     {
       "path": "Cargo.toml",
-      "bytes": 1093,
-      "sha256": "16e0c9336628f218b079c44fef06caf063b57da83e3764f230234b7b4a6b8e73"
+      "bytes": 1118,
+      "sha256": "545dc5e2692e60dc9a560967382a546798b2d63dc97ef9be46a151ce57f38052"
     },
     {
       "path": "FORMAL_RESOURCE_MANIFEST.json",
@@ -141,23 +286,23 @@
     },
     {
       "path": "PROJECT_PROFILE.json",
-      "bytes": 3387,
-      "sha256": "88f79c94b06b5da7b0e9084b8daffef1e1b48e07360ad10e55288ae58d7a332f"
+      "bytes": 3343,
+      "sha256": "c12f7b133ab5560217498a318083d7c8d66506a034a94764fc4f2ddec67e6a09"
     },
     {
       "path": "README.md",
-      "bytes": 29421,
-      "sha256": "9c9ff65e32f2bba58f7343e8aef822c53c259e38e34ed9322c486ca6354fb939"
+      "bytes": 29623,
+      "sha256": "fa6313bb9082632e0571b42c580d9d23371679ce017e1e5fda89b824ba687aec"
     },
     {
       "path": "VERSION",
       "bytes": 6,
-      "sha256": "e9dd8507f4bf0c6f42458e41aea833ad0bd3f6127272335eee9bf4d58541ed67"
+      "sha256": "87b241b275c591694846560e9879f50c9da3150f854efdabd782c539772f3033"
     },
     {
       "path": "bindings/PROJECT_BINDINGS.yaml",
-      "bytes": 2824,
-      "sha256": "1e41ae2a79d74b4abb55b774e43126d3d51aba2e906aedc392308d1f930a0946"
+      "bytes": 2783,
+      "sha256": "20c3e4302ac0d52afee8ed3f5ee4dda25f24efc98dca20df767ca950342f6282"
     },
     {
       "path": "contracts/README.md",
@@ -166,8 +311,8 @@
     },
     {
       "path": "contracts/acp-protected-effects.yaml",
-      "bytes": 4146,
-      "sha256": "6fd132dc67c4213fecb65461f0ee70987cfe41b765a55ab89c11d3f1a8a1a7dd"
+      "bytes": 4409,
+      "sha256": "5563eb2dc7be570c748de9197bab1d3952e89981f22e9b7fe42b6d7e786a4d1f"
     },
     {
       "path": "contracts/contract-execution.yaml",
@@ -206,8 +351,8 @@
     },
     {
       "path": "crates/rust-swift-cli/Cargo.toml",
-      "bytes": 690,
-      "sha256": "38d3eebe9714f72a6cfba26b250552f4a23c8362be00725e107fa114d280c7be"
+      "bytes": 588,
+      "sha256": "fe0b49a15e3ac6400b440e6b8a7c13b55b2f8f031bc72de8ecdabffb163c0e46"
     },
     {
       "path": "crates/rust-swift-cli/README.md",
@@ -216,8 +361,8 @@
     },
     {
       "path": "crates/rust-swift-cli/src/main.rs",
-      "bytes": 47651,
-      "sha256": "3d3eab8875e64beaaa64b635151a4f36f66d01d917ba499d2943c4b15031065a"
+      "bytes": 44734,
+      "sha256": "23092e7718c1ec68cca9a2c5d8cdbc24340e856f92215223ec54ebc11214d8f2"
     },
     {
       "path": "crates/rust-swift-codegen/Cargo.toml",
@@ -330,6 +475,16 @@
       "sha256": "4fd59c004e5ddf1aca5ecea1c27f902c1bb7f901455884addf406bb77cb3b931"
     },
     {
+      "path": "crates/rust-swift/Cargo.toml",
+      "bytes": 744,
+      "sha256": "0ba07405a9c5afe8037d117a4b8a5270164d0e6280866ae078cd8949e4aab73e"
+    },
+    {
+      "path": "crates/rust-swift/src/lib.rs",
+      "bytes": 9884,
+      "sha256": "89e3a3cc1e128d8cffd11313be3d7fcf8e5f601839d80ccaf8e29581b2348cb4"
+    },
+    {
       "path": "docs/01-product-definition.md",
       "bytes": 1302,
       "sha256": "e2ae82b746c506cc7231bf46ba57f436905122c407063408f130c09031d5f26f"
@@ -376,8 +531,8 @@
     },
     {
       "path": "docs/ACP_INTEGRATION.md",
-      "bytes": 15964,
-      "sha256": "8b5bf32e3040581e842718942f52cfd0f00ce1c37f6cc76498b127e4f5f449d9"
+      "bytes": 29258,
+      "sha256": "a42d94a1a771e2f7e258e3583deb9bcf3f5c065f77ddd99c404fa8a46ec26591"
     },
     {
       "path": "docs/AGENT_CAPABILITIES.md",
@@ -396,8 +551,8 @@
     },
     {
       "path": "docs/BOOTSTRAP_SEQUENCE.md",
-      "bytes": 6140,
-      "sha256": "82d04fa96aa477837c64b61a7c5f9e7617d0e325ef3e205dbd037f6ff1e91d51"
+      "bytes": 6713,
+      "sha256": "f1fff8b61e07d89a469d87520504dd9c12dc52696141026e6e4329217b13eaed"
     },
     {
       "path": "docs/CONFORMANCE.md",
@@ -406,8 +561,8 @@
     },
     {
       "path": "docs/CONTEXT_COMPILATION.md",
-      "bytes": 2568,
-      "sha256": "cedad34d38ef2363ab29c40d29f38a5a93168e95ed647b6f729757648d748117"
+      "bytes": 2906,
+      "sha256": "f4340c5afdba5aacf3d912af1ff9edcef21a1caf5bc4256975d23bf603740ed6"
     },
     {
       "path": "docs/EVIDENCE_METHOD.md",
@@ -426,8 +581,8 @@
     },
     {
       "path": "docs/EXISTING_PROJECT_ADOPTION.md",
-      "bytes": 4615,
-      "sha256": "549abfc3926076d522d677ba6dcaec5e6a4e1d9e3043aba70880632ffcdcbbe5"
+      "bytes": 5087,
+      "sha256": "63bdb7b681f9d76d10ee7296b8d035b5c4542426f8897f7ad89ed88101e5fabd"
     },
     {
       "path": "docs/FORMAL_RESOURCES.md",
@@ -465,119 +620,29 @@
       "sha256": "9f1cd25f6c36486f7fe077ba4110b5ead9f4c43f1b54bba24d9a0422a0475164"
     },
     {
+      "path": "docs/README_STANDARD.md",
+      "bytes": 2217,
+      "sha256": "0a00526dc726037e1ee49e412737cd0043a01138fdd25f34daaa37a2a450b0ed"
+    },
+    {
       "path": "docs/RECOVERY.md",
       "bytes": 1115,
       "sha256": "b084f0a4bbad4012bd9d2525a07239e38ff4f563bbdefbd8491518fec14882e9"
     },
     {
       "path": "docs/SKILLS_INDEX.md",
-      "bytes": 914,
-      "sha256": "2c763122a98e23607adf52f4029b3559b779bf2d3bb3a575b7a11f1ebf1f7874"
+      "bytes": 1049,
+      "sha256": "fff86a343840e9a401ffc2bc6c5ddaed9d9e4cb570efd07af50790b3d70f887c"
     },
     {
       "path": "docs/UPGRADING.md",
-      "bytes": 1998,
-      "sha256": "123cf17c5ac29a5530da30388d1342a200b1c09b7543523862c5eeef03627a06"
+      "bytes": 3050,
+      "sha256": "5d68f584e31904d26097f04721b509bbfc02a04be6816eff182c8456f9f0a9c7"
     },
     {
       "path": "docs/WORK_GRAPH.md",
-      "bytes": 1790,
-      "sha256": "427012a108e0b551cf656690da51c74675d0aa99cb138b8d4cf61bfa32691a22"
-    },
-    {
-      "path": "examples/GeneratedFSM/.build/out/Intermediates.noindex/GeneratedModuleMaps/fsm_example-Swift.h",
-      "bytes": 13008,
-      "sha256": "7142a77760d1c18e7d59d18b0869163808aae1256449f1c7be9a154ab58d956f"
-    },
-    {
-      "path": "examples/GeneratedFSM/.build/out/Intermediates.noindex/XCBuildData/c99e9c43d499cd58ea8ea944b59d03fc.xcbuilddata/build-request.json",
-      "bytes": 6081,
-      "sha256": "511ea96af4c0bbc39febf217645b02a3eb38638a571567dd0ee1137edd8e4fc6"
-    },
-    {
-      "path": "examples/GeneratedFSM/.build/out/Intermediates.noindex/XCBuildData/c99e9c43d499cd58ea8ea944b59d03fc.xcbuilddata/manifest.json",
-      "bytes": 154815,
-      "sha256": "3ae53906a55d98ac2e91122811e5ca323afcf1e6ca2a0bc52b7c6d7ae4c7d999"
-    },
-    {
-      "path": "examples/GeneratedFSM/.build/out/Intermediates.noindex/XCBuildData/c99e9c43d499cd58ea8ea944b59d03fc.xcbuilddata/target-graph.txt",
-      "bytes": 430,
-      "sha256": "21e0cfabda387a8540a02edd159825f873e49bb30a644f895e42187adbf524a0"
-    },
-    {
-      "path": "examples/GeneratedFSM/.build/out/Intermediates.noindex/XCBuildData/fc196692d6b27474dbbab2395accf379.xcbuilddata/build-request.json",
-      "bytes": 6165,
-      "sha256": "dabdef9c0a218315a3cdd0b601029869ea0932b2089f4e7af79ae08392fb42b2"
-    },
-    {
-      "path": "examples/GeneratedFSM/.build/out/Intermediates.noindex/XCBuildData/fc196692d6b27474dbbab2395accf379.xcbuilddata/manifest.json",
-      "bytes": 276382,
-      "sha256": "30c39c0dac18f72934228a1c51766d0d6ee815c9314fb091ff632b70d4a50c48"
-    },
-    {
-      "path": "examples/GeneratedFSM/.build/out/Intermediates.noindex/XCBuildData/fc196692d6b27474dbbab2395accf379.xcbuilddata/target-graph.txt",
-      "bytes": 790,
-      "sha256": "d14e10ac4ce3f9fb86bf0dce7fca4cdc775162fa3011633564731f2c742b8f26"
-    },
-    {
-      "path": "examples/GeneratedFSM/.build/out/Intermediates.noindex/XCBuildData/prior-build-descriptions.txt",
-      "bytes": 66,
-      "sha256": "29e8b670478aede65dbfe64511537bbf7e83419e60b69ecffa110349bd3e6294"
-    },
-    {
-      "path": "examples/GeneratedFSM/.build/out/Intermediates.noindex/fsm_example.build/Debug/fsm_example-t.build/Objects-normal/arm64/fsm_example-OutputFileMap.json",
-      "bytes": 4470,
-      "sha256": "a464034280a6f13a3078e9f65d55526b03b9e001a374097f73cf72baac095cde"
-    },
-    {
-      "path": "examples/GeneratedFSM/.build/out/Intermediates.noindex/fsm_example.build/Debug/fsm_example-t.build/Objects-normal/arm64/fsm_example-Swift.h",
-      "bytes": 12912,
-      "sha256": "7ef2cf1083a9023fec59e6ea728e024545d722dc3aa1dd48b5a8a8d44890a822"
-    },
-    {
-      "path": "examples/GeneratedFSM/.build/out/Intermediates.noindex/fsm_example.build/Debug/fsm_example-t.build/Objects-normal/arm64/fsm_example-dependencies-1.json",
-      "bytes": 21214,
-      "sha256": "71e421ef859169b582f38ca5dae2e6bb1a91d750f9342ec198875d61d05f2de1"
-    },
-    {
-      "path": "examples/GeneratedFSM/.build/out/Intermediates.noindex/fsm_example.build/Debug/fsm_example-t.build/Objects-normal/arm64/fsm_example.abi.json",
-      "bytes": 149,
-      "sha256": "4277ac6b49f8511196028a5ac20f5b1b1dfa754c24615d34068089f0b1739728"
-    },
-    {
-      "path": "examples/GeneratedFSM/.build/out/Intermediates.noindex/fsm_example.build/Debug/fsm_example-t.build/Objects-normal/arm64/fsm_example_const_extract_protocols.json",
-      "bytes": 386,
-      "sha256": "deb34a50c6dd08a80341a6229940a0cc38dbc93f989afd9897d76ebe392625b3"
-    },
-    {
-      "path": "examples/GeneratedFSM/.build/out/Intermediates.noindex/fsm_example.build/Debug/fsm_exampleTests-p.build/Objects-normal/arm64/fsm_exampleTests-OutputFileMap.json",
-      "bytes": 4707,
-      "sha256": "b55dd9ca43a09ef230bf0e6c42b394e00a706de57f65a39eb04479ac71663b63"
-    },
-    {
-      "path": "examples/GeneratedFSM/.build/out/Intermediates.noindex/fsm_example.build/Debug/fsm_exampleTests-p.build/Objects-normal/arm64/fsm_exampleTests-dependencies-1.json",
-      "bytes": 43008,
-      "sha256": "31b6b3ee6e18cc730210503dd1f30ae3331b469d6ba01470f0300529d364479a"
-    },
-    {
-      "path": "examples/GeneratedFSM/.build/out/Intermediates.noindex/fsm_example.build/Debug/fsm_exampleTests-p.build/Objects-normal/arm64/fsm_exampleTests.abi.json",
-      "bytes": 149,
-      "sha256": "4277ac6b49f8511196028a5ac20f5b1b1dfa754c24615d34068089f0b1739728"
-    },
-    {
-      "path": "examples/GeneratedFSM/.build/out/Intermediates.noindex/fsm_example.build/Debug/fsm_exampleTests-p.build/Objects-normal/arm64/fsm_exampleTests_const_extract_protocols.json",
-      "bytes": 386,
-      "sha256": "deb34a50c6dd08a80341a6229940a0cc38dbc93f989afd9897d76ebe392625b3"
-    },
-    {
-      "path": "examples/GeneratedFSM/.build/out/Products/Debug/fsm_example.swiftmodule/arm64-apple-macos.abi.json",
-      "bytes": 149,
-      "sha256": "4277ac6b49f8511196028a5ac20f5b1b1dfa754c24615d34068089f0b1739728"
-    },
-    {
-      "path": "examples/GeneratedFSM/.build/out/Products/Debug/fsm_exampleTests.swiftmodule/arm64-apple-macos.abi.json",
-      "bytes": 149,
-      "sha256": "4277ac6b49f8511196028a5ac20f5b1b1dfa754c24615d34068089f0b1739728"
+      "bytes": 2838,
+      "sha256": "b7d32fb78d272a75d0f4c6561bafdb75e9e12010f858daa0813f562f6af0766b"
     },
     {
       "path": "examples/GeneratedFSM/.build/workspace-state.json",
@@ -598,136 +663,6 @@
       "path": "examples/GeneratedFSM/manifest.json",
       "bytes": 932,
       "sha256": "34090c2688e8469624b69a2117da3f8c3ac0898fcf792092e4330c9398689c3c"
-    },
-    {
-      "path": "examples/PeelCoreKit/.build/out/Intermediates.noindex/GeneratedModuleMaps/PeelCoreKit-Swift.h",
-      "bytes": 13008,
-      "sha256": "732d2109f4b591888cb1c027fd1173a05f988009fbdc339eea37a75db16dace7"
-    },
-    {
-      "path": "examples/PeelCoreKit/.build/out/Intermediates.noindex/PeelCoreKit.build/Debug/PeelCoreKit-t.build/Objects-normal/arm64/PeelCoreKit-OutputFileMap.json",
-      "bytes": 4431,
-      "sha256": "d125f21952c6ecb7a110c5fd26040e888e4b5a233a541646ee3703c07ee55ea6"
-    },
-    {
-      "path": "examples/PeelCoreKit/.build/out/Intermediates.noindex/PeelCoreKit.build/Debug/PeelCoreKit-t.build/Objects-normal/arm64/PeelCoreKit-Swift.h",
-      "bytes": 12912,
-      "sha256": "41e3f87539e790a9d9e8528d5d9a1cefce384877e8ff6f78133af5f4d7c35bbe"
-    },
-    {
-      "path": "examples/PeelCoreKit/.build/out/Intermediates.noindex/PeelCoreKit.build/Debug/PeelCoreKit-t.build/Objects-normal/arm64/PeelCoreKit-dependencies-1.json",
-      "bytes": 21179,
-      "sha256": "86083fc580e49eff58e09dac3b0b3944d3463e390df9a2f080cfce541b755f3c"
-    },
-    {
-      "path": "examples/PeelCoreKit/.build/out/Intermediates.noindex/PeelCoreKit.build/Debug/PeelCoreKit-t.build/Objects-normal/arm64/PeelCoreKit.abi.json",
-      "bytes": 149,
-      "sha256": "4277ac6b49f8511196028a5ac20f5b1b1dfa754c24615d34068089f0b1739728"
-    },
-    {
-      "path": "examples/PeelCoreKit/.build/out/Intermediates.noindex/PeelCoreKit.build/Debug/PeelCoreKit-t.build/Objects-normal/arm64/PeelCoreKit_const_extract_protocols.json",
-      "bytes": 386,
-      "sha256": "deb34a50c6dd08a80341a6229940a0cc38dbc93f989afd9897d76ebe392625b3"
-    },
-    {
-      "path": "examples/PeelCoreKit/.build/out/Intermediates.noindex/PeelCoreKit.build/Debug/PeelCoreKitTests-p.build/Objects-normal/arm64/PeelCoreKitTests-OutputFileMap.json",
-      "bytes": 4758,
-      "sha256": "215a02794c92022b58ca75e7fca4ad21525834bd2fe0f3e5ad964fcbd2d11f7e"
-    },
-    {
-      "path": "examples/PeelCoreKit/.build/out/Intermediates.noindex/PeelCoreKit.build/Debug/PeelCoreKitTests-p.build/Objects-normal/arm64/PeelCoreKitTests-dependencies-1.json",
-      "bytes": 42940,
-      "sha256": "ecb69398a47f23b862cff76417d04e85a40ca26a88690def7f1c694158d8afd1"
-    },
-    {
-      "path": "examples/PeelCoreKit/.build/out/Intermediates.noindex/PeelCoreKit.build/Debug/PeelCoreKitTests-p.build/Objects-normal/arm64/PeelCoreKitTests.abi.json",
-      "bytes": 149,
-      "sha256": "4277ac6b49f8511196028a5ac20f5b1b1dfa754c24615d34068089f0b1739728"
-    },
-    {
-      "path": "examples/PeelCoreKit/.build/out/Intermediates.noindex/PeelCoreKit.build/Debug/PeelCoreKitTests-p.build/Objects-normal/arm64/PeelCoreKitTests_const_extract_protocols.json",
-      "bytes": 386,
-      "sha256": "deb34a50c6dd08a80341a6229940a0cc38dbc93f989afd9897d76ebe392625b3"
-    },
-    {
-      "path": "examples/PeelCoreKit/.build/out/Intermediates.noindex/PeelCoreKit.build/Debug/peel-inspect-p.build/Objects-normal/arm64/PeelInspectTool-dependencies-1.json",
-      "bytes": 21426,
-      "sha256": "2827329339ad69f53b4eacda16d17cf6c1ea55c34c9ff1721d3849c0f1641611"
-    },
-    {
-      "path": "examples/PeelCoreKit/.build/out/Intermediates.noindex/PeelCoreKit.build/Debug/peel-inspect-p.build/Objects-normal/arm64/PeelInspectTool.abi.json",
-      "bytes": 149,
-      "sha256": "4277ac6b49f8511196028a5ac20f5b1b1dfa754c24615d34068089f0b1739728"
-    },
-    {
-      "path": "examples/PeelCoreKit/.build/out/Intermediates.noindex/PeelCoreKit.build/Debug/peel-inspect-p.build/Objects-normal/arm64/peel-inspect-OutputFileMap.json",
-      "bytes": 2752,
-      "sha256": "6303f1c00a1b41d89e1edfc64122ed5ad6fb92146f5c1225459b48c3eb518507"
-    },
-    {
-      "path": "examples/PeelCoreKit/.build/out/Intermediates.noindex/PeelCoreKit.build/Debug/peel-inspect-p.build/Objects-normal/arm64/peel-inspect_const_extract_protocols.json",
-      "bytes": 386,
-      "sha256": "deb34a50c6dd08a80341a6229940a0cc38dbc93f989afd9897d76ebe392625b3"
-    },
-    {
-      "path": "examples/PeelCoreKit/.build/out/Intermediates.noindex/XCBuildData/78b2aacf65ffc96eb4484e806170b337.xcbuilddata/build-request.json",
-      "bytes": 6069,
-      "sha256": "452f122ea84fe5f99ebcce4bf20728b2165ec3332394ed93e5e7dd668801ffa9"
-    },
-    {
-      "path": "examples/PeelCoreKit/.build/out/Intermediates.noindex/XCBuildData/78b2aacf65ffc96eb4484e806170b337.xcbuilddata/manifest.json",
-      "bytes": 154112,
-      "sha256": "56d1f848ffe0bb607bd0f44ad2632a74f0beabc645d03c77f99cc689012ef7e8"
-    },
-    {
-      "path": "examples/PeelCoreKit/.build/out/Intermediates.noindex/XCBuildData/78b2aacf65ffc96eb4484e806170b337.xcbuilddata/target-graph.txt",
-      "bytes": 430,
-      "sha256": "91fb5e54cc10c2a223a4485e4c6a86d7d9a279189456377954d6d40054e2f9bb"
-    },
-    {
-      "path": "examples/PeelCoreKit/.build/out/Intermediates.noindex/XCBuildData/ccb03ab476d10b4afa721ee0b31d7224.xcbuilddata/build-request.json",
-      "bytes": 6103,
-      "sha256": "3ac660047d43ccf0220dd72babfa68cd3651d908adcfecd6e66a7eb17e54f86f"
-    },
-    {
-      "path": "examples/PeelCoreKit/.build/out/Intermediates.noindex/XCBuildData/ccb03ab476d10b4afa721ee0b31d7224.xcbuilddata/manifest.json",
-      "bytes": 184541,
-      "sha256": "2d0ba82ff3511750fd25aeeef2631e3cd3a6a68eadaadb714767fae263dd191e"
-    },
-    {
-      "path": "examples/PeelCoreKit/.build/out/Intermediates.noindex/XCBuildData/ccb03ab476d10b4afa721ee0b31d7224.xcbuilddata/target-graph.txt",
-      "bytes": 227,
-      "sha256": "820c144d97ff8d9218b6a5e70e5dcd648301c1720ad166f9cf5cf2ad4ed22c2c"
-    },
-    {
-      "path": "examples/PeelCoreKit/.build/out/Intermediates.noindex/XCBuildData/f52318d42778dabc576f721fb4101e32.xcbuilddata/build-request.json",
-      "bytes": 6153,
-      "sha256": "5053def89e66ea976a410106c7b52856fc2609480346d44c9e464307288cf724"
-    },
-    {
-      "path": "examples/PeelCoreKit/.build/out/Intermediates.noindex/XCBuildData/f52318d42778dabc576f721fb4101e32.xcbuilddata/manifest.json",
-      "bytes": 362832,
-      "sha256": "722b4eef615eaac671b2665c9d55ab085cc6b86683dc29abd1f8155749df2bdc"
-    },
-    {
-      "path": "examples/PeelCoreKit/.build/out/Intermediates.noindex/XCBuildData/f52318d42778dabc576f721fb4101e32.xcbuilddata/target-graph.txt",
-      "bytes": 1000,
-      "sha256": "4cfcb442c744f3e3a41fe56c4894ce7c478ea246236c9fa63716993d600a7102"
-    },
-    {
-      "path": "examples/PeelCoreKit/.build/out/Intermediates.noindex/XCBuildData/prior-build-descriptions.txt",
-      "bytes": 165,
-      "sha256": "9d8a9da6897f2f9991e9b110b87e5235334966eb2b4c416cfd80d6f15c7cc5f7"
-    },
-    {
-      "path": "examples/PeelCoreKit/.build/out/Products/Debug/PeelCoreKit.swiftmodule/arm64-apple-macos.abi.json",
-      "bytes": 149,
-      "sha256": "4277ac6b49f8511196028a5ac20f5b1b1dfa754c24615d34068089f0b1739728"
-    },
-    {
-      "path": "examples/PeelCoreKit/.build/out/Products/Debug/PeelCoreKitTests.swiftmodule/arm64-apple-macos.abi.json",
-      "bytes": 149,
-      "sha256": "4277ac6b49f8511196028a5ac20f5b1b1dfa754c24615d34068089f0b1739728"
     },
     {
       "path": "examples/PeelCoreKit/.build/workspace-state.json",
@@ -760,99 +695,9 @@
       "sha256": "9e04f61cdfa9570c7fde62ad90b4ebdd64651248dda9d1ba2404c17cd4763a5d"
     },
     {
-      "path": "examples/PluginDemoApp/.build/out/Intermediates.noindex/PluginDemoApp.build/Debug/PluginDemoApp-p.build/Objects-normal/arm64/PluginDemoApp-OutputFileMap.json",
-      "bytes": 6354,
-      "sha256": "5c152366b0a4634e6fa2a246016807ad00ba6bd23a87c0c293ed110cdeabe8d1"
-    },
-    {
-      "path": "examples/PluginDemoApp/.build/out/Intermediates.noindex/PluginDemoApp.build/Debug/PluginDemoApp-p.build/Objects-normal/arm64/PluginDemoApp-dependencies-1.json",
-      "bytes": 21245,
-      "sha256": "d6382c1615ebbfb113a8d6af93480bf9809c6e4b74f07506ec2c616f25052c7e"
-    },
-    {
-      "path": "examples/PluginDemoApp/.build/out/Intermediates.noindex/PluginDemoApp.build/Debug/PluginDemoApp-p.build/Objects-normal/arm64/PluginDemoApp.abi.json",
-      "bytes": 149,
-      "sha256": "4277ac6b49f8511196028a5ac20f5b1b1dfa754c24615d34068089f0b1739728"
-    },
-    {
-      "path": "examples/PluginDemoApp/.build/out/Intermediates.noindex/PluginDemoApp.build/Debug/PluginDemoApp-p.build/Objects-normal/arm64/PluginDemoApp_const_extract_protocols.json",
-      "bytes": 386,
-      "sha256": "deb34a50c6dd08a80341a6229940a0cc38dbc93f989afd9897d76ebe392625b3"
-    },
-    {
-      "path": "examples/PluginDemoApp/.build/out/Intermediates.noindex/PluginDemoApp.build/Debug/PluginDemoApp-p.build/Objects-normal/arm64/unknown-dependencies-1.json",
-      "bytes": 4,
-      "sha256": "ace810d7e2cbb4f8c40ce09dc8e191ae466adb4e1a7d49c59f2215b411d38b05"
-    },
-    {
-      "path": "examples/PluginDemoApp/.build/out/Intermediates.noindex/XCBuildData/05ada3e569f37626c06802e26d042c52.xcbuilddata/build-request.json",
-      "bytes": 6093,
-      "sha256": "d101838d39ffa3f45394d0fd7bf6b1420f86f43d7f1c3e3b89fb002e225561a6"
-    },
-    {
-      "path": "examples/PluginDemoApp/.build/out/Intermediates.noindex/XCBuildData/05ada3e569f37626c06802e26d042c52.xcbuilddata/manifest.json",
-      "bytes": 185999,
-      "sha256": "0a52cb82e3a1aea128a0e65d420a041f42aad5bf67f6f55da750eb99754a90fe"
-    },
-    {
-      "path": "examples/PluginDemoApp/.build/out/Intermediates.noindex/XCBuildData/05ada3e569f37626c06802e26d042c52.xcbuilddata/target-graph.txt",
-      "bytes": 512,
-      "sha256": "23db9d8c0611975f0a48f02cc58d362cffba7ca03d6f294514deb7964e8a28e6"
-    },
-    {
-      "path": "examples/PluginDemoApp/.build/out/Intermediates.noindex/XCBuildData/193a4318d9ac1626b13c5ca7ff3d746c.xcbuilddata/build-request.json",
-      "bytes": 6093,
-      "sha256": "d101838d39ffa3f45394d0fd7bf6b1420f86f43d7f1c3e3b89fb002e225561a6"
-    },
-    {
-      "path": "examples/PluginDemoApp/.build/out/Intermediates.noindex/XCBuildData/193a4318d9ac1626b13c5ca7ff3d746c.xcbuilddata/manifest.json",
-      "bytes": 189335,
-      "sha256": "b9fe6f3b579d1887536d3f9c120988c3b2a3c51c50a603c636b79de389466cd7"
-    },
-    {
-      "path": "examples/PluginDemoApp/.build/out/Intermediates.noindex/XCBuildData/193a4318d9ac1626b13c5ca7ff3d746c.xcbuilddata/target-graph.txt",
-      "bytes": 512,
-      "sha256": "23db9d8c0611975f0a48f02cc58d362cffba7ca03d6f294514deb7964e8a28e6"
-    },
-    {
-      "path": "examples/PluginDemoApp/.build/out/Intermediates.noindex/XCBuildData/4a75b1edc7a3a5180c532ad84723af45.xcbuilddata/build-request.json",
-      "bytes": 6131,
-      "sha256": "2f7c6858afc2047546c3b3b9d388c701a009ef7c4d37bea54c04c036872bea52"
-    },
-    {
-      "path": "examples/PluginDemoApp/.build/out/Intermediates.noindex/XCBuildData/4a75b1edc7a3a5180c532ad84723af45.xcbuilddata/manifest.json",
-      "bytes": 183823,
-      "sha256": "76a2423aadef4ec70a3e5db6c352cbe2a6c35c5e571084c196a9d294c31ef390"
-    },
-    {
-      "path": "examples/PluginDemoApp/.build/out/Intermediates.noindex/XCBuildData/4a75b1edc7a3a5180c532ad84723af45.xcbuilddata/target-graph.txt",
-      "bytes": 377,
-      "sha256": "83cae08cf04506d47c2cc3c79761d65c77b0e66cea861bf0f74b219758c1c62a"
-    },
-    {
-      "path": "examples/PluginDemoApp/.build/out/Intermediates.noindex/XCBuildData/97def436ed92f30709dca6bcc7d287c2.xcbuilddata/build-request.json",
-      "bytes": 6131,
-      "sha256": "2f7c6858afc2047546c3b3b9d388c701a009ef7c4d37bea54c04c036872bea52"
-    },
-    {
-      "path": "examples/PluginDemoApp/.build/out/Intermediates.noindex/XCBuildData/97def436ed92f30709dca6bcc7d287c2.xcbuilddata/manifest.json",
-      "bytes": 183823,
-      "sha256": "9bd955ac765ee6d9fca529e1d6af5dd313b752d6122b432044d68826b55d3b7f"
-    },
-    {
-      "path": "examples/PluginDemoApp/.build/out/Intermediates.noindex/XCBuildData/97def436ed92f30709dca6bcc7d287c2.xcbuilddata/target-graph.txt",
-      "bytes": 377,
-      "sha256": "83cae08cf04506d47c2cc3c79761d65c77b0e66cea861bf0f74b219758c1c62a"
-    },
-    {
-      "path": "examples/PluginDemoApp/.build/out/Intermediates.noindex/XCBuildData/prior-build-descriptions.txt",
-      "bytes": 132,
-      "sha256": "c0705fc60ea9a58b8678c526612d95555b74fa1478e9cb7d755775c8d6b7ab0c"
-    },
-    {
       "path": "examples/PluginDemoApp/.build/plugins/cache/RustSwiftPlugin-state.json",
-      "bytes": 10540,
-      "sha256": "4203160458cc9b23521aa09e3d4d3994098e34747e407f78974c5205224c64b6"
+      "bytes": 9035,
+      "sha256": "4b1d3df38c68315a373832af749cf149646253347f932f68e2ee86769a9e1040"
     },
     {
       "path": "examples/PluginDemoApp/.build/plugins/cache/RustSwiftPlugin.dSYM/Contents/Resources/Relocations/aarch64/RustSwiftPlugin.yml",
@@ -883,46 +728,6 @@
       "path": "examples/README.md",
       "bytes": 2394,
       "sha256": "4f5eae02cb842217fa1ac4f4566506bdbabd469dd2da915ac9a6f3b8215bb2e4"
-    },
-    {
-      "path": "examples/SwiftUIDemoApp/.build/out/Intermediates.noindex/SwiftUIDemoApp.build/Debug/SwiftUIDemoApp-p.build/Objects-normal/arm64/SwiftUIDemoApp-OutputFileMap.json",
-      "bytes": 6444,
-      "sha256": "ed7471b6d366d0ccf226e8ff8251ed73af4a375abd090b45153b6dc0060f4c93"
-    },
-    {
-      "path": "examples/SwiftUIDemoApp/.build/out/Intermediates.noindex/SwiftUIDemoApp.build/Debug/SwiftUIDemoApp-p.build/Objects-normal/arm64/SwiftUIDemoApp-dependencies-1.json",
-      "bytes": 44219,
-      "sha256": "33ccde3eacd431a6cd830e5df2989b005c93f0603d26f9acb079963a6290cc41"
-    },
-    {
-      "path": "examples/SwiftUIDemoApp/.build/out/Intermediates.noindex/SwiftUIDemoApp.build/Debug/SwiftUIDemoApp-p.build/Objects-normal/arm64/SwiftUIDemoApp.abi.json",
-      "bytes": 149,
-      "sha256": "4277ac6b49f8511196028a5ac20f5b1b1dfa754c24615d34068089f0b1739728"
-    },
-    {
-      "path": "examples/SwiftUIDemoApp/.build/out/Intermediates.noindex/SwiftUIDemoApp.build/Debug/SwiftUIDemoApp-p.build/Objects-normal/arm64/SwiftUIDemoApp_const_extract_protocols.json",
-      "bytes": 386,
-      "sha256": "deb34a50c6dd08a80341a6229940a0cc38dbc93f989afd9897d76ebe392625b3"
-    },
-    {
-      "path": "examples/SwiftUIDemoApp/.build/out/Intermediates.noindex/XCBuildData/efdb414b7008e96fcb2b6ffa4fbe76d3.xcbuilddata/build-request.json",
-      "bytes": 6105,
-      "sha256": "23ab573c5b831b6b5dd0fb90a4ecfc23344b3b323e835335ee2480e845c46549"
-    },
-    {
-      "path": "examples/SwiftUIDemoApp/.build/out/Intermediates.noindex/XCBuildData/efdb414b7008e96fcb2b6ffa4fbe76d3.xcbuilddata/manifest.json",
-      "bytes": 191599,
-      "sha256": "6822cfc1370d64ddd94248ed8d094f959802cf639ed511d29df11220bb2a9650"
-    },
-    {
-      "path": "examples/SwiftUIDemoApp/.build/out/Intermediates.noindex/XCBuildData/efdb414b7008e96fcb2b6ffa4fbe76d3.xcbuilddata/target-graph.txt",
-      "bytes": 516,
-      "sha256": "62d457ccb4879915c753220e4b10405d8b77f36347ba06cfe3b924510c7742e2"
-    },
-    {
-      "path": "examples/SwiftUIDemoApp/.build/out/Intermediates.noindex/XCBuildData/prior-build-descriptions.txt",
-      "bytes": 33,
-      "sha256": "c1fa480d82ac200ce077cf15c27e161e949552d02fe296d28a32dc3c7c49ee13"
     },
     {
       "path": "examples/SwiftUIDemoApp/.build/plugins/cache/RustSwiftPlugin-state.json",
@@ -965,9 +770,19 @@
       "sha256": "87f058b441eea1fb8f10c5384d596e8d4cee16d5a042f75788513225796b50ab"
     },
     {
+      "path": "policy-proposals/zachshallbetter-rust-swift-v1.json",
+      "bytes": 5140,
+      "sha256": "5a47bca524c8d0115e8be2f63fbbcb0110b26d4d0651a13651517e936638338e"
+    },
+    {
       "path": "schemas/acp-decision.schema.json",
       "bytes": 5605,
       "sha256": "2a870190e4a3d208b765054b04de35819570770639e93e16ebb52d4365e8c76c"
+    },
+    {
+      "path": "schemas/acp-endpoint-registry.schema.json",
+      "bytes": 1224,
+      "sha256": "a391fd2748e5e41baa78dfc5f8f0bbcd6114989af631cad4edb3b7872ba5f009"
     },
     {
       "path": "schemas/agent-message.schema.json",
@@ -1026,13 +841,23 @@
     },
     {
       "path": "scripts/acp-check.py",
-      "bytes": 11196,
-      "sha256": "ef1863692a470634adae144c0b6f3aadfc375543915c7b9c428b6b99f4c9225a"
+      "bytes": 20703,
+      "sha256": "72dc6cb031a2b4ccfb8ae6b79b74341cce31657d72a193f29548a510f9a7956c"
     },
     {
       "path": "scripts/acp.py",
-      "bytes": 25463,
-      "sha256": "6fca8c5738deb7864a77838d95214cf388a6b80dcfac97fe9446eb0aa83176dd"
+      "bytes": 59939,
+      "sha256": "438ae9b3e8cba6a8adca3bd4079a488342a1d939f7971e4ad06f80cdeb4e010d"
+    },
+    {
+      "path": "scripts/acp_endpoint_registry.py",
+      "bytes": 12450,
+      "sha256": "bf1dcd4727ed4b9863c838df67b41d4909a7ceaa46378e4606cdd98f3e1bbb01"
+    },
+    {
+      "path": "scripts/acp_override.py",
+      "bytes": 8207,
+      "sha256": "23e27d11bd554d3ecf69a42757740be4b0aa91b1fcab6de342462d1d06124d84"
     },
     {
       "path": "scripts/apple-notarize.sh",
@@ -1046,8 +871,8 @@
     },
     {
       "path": "scripts/check-protocol-integrity.py",
-      "bytes": 6917,
-      "sha256": "fdac207980574121a5a7be9316c6cbb436c9f32c521c2d6100d14ce16733f96d"
+      "bytes": 7077,
+      "sha256": "a87d1f6dcae5255cc0d616318ad7d5a6fd47ef29a6548d025d58f997d610de37"
     },
     {
       "path": "scripts/esp-instance.py",
@@ -1061,8 +886,8 @@
     },
     {
       "path": "scripts/gen-context.py",
-      "bytes": 13025,
-      "sha256": "eee7f301274b03d452987e5f3eb82891c828a951900454cf983cca3a97b25c87"
+      "bytes": 13729,
+      "sha256": "0c951731c9b7596de1eb2241a31cbb84723ece20ed830db3af76aa929a112627"
     },
     {
       "path": "scripts/iepe-adopt.py",
@@ -1076,23 +901,28 @@
     },
     {
       "path": "scripts/reconcile-project.py",
-      "bytes": 11596,
-      "sha256": "a9d4002736f1fef51ba2c124f4abb2414e67fd131016b42604bd57c633facedd"
+      "bytes": 16212,
+      "sha256": "26a2b3dee9d562646d4eeab895b8f2eea1997f0e6a45e5d2ce3f16cc9076e102"
     },
     {
       "path": "scripts/upgrade-project.py",
-      "bytes": 14138,
-      "sha256": "e0ac6478ec44fee27f8ead869ebaae80952a817203d253e1556701b6d522e346"
+      "bytes": 18113,
+      "sha256": "47b68d85e61f64d9ea1febdac5b617484d5a7fe91c2b604aabd2f22c2e8e3ad7"
     },
     {
       "path": "scripts/validate-bootstrap.py",
-      "bytes": 10636,
-      "sha256": "377ee4ba3f343373db6c4a6f12f04bd2176995b3b2df2dde7966020f78338f76"
+      "bytes": 14835,
+      "sha256": "603ea01fa371d42b7ea90119c8b118f28aa330ab5c7a116edc998c5cc6f4e5fd"
     },
     {
       "path": "scripts/validate-interaction-contract.py",
       "bytes": 2441,
       "sha256": "74de7cf8d3efa6cca102e2982377d9829f35218632dbea1eb0f6ab7d39706b2a"
+    },
+    {
+      "path": "scripts/validate-local-work-items.py",
+      "bytes": 5856,
+      "sha256": "37b62dd766cbd1bb59f139a488520486a1e92c648cf8ade3ed35dd0a003b5285"
     },
     {
       "path": "scripts/validate-protocol-adapters.py",

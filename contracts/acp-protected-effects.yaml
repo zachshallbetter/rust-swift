@@ -38,6 +38,12 @@ operations:
     acpAction: production.deploy
     governed: true
 
+  - operation: migrate one explicitly identified database using the approved repository revision
+    effectClass: E3
+    acpAction: database.migrate
+    governed: true
+    contextRequired: [source_database, target_database, work_item, environment, ref, new_sha]
+
   - operation: rewrite history or force-push a protected ref
     effectClass: E4
     acpAction: git.history.rewrite

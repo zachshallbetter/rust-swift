@@ -29,6 +29,18 @@ DEFAULT_SENSITIVE_PATTERNS = (
     "*credentials*.json",
     "*secrets*.json",
 )
+DEFAULT_EXCLUDED_DIRS = frozenset({
+    ".git", "node_modules", "target", "dist", "build", "out", "coverage", "htmlcov",
+    "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", ".venv", "venv",
+    ".cache", ".next", ".turbo", ".vercel", "tmp", "temp",
+})
+DEFAULT_EXCLUDED_PATHS = frozenset({
+    ".agents/llms.txt", ".agents/llms-full.txt", ".agents/context-lock.json",
+})
+DEFAULT_GENERATED_FILE_PATTERNS = (
+    "llms*.txt", "llm-full-docs*.txt", "llm-full-docs-all.zip", "*.tmp", "*.temp",
+    "*.bak", "*~", "*.pyc", "*.pyo", "*.tsbuildinfo", "*.log", "*.swp", "*.swo", "*.orig", "*.rej",
+)
 
 
 class ContextError(RuntimeError):
@@ -159,8 +171,8 @@ def load_policy() -> dict:
 def source_files(
     policy: dict, path_filters: tuple[str, ...] = ()
 ) -> tuple[list[tuple[str, bytes]], dict[str, int]]:
-    ex_dirs = set(policy["excludeDirectories"])
-    ex_paths = set(policy["excludePaths"])
+    ex_dirs = set(policy["excludeDirectories"]) | DEFAULT_EXCLUDED_DIRS
+    ex_paths = set(policy["excludePaths"]) | DEFAULT_EXCLUDED_PATHS
     exts = set(policy["includeExtensions"])
     include_files = set(policy.get("includeFiles", []))
     max_bytes = int(policy["maxFileBytes"])
@@ -199,6 +211,9 @@ def source_files(
             skipped["vendor"] = skipped.get("vendor", 0) + 1
             continue
         if rel in ex_paths:
+            continue
+        if any(fnmatch.fnmatch(path.name, pattern) for pattern in DEFAULT_GENERATED_FILE_PATTERNS):
+            skipped["generated-or-transient-file"] = skipped.get("generated-or-transient-file", 0) + 1
             continue
         if any(fnmatch.fnmatch(rel, pattern) for pattern in sensitive_patterns):
             skipped["excluded-path"] = skipped.get("excluded-path", 0) + 1
@@ -327,16 +342,12 @@ def main() -> int:
             if current.get(key) != lock[key]:
                 print(f"STALE: context lock field differs: {key}", file=sys.stderr)
                 return 2
-        if not (AGENTS / "llms.txt").exists() or not (AGENTS / "llms-full.txt").exists():
-            print("STALE: generated corpus missing", file=sys.stderr)
-            return 2
-        if (AGENTS / "llms.txt").read_text(encoding="utf-8") != index:
-            print("STALE: llms.txt differs", file=sys.stderr)
-            return 2
-        if (AGENTS / "llms-full.txt").read_text(encoding="utf-8") != full:
-            print("STALE: llms-full.txt differs", file=sys.stderr)
-            return 2
-        print(f"OK {lock['aggregateSourceDigest']}")
+        for name, expected in (("llms.txt", index), ("llms-full.txt", full)):
+            output = AGENTS / name
+            if output.exists() and output.read_bytes() != expected.encode("utf-8"):
+                print(f"STALE: {name} differs", file=sys.stderr)
+                return 2
+        print(f"OK {lock['aggregateSourceDigest']} (generated exports absent or current)")
         return 0
 
     AGENTS.mkdir(parents=True, exist_ok=True)
@@ -350,7 +361,7 @@ def main() -> int:
             temp_root = Path(tmp)
             for name, content in outputs.items():
                 temp_path = temp_root / name
-                temp_path.write_text(content, encoding="utf-8")
+                temp_path.write_bytes(content.encode("utf-8"))
             for name in outputs:
                 os.replace(temp_root / name, AGENTS / name)
     except OSError as exc:

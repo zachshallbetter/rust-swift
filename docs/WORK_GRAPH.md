@@ -92,6 +92,23 @@ whether unrelated work may proceed
 
 Blocked state does not erase the item.
 
+## Local work while ACP or the board is unavailable
+
+`records/local-work-items.jsonl` is the durable queue for independently scoped
+local work when a GitHub board cannot yet be bound or ACP is unreachable. Each
+line is one complete work item using the fields above plus `state`. Validate it
+with `python3 scripts/validate-local-work-items.py` before acting on it.
+
+The local ledger accepts active E0/E1 items and the local permission vocabulary
+`repository.read`, `source.inspect`, `local.analysis`, `local.test`, `local.edit`,
+and `local.commit`. A Ready local item may authorize only those local actions on
+its declared paths. It does not authorize GitHub writes, protected pushes,
+merges, deployments, policy or credential changes, or recovery. Those effects
+still require an exact live ACP `ALLOW`. Reconcile local items into the project
+board after service returns; board synchronization is not itself authorization.
+Completed E2+ rows are accepted only as historical evidence with completion
+evidence; they never authorize a current effect.
+
 ## Frontier
 
 The coordinator selects from all currently Ready, unclaimed, dependency-satisfied items within authority and budget.

@@ -32,7 +32,9 @@ def main() -> int:
         if resource.get("required") and resource.get("canonicalSource") in {None, ""}: errors.append(f"required resource {resource.get('id')} has no canonical source")
     declared = profile.get("protocolAdapters") or profile.get("profiles") or []
     for adapter in declared:
-        if not (root / "profiles" / str(adapter) / "adapter.json").exists(): errors.append(f"declared adapter is not bundled: {adapter}")
+        bundle = root / "profiles" / str(adapter)
+        # A domain profile (PROFILE.yaml) is not a protocol adapter and has no adapter.json.
+        if not (bundle / "adapter.json").exists() and not (bundle / "PROFILE.yaml").exists(): errors.append(f"declared adapter is not bundled: {adapter}")
     if "esp-rcp" in declared:
         try: instance = json.loads((root / "records/external-state.json").read_text(encoding="utf-8"))
         except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc: instance = {}; errors.append(f"external-state instance is unreadable: {exc}")

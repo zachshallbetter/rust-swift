@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -18,6 +19,7 @@ COMMON = [
     "docs/BOOTSTRAP_SEQUENCE.md",
     "docs/CONTEXT_COMPILATION.md",
     "docs/UPGRADING.md",
+    "docs/README_STANDARD.md",
     "docs/EVIDENCE_METHOD.md",
     "docs/EXECUTION_PIPELINE.md",
     "docs/EXECUTION_PROVIDER_CONTRACT.md",
@@ -43,7 +45,11 @@ COMMON = [
     "schemas/semantic-surface.schema.json",
     "contracts/acp-protected-effects.yaml",
     ".agents/skills/authorize-protected-effect/SKILL.md",
+    ".agents/skills/github-projects/SKILL.md",
     ".agents/rules/standards.md",
+    ".agents/rules/workflow.md",
+    ".agents/rules/codestyle.md",
+    ".agents/rules/types.md",
     ".agents/rules/ci.md",
     ".agents/rules/governance.md",
     ".agents/rules/security.md",
@@ -51,7 +57,9 @@ COMMON = [
     "scripts/upgrade-project.py",
     "scripts/reconcile-project.py",
     "scripts/acp-check.py",
+    "scripts/validate-local-work-items.py",
     "scripts/acp.py",
+    "scripts/acp_override.py",
     "scripts/validate-protocol-adapters.py",
     "scripts/validate-qualification.py",
     "scripts/validate-interaction-contract.py",
@@ -89,7 +97,46 @@ PROJECT_ONLY = [
     "records/negative-results.jsonl",
     "records/deviations.jsonl",
     "records/alignment.jsonl",
+    "records/local-work-items.jsonl",
 ]
+
+
+def readme_findings(path: Path) -> list[str]:
+    text = path.read_text(encoding="utf-8")
+    headings: list[tuple[int, str]] = []
+    outside_fence: list[str] = []
+    in_fence = False
+    for line in text.splitlines():
+        if line.lstrip().startswith(("```", "~~~")):
+            in_fence = not in_fence
+            continue
+        if not in_fence:
+            outside_fence.append(line)
+            match = re.match(r"^(#{1,6})\s+(.+?)\s*#*\s*$", line)
+            if match:
+                headings.append((len(match.group(1)), match.group(2).strip()))
+
+    findings: list[str] = []
+    nonempty = [line.strip() for line in outside_fence if line.strip()]
+    if not nonempty or not re.match(r"^#\s+\S", nonempty[0]):
+        findings.append("start with one descriptive H1 title")
+    if sum(level == 1 for level, _ in headings) != 1:
+        findings.append("use exactly one H1 title")
+    if len(nonempty) < 2 or nonempty[1].startswith("#") or len(nonempty[1]) < 30:
+        findings.append("include a concise factual summary after the title")
+
+    labels = {re.sub(r"[^a-z0-9]+", " ", title.lower()).strip() for _, title in headings}
+    groups = {
+        "quick start": {"quick start", "getting started", "quickstart", "usage", "install", "installation"},
+        "repository map": {"repository structure", "project structure", "repository map", "project map",
+                           "repository layout", "project layout", "contents"},
+        "verification": {"verification", "validation", "tests", "testing", "development"},
+        "status and limits": {"status and limitations", "status and limits", "status honesty", "current status", "maturity"},
+    }
+    for label, alternatives in groups.items():
+        if not labels.intersection(alternatives):
+            findings.append(f"include a {label} section")
+    return findings
 
 
 def validate_acp(profile: dict) -> int:
@@ -105,6 +152,19 @@ def validate_acp(profile: dict) -> int:
         return 2
     if acp.get("failClosed") is not True:
         print("INVALID: authorizationProvider.failClosed must be true", file=sys.stderr)
+        return 2
+    endpoint_set = acp.get("gatewayEndpointSet")
+    legacy_endpoints = acp.get("gatewayEndpoints")
+    if endpoint_set is not None and (not isinstance(endpoint_set, str)
+                                     or not re.fullmatch(r"[a-z0-9][a-z0-9._-]{0,63}", endpoint_set)):
+        print("INVALID: authorizationProvider.gatewayEndpointSet must be a lowercase named set", file=sys.stderr)
+        return 2
+    if endpoint_set is not None and legacy_endpoints is not None:
+        print("INVALID: profile cannot define both gatewayEndpointSet and legacy gatewayEndpoints", file=sys.stderr)
+        return 2
+    if legacy_endpoints is not None and (not isinstance(legacy_endpoints, list) or len(legacy_endpoints) != 1
+                                         or not isinstance(legacy_endpoints[0], dict)):
+        print("INVALID: only a legacy single-endpoint ACP profile can be normalized", file=sys.stderr)
         return 2
     if acp.get("authorizedEffectClassesMinimum") not in ("E0", "E1", "E2", "E3"):
         print("INVALID: authorizedEffectClassesMinimum must be E0..E3 (E4 is always governed)", file=sys.stderr)
@@ -148,11 +208,15 @@ def validate_acp(profile: dict) -> int:
         return 2
     if acp.get("status") == "bound":
         board_env = ROOT / acp.get("boardEnvFile", ".agents/board.env")
-        if not board_env.exists() or "ACP_GATEWAY_URL=" not in board_env.read_text(encoding="utf-8"):
-            print("INVALID: bound authorizationProvider requires ACP_GATEWAY_URL in " + str(board_env.relative_to(ROOT)), file=sys.stderr)
+        contents = board_env.read_text(encoding="utf-8") if board_env.exists() else ""
+        has_endpoint_binding = endpoint_set is not None or bool(acp.get("gatewayUrlEnv"))
+        if not has_endpoint_binding or not board_env.exists() or "ACP_REMOTE_URL=" not in contents:
+            print("INVALID: bound authorizationProvider requires an endpoint binding and repository identity in "
+                  + str(board_env.relative_to(ROOT)), file=sys.stderr)
             return 2
-        if "ACP_GATEWAY_TOKEN=" in board_env.read_text(encoding="utf-8"):
-            print("INVALID: ACP_GATEWAY_TOKEN must never be written to a committed file", file=sys.stderr)
+        if any(line.split("=", 1)[0].strip().startswith(("ACP_GATEWAY_TOKEN", "ACP_POLICY_ADMIN_TOKEN"))
+               for line in contents.splitlines() if "=" in line):
+            print("INVALID: ACP gateway bearer tokens must never be written to a committed file", file=sys.stderr)
             return 2
     return 0
 
@@ -186,6 +250,17 @@ def main() -> int:
     missing = [path for path in required if not (ROOT / path).exists()]
     if missing:
         print("MISSING:", *missing, sep="\n  ", file=sys.stderr)
+        return 2
+
+    readme_issues = readme_findings(ROOT / "README.md")
+    marker = json.loads((ROOT / ".formal-bootstrap.json").read_text(encoding="utf-8")) if project_mode else {}
+    preserve_existing_readme = project_mode and marker.get("mode") == "existing"
+    if readme_issues and preserve_existing_readme:
+        print("WARN: existing README preserved; review docs/README_STANDARD.md:",
+              *readme_issues, sep="\n  ")
+    elif readme_issues:
+        print("INVALID: README does not meet docs/README_STANDARD.md:",
+              *readme_issues, sep="\n  ", file=sys.stderr)
         return 2
 
     ignored = ignored_required(required + ([".agents/board.env"] if (ROOT / ".agents/board.env").exists() else []))
@@ -241,6 +316,11 @@ def main() -> int:
     rc = validate_acp(profile)
     if rc:
         return rc
+
+    if project_mode:
+        local_items_check = subprocess.call([sys.executable, str(ROOT / "scripts/validate-local-work-items.py")])
+        if local_items_check:
+            return local_items_check
 
     if args.check_context:
         rc = subprocess.call([sys.executable, str(ROOT / "scripts/gen-context.py"), "--check"])
