@@ -6,7 +6,7 @@
   "selectedPaths": [],
   "sourceSelection": {
     "includedCount": 199,
-    "includedBytes": 1779947,
+    "includedBytes": 1780387,
     "excludedCounts": {
       "extension": 42
     }
@@ -17,14 +17,14 @@
     "repositories": [
       {
         "path": ".",
-        "commit": "c007d8027289f5e12a4ccad239f4db8326e9e40d",
-        "branch": "chore/bootstrap-0.7.3",
+        "commit": "306c16110a4ef1af4de2e04cd3b3c76d37d23aae",
+        "branch": "fix/agents-rules-path",
         "dirty": true,
         "remote": "https://github.com/zachshallbetter/rust-swift.git"
       }
     ]
   },
-  "aggregateSourceDigest": "8c1390b6b1290fad69a937f8fd3dee1f6a9516bdd2d49b7ae1caa86fa21bdcc7",
+  "aggregateSourceDigest": "2884848477515bdd8b1b0d5a8c1640c65f0cb55e38d8fd5aaa98039add820ac4",
   "sources": [
     {
       "path": ".agents/AGENTS.md",
@@ -733,8 +733,8 @@
     },
     {
       "path": "AGENTS.md",
-      "bytes": 11822,
-      "sha256": "8d5076250d28a4b3b320a96362e2474583848a84cb9e8a4e0847852f99269372"
+      "bytes": 12262,
+      "sha256": "c8f37f17397bdcdc72cc1fe8e363f4bf208385111b9b4ba8930ac353653bf103"
     },
     {
       "path": "CHANGELOG.md",
