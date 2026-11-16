@@ -13,7 +13,7 @@ concurrency:
 jobs:
   qualification:
     name: Build, Test, and Qualify
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 15
     steps:
       - name: Checkout repository
