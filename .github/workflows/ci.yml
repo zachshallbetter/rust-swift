@@ -6,10 +6,15 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   qualification:
     name: Build, Test, and Qualify
     runs-on: macos-14
+    timeout-minutes: 15
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
