@@ -321,7 +321,8 @@ def main() -> int:
                 why = (f"no ACP policy governs {resource}: inside ACP_POLICY_SCOPE every protected action is "
                        "refused (POLICY_NOT_FOUND); outside it ACP answers ALLOW/NOT_GOVERNED, which "
                        ".agents/acp/acp refuses while the profile is failClosed. The repository owner registers "
-                       "one on the gateway: scripts/policy-admin.py register OWNER/NAME --apply")
+                       "one on the gateway, which also meters the providers that build it: "
+                       "scripts/policy-admin.py enroll OWNER/NAME --apply")
                 if cfg["fail_closed"] and not args.allow_ungoverned:
                     notice_failure = why
                     summary["checks"]["notice"] = "FAILED (not governed)"

@@ -2,7 +2,7 @@
   "format": "1",
   "adapterId": "iepe",
   "protocol": {"id":"iepe","version":"0.2.0","revisionOrDigest":"git:f1892e4","canonicalSource":"intent-evidence-project-engine"},
-  "supportedBootstrap": "0.7.x",
+  "supportedBootstrap": "0.8.x",
   "authority": {"role":"operating-governance","sourceOfTruth":"IEPE canonical intent, authority, and work-graph records","promotionBoundary":"IEPE promotion authority plus FPB/ACP protected-effect authorization"},
   "mappings": {
     "imports": ["intent", "authority", "epic", "issue", "artifact", "evaluation", "evidence", "qualification", "promotion"],

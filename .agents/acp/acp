@@ -3,6 +3,7 @@
 
     .agents/acp/acp status        is everything set up and current? (one line per check, with the fix)
     .agents/acp/acp init          generate or refresh the project's ACP settings
+    .agents/acp/acp doctor        check the whole setup; each gap prints its exact fix
     .agents/acp/acp push          publish a commit through ACP, one exact approval per step
     .agents/acp/acp authorize …   one decision for one governed effect
     .agents/acp/acp --help        every command

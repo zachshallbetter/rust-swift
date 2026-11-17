@@ -36,8 +36,8 @@ descriptive-to-normative contamination
 
 Retention does not prevent rediscovery. A recorded result was re-run in an
 observed adoption, reproduced its documented failure, and was proposed as new
-work by the worker that had recorded it. `.agents/bootstrap/scripts/check-negative-results.py`
-refuses a change that reintroduces a gated row.
+work by the worker that had recorded it. `.agents/bootstrap/scripts/check-negative-results.py` in the bootstrap
+repository (not installed into projects) refuses a change that reintroduces a gated row.
 
 A row is gated only when it carries `detect` patterns:
 

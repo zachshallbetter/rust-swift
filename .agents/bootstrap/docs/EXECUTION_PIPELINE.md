@@ -45,6 +45,8 @@ Does this invalidate project-wide authority/safety?
 
 Do not turn a local blocker into a conversational project halt.
 
+In a lane setup, a lane reports a blocker in its state file; the coordinator's monitor surfaces it, and the coordinator recomputes the frontier and rebalances. A lane with no Ready work is reported `blocked` or `idle`; it is not a project halt.
+
 ## Retry
 
 Retry only when:

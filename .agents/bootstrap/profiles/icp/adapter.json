@@ -2,7 +2,7 @@
   "format": "1",
   "adapterId": "icp",
   "protocol": {"id":"icp","version":"0.1.0","revisionOrDigest":"git:f1892e4","canonicalSource":"interaction-contract-protocol"},
-  "supportedBootstrap": "0.7.x",
+  "supportedBootstrap": "0.8.x",
   "authority": {"role":"interaction-contract","sourceOfTruth":"ICP contract for the consequential interaction","promotionBoundary":"ACP decision is required before protected effect execution"},
   "mappings": {"imports":["intent","participants","boundary","state","actions","checks","verification","transition","effects","invariants","outcome","recovery","receipt","closure"],"projects":["effect->ACP protected effect", "recovery->FPB recovery record", "receipt->audit/evidence record"],"lifecycle":["declared","validated","authorized","executing","observed","verified","closed","recovered"],"evidence":["input validation","consequence-derived verification","receipt","trace","closure"]},
   "unsupported": ["an exposed operation is not permission or execution", "ICP does not replace provider-specific API schemas"],

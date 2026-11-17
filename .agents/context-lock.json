@@ -1,12 +1,12 @@
 {
   "format": "2",
-  "generatorVersion": "0.7.3",
+  "generatorVersion": "0.8.5",
   "root": ".",
   "validityBasis": "aggregate-source-digest",
   "selectedPaths": [],
   "sourceSelection": {
-    "includedCount": 199,
-    "includedBytes": 1779947,
+    "includedCount": 202,
+    "includedBytes": 1858000,
     "excludedCounts": {
       "extension": 42
     }
@@ -17,14 +17,14 @@
     "repositories": [
       {
         "path": ".",
-        "commit": "c007d8027289f5e12a4ccad239f4db8326e9e40d",
-        "branch": "chore/bootstrap-0.7.3",
+        "commit": "ca0f1096cb21f56b9fd8dac741c85ad35cfdfc8b",
+        "branch": "chore/bootstrap-0.8.5",
         "dirty": true,
         "remote": "https://github.com/zachshallbetter/rust-swift.git"
       }
     ]
   },
-  "aggregateSourceDigest": "8c1390b6b1290fad69a937f8fd3dee1f6a9516bdd2d49b7ae1caa86fa21bdcc7",
+  "aggregateSourceDigest": "ecdbe53135342e9631298f6e9eeb162df4bdc084b8c6bd60495d44aab9422e72",
   "sources": [
     {
       "path": ".agents/AGENTS.md",
@@ -33,28 +33,28 @@
     },
     {
       "path": ".agents/acp/README.md",
-      "bytes": 33024,
-      "sha256": "2278c556b501c6b75c0b2ffcb51618af44fdc777b2c44dd70910d872a0384432"
+      "bytes": 40446,
+      "sha256": "b8486063690f8772e323b5e1d02c1a065343fb24b75537c964d4ac18ee5f0b9e"
     },
     {
       "path": ".agents/acp/lib/acp-check.py",
-      "bytes": 20674,
-      "sha256": "07fc5d88fd208d5db5a4a8457192806ce15fdf3d75ad0895c57ed0f4145a9cf1"
+      "bytes": 20745,
+      "sha256": "d6dd6d35ba2f89a7ec7dc24a887e33836e2da22e0337dace8a8b67a74eeb42f8"
     },
     {
       "path": ".agents/acp/lib/acp.py",
-      "bytes": 62603,
-      "sha256": "b07c3fc0ae6b3d945e62dfaec1428083ab55e54ddb49d57883f34708128035c1"
+      "bytes": 70474,
+      "sha256": "c646d7eff1f235a97252c6df8042a6bd56aae918ca4c2001eefc7d71af1f9ead"
     },
     {
       "path": ".agents/acp/lib/acp_commands.py",
-      "bytes": 37660,
-      "sha256": "b203a79cacddcac4caac948bcc9950a8323585e0356f15e748c87b84f4499739"
+      "bytes": 63716,
+      "sha256": "73699da6a5b943f73dbe7d578de471f6606cc1e56ae69e3726f4a2c549ff1140"
     },
     {
       "path": ".agents/acp/lib/acp_endpoint_registry.py",
-      "bytes": 12450,
-      "sha256": "bf1dcd4727ed4b9863c838df67b41d4909a7ceaa46378e4606cdd98f3e1bbb01"
+      "bytes": 12718,
+      "sha256": "a368e3906d2062d9088fa59211c08949c2c201cec9d766428b97d43545e36725"
     },
     {
       "path": ".agents/acp/lib/acp_override.py",
@@ -83,8 +83,8 @@
     },
     {
       "path": ".agents/bootstrap/RELEASE.json",
-      "bytes": 15368,
-      "sha256": "408a1b489a03be0380c72ec52d144def28515d1064dce5140dc6a76b8ce3d315"
+      "bytes": 15751,
+      "sha256": "d04f2d01a978e4083d54603afd46d700324952d6d7837c217797bd016106b268"
     },
     {
       "path": ".agents/bootstrap/docs/AGENT_CAPABILITIES.md",
@@ -123,8 +123,8 @@
     },
     {
       "path": ".agents/bootstrap/docs/EXECUTION_PIPELINE.md",
-      "bytes": 1861,
-      "sha256": "529c01ec25ac7d0552a19d591514244ec7bbe3f1966f1dd38d2c2f69494ba2db"
+      "bytes": 2107,
+      "sha256": "11a177eb3da816e9e4aca579cbf195f92d7f5b8c7ac9d679b4c9c9153e8e8310"
     },
     {
       "path": ".agents/bootstrap/docs/EXECUTION_PROVIDER_CONTRACT.md",
@@ -153,13 +153,13 @@
     },
     {
       "path": ".agents/bootstrap/docs/MULTI_AGENT_COORDINATION.md",
-      "bytes": 2078,
-      "sha256": "c27fc5594ef31ff4574582b4c6f2e69dc684bb897b9f9455fce1b50ca44f968a"
+      "bytes": 17705,
+      "sha256": "bb9abedb56ca373f6b205e749ecbc853bde47c4a5b3137a2e8e0a7980911b467"
     },
     {
       "path": ".agents/bootstrap/docs/NEGATIVE_KNOWLEDGE.md",
-      "bytes": 2195,
-      "sha256": "2576b80f7bb0bacb21646722e4a9cb03885eedb7a57cc95b63dd65cc7479b469"
+      "bytes": 2253,
+      "sha256": "80db872620c3d5ce46871e25f4e2c54de3e995b61ec8712d577d3ff14d4943b9"
     },
     {
       "path": ".agents/bootstrap/docs/PROTOCOL_ADAPTERS.md",
@@ -178,8 +178,8 @@
     },
     {
       "path": ".agents/bootstrap/docs/SKILLS_INDEX.md",
-      "bytes": 1049,
-      "sha256": "fff86a343840e9a401ffc2bc6c5ddaed9d9e4cb570efd07af50790b3d70f887c"
+      "bytes": 1132,
+      "sha256": "242261e59c71c9923cfbfc0199a8d5a6c9125ab6a754c5c5a1235d1f2e262662"
     },
     {
       "path": ".agents/bootstrap/docs/UPGRADING.md",
@@ -188,8 +188,8 @@
     },
     {
       "path": ".agents/bootstrap/docs/WORK_GRAPH.md",
-      "bytes": 2864,
-      "sha256": "f702cbdff484c8b5279d145ed7505f744a7f3820d67d0f6f4fce9ee881dd4fbb"
+      "bytes": 3482,
+      "sha256": "93c485ec7b79e1fc249ffc99fddb3534cbc5da60a4ad5c331c20113e064d6f8b"
     },
     {
       "path": ".agents/bootstrap/profiles/commercialization/PROFILE.yaml",
@@ -214,7 +214,7 @@
     {
       "path": ".agents/bootstrap/profiles/eqp/adapter.json",
       "bytes": 1752,
-      "sha256": "4e2e5fd6de327ec04bff9601312b791bbc8801bd4c03769c3d13dc55bd3b8e92"
+      "sha256": "c3c829ee8c89c46418072c38b103541e671650889aa5f5de2816d081042a8432"
     },
     {
       "path": ".agents/bootstrap/profiles/esp-rcp/README.md",
@@ -224,22 +224,22 @@
     {
       "path": ".agents/bootstrap/profiles/esp-rcp/adapter.json",
       "bytes": 1967,
-      "sha256": "59b4c9596771988a3b806a4457d594faa2f5af1db274cf67fb36306768fd0f67"
+      "sha256": "00f0027121958dc7300d72344918850720b0e0c68d10b5b8a85720d7fbd97069"
     },
     {
       "path": ".agents/bootstrap/profiles/icp/adapter.json",
       "bytes": 1804,
-      "sha256": "0a163f83b6ecfd433313d178d4e522bd3230604de5fff2f189f8b22cd7065970"
+      "sha256": "37fac9e1e7943b57737cb0bf45741edbbe6b0a3070aa75e05994f523a30dcd8d"
     },
     {
       "path": ".agents/bootstrap/profiles/iepe/adapter.json",
       "bytes": 1885,
-      "sha256": "7502e58d9695319feeebd0aa20ebf12679e93c923f4c35446362740b3b7d6848"
+      "sha256": "4e68b7843d20921fd402df592f0ae16d47ce1b9197b053662ddbe3c0721757e6"
     },
     {
       "path": ".agents/bootstrap/profiles/ses-sps/adapter.json",
       "bytes": 1766,
-      "sha256": "a2142607a27cb320f49df32da07a8adb10fef53672192aa04dab28685a90ac10"
+      "sha256": "9bb479935cbda57edc485b7edc79bfa2c9c891956740abfd22635133c2351e12"
     },
     {
       "path": ".agents/bootstrap/schemas/agent-message.schema.json",
@@ -300,6 +300,11 @@
       "path": ".agents/bootstrap/scripts/bootstrap_cli.py",
       "bytes": 17197,
       "sha256": "6701b7a30d6f29b22126ce49db4090a70b8cf6c02b2f3193db383721d028d037"
+    },
+    {
+      "path": ".agents/bootstrap/scripts/check-build-budget.py",
+      "bytes": 5479,
+      "sha256": "41f2cea50ef615e0e8f2e683390731ed402cfac3d12b8a495badbf73b6bfd83f"
     },
     {
       "path": ".agents/bootstrap/scripts/check-protocol-integrity.py",
@@ -413,13 +418,13 @@
     },
     {
       "path": ".agents/bootstrap/templates/rules/ci.md",
-      "bytes": 1211,
-      "sha256": "a5c4e8793fb83e578fc6532118b87476dac2f4477cb6e36f2e5e90ebfefd3b5d"
+      "bytes": 3319,
+      "sha256": "6f619eaef9045a1186d613bc5266b7d3d57fc92f10a23cd1fccc79a209aab5e2"
     },
     {
       "path": ".agents/bootstrap/templates/rules/codestyle.md",
-      "bytes": 3139,
-      "sha256": "62923830e444431d07e29e990168c4dba13026ed0ef6c530ed783daf500d720e"
+      "bytes": 2414,
+      "sha256": "7f2f363641a05ea6542145352b9f565be08a86a36373a49b5aa52ead0913c237"
     },
     {
       "path": ".agents/bootstrap/templates/rules/governance.md",
@@ -438,13 +443,13 @@
     },
     {
       "path": ".agents/bootstrap/templates/rules/types.md",
-      "bytes": 3209,
-      "sha256": "15ebec204bb08ff126397aa0b5fdd5f941f88143efb07ebfd187a9e8405203d5"
+      "bytes": 2466,
+      "sha256": "2217db9a95034a41870cf0b39e9b809faad1a950a51a8aa265faf895b94214c1"
     },
     {
       "path": ".agents/bootstrap/templates/rules/workflow.md",
-      "bytes": 7678,
-      "sha256": "ea83934293589cdcee7e720e83b6b2d14814636c5bb264ba948bec8f9f6dafc7"
+      "bytes": 7692,
+      "sha256": "8dfb382a2ee7f71a6401bde3b929cf4823f2693b2b9ba3b0f86259f1a4bdcee9"
     },
     {
       "path": ".agents/project/bindings.yaml",
@@ -509,7 +514,7 @@
     {
       "path": ".agents/project/installation.json",
       "bytes": 448,
-      "sha256": "2ed25e92ecadef7314c9df942bb659e3a98b0b5a8276077edbf5a0bef838e146"
+      "sha256": "03ba0b0ed8ec900719141c4507015c907bbfc7dbe9916d7f0798e1bb6dec1d3a"
     },
     {
       "path": ".agents/project/intent.md",
@@ -523,13 +528,13 @@
     },
     {
       "path": ".agents/project/rules/ci.md",
-      "bytes": 1211,
-      "sha256": "a5c4e8793fb83e578fc6532118b87476dac2f4477cb6e36f2e5e90ebfefd3b5d"
+      "bytes": 3319,
+      "sha256": "6f619eaef9045a1186d613bc5266b7d3d57fc92f10a23cd1fccc79a209aab5e2"
     },
     {
       "path": ".agents/project/rules/codestyle.md",
-      "bytes": 3139,
-      "sha256": "62923830e444431d07e29e990168c4dba13026ed0ef6c530ed783daf500d720e"
+      "bytes": 2414,
+      "sha256": "7f2f363641a05ea6542145352b9f565be08a86a36373a49b5aa52ead0913c237"
     },
     {
       "path": ".agents/project/rules/governance.md",
@@ -548,13 +553,13 @@
     },
     {
       "path": ".agents/project/rules/types.md",
-      "bytes": 3209,
-      "sha256": "15ebec204bb08ff126397aa0b5fdd5f941f88143efb07ebfd187a9e8405203d5"
+      "bytes": 2466,
+      "sha256": "2217db9a95034a41870cf0b39e9b809faad1a950a51a8aa265faf895b94214c1"
     },
     {
       "path": ".agents/project/rules/workflow.md",
-      "bytes": 7678,
-      "sha256": "ea83934293589cdcee7e720e83b6b2d14814636c5bb264ba948bec8f9f6dafc7"
+      "bytes": 7692,
+      "sha256": "8dfb382a2ee7f71a6401bde3b929cf4823f2693b2b9ba3b0f86259f1a4bdcee9"
     },
     {
       "path": ".agents/skills/authorize-protected-effect/SKILL.md",
@@ -568,8 +573,18 @@
     },
     {
       "path": ".agents/skills/coordinate-workers/SKILL.md",
-      "bytes": 1524,
-      "sha256": "9b59dd9fe8a7fe704dc330a098a4db2eaf180c090f955e4ac1d53957196f5c60"
+      "bytes": 4945,
+      "sha256": "9a72b099994fc1eed1d284551d1e2baf5b29b08cf401d3025a71d947a97757f3"
+    },
+    {
+      "path": ".agents/skills/coordinate-workers/references/lanes.md",
+      "bytes": 3967,
+      "sha256": "27da0d58e94a148105a460547b7164217d4d0e955a15b03ef504d5434f567b6f"
+    },
+    {
+      "path": ".agents/skills/coordinate-workers/scripts/lane-watch.py",
+      "bytes": 4905,
+      "sha256": "c8313c6a4557c56151bb2794631b769b51594dc7218f3629d3a2769313fc6594"
     },
     {
       "path": ".agents/skills/github-projects/SKILL.md",
@@ -578,8 +593,8 @@
     },
     {
       "path": ".agents/skills/github-projects/assets/roles/resolver.md",
-      "bytes": 1524,
-      "sha256": "5997cbcc50c7825f46e686b0f60c3d0d91ef38076c348132d33d9ebadda0c21f"
+      "bytes": 1515,
+      "sha256": "e6e991e21f7b7104fffa169eebc2134401cc5aeae4e4a45f5d51d58d78e017c9"
     },
     {
       "path": ".agents/skills/github-projects/assets/roles/triager.md",
@@ -643,8 +658,8 @@
     },
     {
       "path": ".agents/skills/github-projects/scripts/coordinator.sh",
-      "bytes": 11844,
-      "sha256": "9cb6815731dad06f33156d629456a695e171cae7503bc7ff528968b3b370c3b6"
+      "bytes": 11846,
+      "sha256": "96359e07be61bddb1230ae9b33efa0ec55a48acd6ed6ecc339ea339406c3c571"
     },
     {
       "path": ".agents/skills/github-projects/scripts/lib.sh",
@@ -723,13 +738,13 @@
     },
     {
       "path": ".github/workflows/ci.yml",
-      "bytes": 2158,
-      "sha256": "674111b30a0d13128e37b6719b37dfcd5f94410e36b639998d023d7a3133dbf6"
+      "bytes": 2273,
+      "sha256": "02dea8e859f7387b4c388636aeaf2f406a51708e7f175e135a833a12fcfc2b66"
     },
     {
       "path": ".github/workflows/release.yml",
-      "bytes": 2616,
-      "sha256": "ae6969dabfd7a23627a4aba6797240474228a4f1ee707f5e5bba02c227b31012"
+      "bytes": 2778,
+      "sha256": "ad5d84062d80577b48bf490bbb5e217d7354f9a5df0e9ecbba1a53c644dc688d"
     },
     {
       "path": "AGENTS.md",

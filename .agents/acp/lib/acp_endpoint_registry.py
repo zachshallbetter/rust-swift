@@ -10,6 +10,7 @@ import re
 import stat
 import tempfile
 from pathlib import Path
+from typing import Callable
 from urllib.parse import urlsplit
 
 
@@ -161,8 +162,11 @@ def read_registry(path: Path) -> dict:
 
 
 def configure_registry(path: Path, set_name: str, endpoint_values: list[dict], *,
-                       shared_state_id: str | None = None, replace_set: bool = False) -> dict:
-    """Atomically write URL and Keychain-account bindings, never bearer values."""
+                       shared_state_id: str | None = None, replace_set: bool = False,
+                       verify: Callable[[list[dict]], None] | None = None) -> dict:
+    """Atomically write URL and Keychain-account bindings, never bearer values.
+
+    verify, when given, receives the validated endpoints and raises EndpointRegistryError to refuse the write."""
     if shared_state_id is not None:
         if not isinstance(shared_state_id, str) or not STATE_AUTHORITY_ID.fullmatch(shared_state_id):
             raise EndpointRegistryError("--shared-state-id must be a lowercase stable identifier")
@@ -175,6 +179,8 @@ def configure_registry(path: Path, set_name: str, endpoint_values: list[dict], *
         registry["endpointSets"].update(current["endpointSets"])
     if set_name in registry["endpointSets"] and not replace_set:
         raise EndpointRegistryError(f"endpoint set {set_name!r} already exists; pass --replace-set to replace it")
+    if verify is not None:
+        verify(endpoints)
     registry["endpointSets"][set_name] = [
         {"name": item["name"], "url": item["url"],
          "keychainAccount": item["keychain_account"], "localOnly": item["local_only"]}
