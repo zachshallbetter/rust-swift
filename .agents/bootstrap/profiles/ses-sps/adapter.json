@@ -2,7 +2,7 @@
   "format": "1",
   "adapterId": "ses-sps",
   "protocol": {"id":"ses","version":"1.0.0","revisionOrDigest":"git:f1892e4","canonicalSource":"semantic-expression-system"},
-  "supportedBootstrap": "0.7.x",
+  "supportedBootstrap": "0.8.x",
   "authority": {"role":"semantic-publication","sourceOfTruth":"SES/SSS/SPS canonical semantic and publication records","promotionBoundary":"publication remains an explicit protected effect"},
   "mappings": {"imports":["meaning","expression","surface","situation","access projection","publication truth","presentation"],"projects":["intent->semantic purpose","surface->context projection","publication->protected effect contract"],"lifecycle":["canonical","resolved","rendered","reviewed","published","superseded"],"evidence":["resolution trace","dependency fingerprint","schema conformance","publication receipt"]},
   "unsupported": ["SSS does not decide domain truth","generated context is not canonical semantic state","publication adapters remain domain-owned"],

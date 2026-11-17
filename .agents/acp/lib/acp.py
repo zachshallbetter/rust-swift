@@ -70,7 +70,10 @@ _HTTP = build_opener(_NoRedirect())
 MAX_HTTP_RESPONSE_BYTES = 8 * 1024 * 1024
 # A healthy serverless /ready answers in ~1.3-1.6s warm and slower from a cold start; a tighter
 # limit turns a slow but ready endpoint into "no endpoint reports readiness".
-READINESS_PROBE_TIMEOUT = 8.0
+READINESS_PROBE_TIMEOUT = float(os.environ.get("ACP_READINESS_PROBE_TIMEOUT", "8.0"))
+# A transport timeout on /ready is probed once more while the deadline allows: a cold-starting endpoint usually
+# answers the second request. A refused or malformed answer is never retried.
+READINESS_PROBE_ATTEMPTS = 2
 TRANSIENT_READ_ERRORS = frozenset({"UPSTREAM_FAILURE", "TEMPORARY", "SERVICE_UNAVAILABLE"})
 HARD_STOP_READINESS_ERRORS = frozenset({"APP_NOT_CONFIGURED", "POLICY_INVALID", "SECURITY_STATE_UNAVAILABLE",
                                        "STATE_STORE_UNAVAILABLE", "INTEGRITY_INVALID", "INTEGRITY_MISMATCH",
@@ -215,6 +218,8 @@ def settings() -> dict:
         "token": endpoints[0]["token"] if endpoints else "",
         "endpoints": endpoints,
         "endpoint_problems": endpoint_problems,
+        "endpoint_specs": endpoint_specs,
+        "missing_accounts": missing_accounts,
         "secrets": [secret for endpoint in endpoints for secret in
                     (endpoint["token"], endpoint["admin_token"]) if secret],
         "token_env": endpoints[0]["token_env"] if endpoints else
@@ -310,6 +315,60 @@ def _http_call(endpoint: dict, method: str, path: str, body: dict | None = None,
         return status, raw
 
 
+def state_identity_problem(reported: object, expected: str) -> str | None:
+    """None when an endpoint reports the registry's shared state id; else why not, with the remedy.
+
+    No id and a different id are different faults: the first is a gateway that predates the field or a host
+    without ACP_SHARED_STATE_ID, fixed by the operator setting it; the second is a real identity mismatch."""
+    if reported == expected:
+        return None
+    if not reported:
+        return ("the endpoint reports no shared state id: its gateway predates the field or ACP_SHARED_STATE_ID "
+                "is unset on that host; the ACP operator sets it and redeploys")
+    return ("the endpoint reports a different shared state id than the registry's stateAuthorityId (an identity "
+            "mismatch); the ACP operator must verify endpoint identity")
+
+
+def probe_ready(endpoint: dict, timeout: float | None = None) -> tuple[int, object]:
+    """GET /ready, once more after a transport failure (a cold-starting endpoint answers the second time)."""
+    for attempt in (1, 2):
+        try:
+            return _http_call(endpoint, "GET", "/ready", auth=False, timeout=timeout or READINESS_PROBE_TIMEOUT)
+        except ResponseRejected:
+            raise
+        except Unreachable:
+            if attempt == 2:
+                raise
+    raise AssertionError("unreachable")
+
+
+def verify_state_identity(set_name: str, endpoints: list[dict]) -> None:
+    """Refuse to save a multi-endpoint set unless every endpoint is ready and already reports the set's id."""
+    if len(endpoints) < 2:
+        return
+    problems = []
+    for endpoint in endpoints:
+        label = f"{endpoint['name']} ({endpoint['url']})"
+        try:
+            status, body = probe_ready(endpoint)
+        except Unreachable as exc:
+            problems.append(f"{label}: /ready is unreachable ({exc})")
+            continue
+        if not (status == 200 and isinstance(body, dict) and body.get("status") == "ready"
+                and body.get("storage") == "postgres"):
+            problems.append(f"{label}: /ready answered HTTP {status} and is not ready on PostgreSQL")
+            continue
+        problem = state_identity_problem(body.get("state_authority_id"), endpoint["state_authority_id"])
+        if problem:
+            problems.append(f"{label}: {problem}")
+    if problems:
+        raise acp_endpoint_registry.EndpointRegistryError(
+            f"endpoint set {set_name!r} was not saved; every endpoint must report the shared state id "
+            f"{endpoints[0]['state_authority_id']!r} before failover can rely on it:\n  - " + "\n  - ".join(problems)
+            + "\nNext: fix the endpoints above (the ACP operator sets ACP_SHARED_STATE_ID and redeploys), or leave "
+              "an endpoint that is not ready out of the set, then run the command again.")
+
+
 def select_endpoint(cfg: dict, timeout: float = 15.0, admin: bool = False,
                     exclude: set[str] | None = None) -> dict:
     deadline = time.monotonic() + timeout
@@ -325,25 +384,38 @@ def select_endpoint(cfg: dict, timeout: float = 15.0, admin: bool = False,
             failures.append("readiness deadline exhausted before remaining endpoints were probed")
             break
         probe = f"{endpoint['name']} /ready"
-        limit = min(remaining, READINESS_PROBE_TIMEOUT)
-        started = time.monotonic()
-        try:
-            status, body = _http_call(endpoint, "GET", "/ready", auth=False, timeout=limit)
-        except ResponseRejected:
-            raise
-        except Unreachable:
-            elapsed = round((time.monotonic() - started) * 1000)
-            hint = (f" (probe limit {round(limit * 1000)}ms; the endpoint may be cold-starting, retry or raise --timeout)"
-                    if elapsed >= limit * 1000 * 0.9 else "")
-            failures.append(f"{probe}: transport unavailable after {elapsed}ms{hint}")
+        attempts, status, body, timings = 0, None, None, []
+        while True:
+            remaining = deadline - time.monotonic()
+            limit = min(remaining, READINESS_PROBE_TIMEOUT)
+            attempts += 1
+            started = time.monotonic()
+            try:
+                status, body = _http_call(endpoint, "GET", "/ready", auth=False, timeout=limit)
+                break
+            except ResponseRejected:
+                raise
+            except Unreachable:
+                elapsed = round((time.monotonic() - started) * 1000)
+                timings.append(elapsed)
+                timed_out = elapsed >= limit * 1000 * 0.9
+                if timed_out and attempts < READINESS_PROBE_ATTEMPTS and deadline - time.monotonic() > 0.5:
+                    continue
+                break
+        if status is None:
+            tried = " and ".join(f"{ms}ms" for ms in timings)
+            hint = (f" (probe limit {round(READINESS_PROBE_TIMEOUT * 1000)}ms per attempt, {attempts} attempt(s); "
+                    "the endpoint may be cold-starting: retry, or raise --timeout to allow a second attempt)"
+                    if timed_out else "")
+            failures.append(f"{probe}: transport unavailable after {tried}{hint}")
             continue
         if (status == 200 and isinstance(body, dict) and body.get("status") == "ready"
                 and body.get("storage") == "postgres"):
             expected_state_id = endpoint.get("state_authority_id")
-            if expected_state_id and body.get("state_authority_id") != expected_state_id:
-                raise ResponseRejected(
-                    f"ACP endpoint {probe} HTTP {status}: different or missing shared state authority; "
-                    "ACP operator must verify endpoint identity; failover stopped")
+            problem = (state_identity_problem(body.get("state_authority_id"), expected_state_id)
+                       if expected_state_id else None)
+            if problem:
+                raise ResponseRejected(f"ACP endpoint {probe} HTTP {status}: {problem}; failover stopped")
             capability = body.get("idempotency")
             endpoint["idempotency_routes"] = (
                 set(capability["routes"])
@@ -526,8 +598,8 @@ def dispose(action: str, asked: dict, status: int, body: object, fail_closed: bo
         return synthetic(action, "ACP_NOT_GOVERNING",
                          "ACP answered ALLOW because no policy governs this repository "
                          f"({body.get('reason')}). The profile is fail-closed, so that is not an "
-                         "authorization. The repository owner registers one with acp-gateway "
-                         "scripts/policy-admin.py register OWNER/NAME --apply.",
+                         "authorization. The repository owner enrolls it with acp-gateway "
+                         "scripts/policy-admin.py enroll OWNER/NAME --apply.",
                          gateway_decision={k: body.get(k) for k in ("decision", "reason", "policy_effect",
                                                                     "request_id")})
     granted = body.get("authorized_action") or {}
@@ -557,7 +629,8 @@ def cmd_authorize(args, cfg) -> int:
         print(f"{args.action} cannot be authorized in environment {environment}.", file=sys.stderr)
         return 2
     context = {k: v for k, v in (("ref", args.ref), ("old_sha", args.old_sha),
-                                 ("new_sha", args.new_sha)) if v}
+                                 ("new_sha", args.new_sha), ("trigger", args.trigger),
+                                 ("reason", args.reason)) if v}
     if args.action == "database.migrate":
         if not args.context_json or not args.work_item or not args.ref or not args.new_sha:
             print("database.migrate requires --context-json with source_database and target_database, --work-item, --ref, and --new-sha",
@@ -600,6 +673,16 @@ def cmd_authorize(args, cfg) -> int:
         context["recovery_authorization_id"] = args.recovery_authorization_id
     if args.owner_override_id:
         context["owner_override_id"] = args.owner_override_id
+    try:
+        priority = priority_context(args.priority, args.priority_reason, os.environ.get("ACP_PRIORITY"))
+    except ValueError as exc:
+        print(exc, file=sys.stderr)
+        return 2
+    if priority and args.action == "hosted_build":
+        context["priority"] = priority
+    elif priority:
+        # ACP paces and budgets hosted builds only; it refuses priority on other metered actions.
+        print(f"note: priority applies to hosted_build only; not sent with {args.action}", file=sys.stderr)
     def decide(action: str, context: dict) -> dict:
         if problem:
             return synthetic(action, "GATEWAY_UNAVAILABLE", problem, local_setup=True)
@@ -662,6 +745,62 @@ def cmd_authorize(args, cfg) -> int:
                       "the project profile so the client asks for production.deploy too.", file=sys.stderr)
     emit(decision, cfg)
     return exit_code
+
+
+# ------------------------------------------------------------------ advice and priority
+
+PRIORITY_BLOCKING = ("continue_work", "release", "fix")
+PRIORITY_REASON_LENGTH = (8, 512)
+
+
+def priority_context(blocking: str | None, reason: str | None, env_value: str | None) -> dict | None:
+    """context.priority from --priority and --priority-reason, else ACP_PRIORITY="<blocking>: <reason>".
+
+    None when none is given; ValueError, naming the fix, when the value cannot be sent."""
+    low, high = PRIORITY_REASON_LENGTH
+    shape = f'"<{"|".join(PRIORITY_BLOCKING)}>: <reason, {low} to {high} characters>"'
+    if blocking or reason:
+        if not (blocking and reason):
+            raise ValueError("--priority and --priority-reason go together")
+    elif env_value and env_value.strip():
+        blocking, separator, reason = env_value.partition(":")
+        if not separator:
+            raise ValueError(f"ACP_PRIORITY must look like {shape}")
+    else:
+        return None
+    blocking, reason = blocking.strip(), reason.strip()
+    if blocking not in PRIORITY_BLOCKING:
+        raise ValueError(f"priority blocking must be one of {', '.join(PRIORITY_BLOCKING)}, not {blocking!r}")
+    if not low <= len(reason) <= high:
+        raise ValueError(f"the priority reason must be {low} to {high} characters, not {len(reason)}")
+    return {"reason": reason, "blocking": blocking}
+
+
+def advice_lines(decision: dict) -> list[str]:
+    """One `advice: <text>` line per recommendation the gateway attached to a decision."""
+    advice = decision.get("advice")
+    items = advice.get("recommendations") if isinstance(advice, dict) else None
+    return [f"advice: {' '.join(item['text'].split())[:300]}" for item in items or []
+            if isinstance(item, dict) and isinstance(item.get("text"), str) and item["text"].strip()]
+
+
+def retry_line(decision: dict) -> str | None:
+    seconds = decision.get("retry_after")
+    return f"retry after {seconds}s" if type(seconds) is int and seconds >= 0 else None
+
+
+def priority_hint(decision: dict, command: str) -> str | None:
+    """The exact way to ask for priority when a refusal says priority can apply; `command` is how to say it."""
+    request = decision.get("priority_request")
+    if not isinstance(request, dict) or request.get("field") != "context.priority":
+        return None
+    blocking = [item for item in PRIORITY_BLOCKING if item in (request.get("blocking") or [])]
+    if not blocking:
+        return None
+    remaining = request.get("remaining_today")
+    left = f" ({remaining} left today)" if type(remaining) is int else ""
+    return (f"priority: ACP can allow this ahead of the limit when it blocks work{left}. Run again with "
+            + command.format(blocking="|".join(blocking)))
 
 
 # ------------------------------------------------------------------ others
@@ -758,8 +897,8 @@ def cmd_notice(args, cfg) -> int:
     if status != 200 or not isinstance(reply, dict):
         return 3
     if reply.get("governed") is not True:
-        print("NOT GOVERNED: no active ACP policy names this repository. Register one: "
-              "the repository owner runs acp-gateway scripts/policy-admin.py register OWNER/NAME --apply",
+        print("NOT GOVERNED: no active ACP policy names this repository. Enroll it: "
+              "the repository owner runs acp-gateway scripts/policy-admin.py enroll OWNER/NAME --apply",
               file=sys.stderr)
         return 0 if args.allow_ungoverned else 5
     return 0
@@ -900,7 +1039,7 @@ def cmd_endpoints(args, cfg) -> int:
                        for name, url, account in args.endpoint]
             registry = acp_endpoint_registry.configure_registry(
                 path, args.set_name, entries, shared_state_id=args.shared_state_id,
-                replace_set=args.replace_set)
+                replace_set=args.replace_set, verify=lambda endpoints: verify_state_identity(args.set_name, endpoints))
         else:
             registry = acp_endpoint_registry.read_registry(path)
     except acp_endpoint_registry.EndpointRegistryError as exc:
@@ -1041,6 +1180,10 @@ def main() -> int:
     p.add_argument("--old-sha")
     p.add_argument("--new-sha")
     p.add_argument("--force", action="store_true")
+    p.add_argument("--trigger", choices=("push", "cli_deploy", "railway_up", "merge", "promote",
+                                         "workflow_dispatch", "rerun"),
+                   help="what starts the build, for hosted_build, production_merge and manual_ci")
+    p.add_argument("--reason", help="one sentence, 8 to 512 characters, for a metered action")
     p.add_argument("--recovery-authorization-id")
     p.add_argument("--owner-override-id", help="use an active shared remote owner override grant")
     p.add_argument("--work-item", help="recorded with the decision")
@@ -1050,6 +1193,9 @@ def main() -> int:
                    choices=("interactive_user", "repository_instruction", "issue_comment",
                             "pull_request_comment", "tool_output", "secondary_agent", "automation",
                             "ci", "unknown"))
+    p.add_argument("--priority", choices=PRIORITY_BLOCKING,
+                   help="ask ACP to run this ahead of a metered limit because it blocks this work (default: ACP_PRIORITY)")
+    p.add_argument("--priority-reason", help="why, 8 to 512 characters; required with --priority")
     p.add_argument("--record", action="store_true", help="append to the project's evidence ledger")
     p.set_defaults(fn=cmd_authorize)
 

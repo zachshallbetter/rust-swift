@@ -119,7 +119,7 @@ ${NOTE}
 
 1. Make the smallest change that satisfies the gate. Match style; no version bumps.
 2. Prove it compiles: run \`$checkcmd\` in the worktree. If that regenerated Cargo.lock and you did not intend a dependency change, restore it (git checkout -- Cargo.lock).
-3. Commit to branch $BRANCH (end the message with a Co-Authored-By: Claude trailer). Do NOT push and do NOT open a PR — the coordinator does that.
+3. Commit to branch $BRANCH (no Co-Authored-By trailer; the owner is the only author). Do NOT push and do NOT open a PR — the coordinator does that.
 If blocked or ambiguous, STOP and report."
 
   local SESSION="" FEEDBACK="" ok=0 PR="" attempt OUT V rv VOUT vv

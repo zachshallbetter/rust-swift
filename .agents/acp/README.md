@@ -16,18 +16,23 @@ Everything ACP needs in a project lives in `.agents/acp/`, and one command runs 
 .agents/acp/acp init      # write the ACP settings: repository, endpoint set, board, auto-deploy
 .agents/acp/acp login     # store the gateway token in the macOS Keychain (hidden prompt)
 .agents/acp/acp status    # one line per check: OK / WARN / FAIL, each with its fix
+.agents/acp/acp doctor    # adoption check: PASS / WARN / FAIL per check, each gap with its exact fix
 .agents/acp/acp push      # publish a commit: your pre-push hook, then one exact approval per step
+.agents/acp/acp deploy railway   # deploy the merged default branch once ACP finds its CI green
 ```
 
 - **`status`** checks, in order: Python, layout, profile, auto-deploy, compiled context, endpoints, gateway readiness, credential (and where it came from), client version against the latest release, policy and containment, the ACP GitHub App for the owner, pinned-file integrity, and the board. Every WARN and FAIL prints its exact fix. Use `--json` for machines, `--offline` for local checks only, and `--strict` to exit 1 on warnings.
 - **`init`** is idempotent. It detects the repository from `origin` (and says so when an `upstream` differs), picks the only visible board or lists the choices, and declares `autoDeploy` when `vercel.json`, `.vercel/project.json` or `netlify.toml` is present. It also makes sure `.gitignore` keeps `.agents/` tracked. It never writes a token.
-- **`push`** runs the project's own `pre-push` hook first, so a slow gate cannot outlive the roughly one-minute approval. For a protected ref it publishes the commit on a temporary `acp/<sha>` branch, updates the ref, and gets `production.deploy` too where `autoDeploy` applies. It pushes the exact commit and removes the temporary branch. `--dry-run` lists each step.
+- **`push`** runs the project's own `pre-push` hook first, so a slow gate cannot outlive the roughly one-minute approval. For a protected ref it publishes the commit on a temporary `refs/acp/<sha>` ref, updates the ref, and gets `production.deploy` too where `autoDeploy` applies. It pushes the exact commit and removes the temporary ref. The temporary ref is outside `refs/heads/`, so Vercel, Railway and GitHub Actions, which build branches and tags, start nothing for it; `--stage NAME` publishes on a branch you keep instead. `--dry-run` lists each step.
+- **`push` notes.** When ACP attaches advice to a decision, `push` prints each recommendation as `advice: <text>` on an `ALLOW` and on a refusal. A refusal that carries `retry_after` also prints `retry after Ns`, and one that carries `priority_request` prints the exact command to ask for priority (see below).
 - **`record`** lists this machine's decisions. Each one is kept in `.agents/records/local/acp-decisions.jsonl`, which is git-ignored, so recording never leaves an uncommitted file behind. `acp record ID…` or `--all` copies chosen ones into `.agents/records/evidence.jsonl` for your next commit.
-- **`doctor --fix`** applies safe local fixes, asking before each: `.gitignore` negations, regenerating the context, the context pre-commit hook, and declaring auto-deploy.
+- **`doctor`** is the check to run once on adoption and after any infrastructure change. It prints one line per check, `PASS|WARN|FAIL <id> <message>`, then a `fix:` line for each gap (or the owner's command when the fix is the owner's), and exits 0 only when every check passes. It checks, in order: `D001` the profile's `authorizationProvider.gatewayEndpointSet`; `D002` the machine endpoint registry and the named set; `D003` each endpoint's Keychain account (existence only; no value is read out or printed); `D004` each endpoint's `/ready` (ready, PostgreSQL, and the shared state id the registry expects, where a missing id and a different one are told apart); `D005` enrollment, asking the gateway `GET /internal/coverage?owner=&name=` (the repository is governed and every provider project that builds it is `METERED`; each other project is printed with its command, and a gateway too old to answer says so and the rest still run); `D006` the harness guards installed in `~/.claude/settings.json`; `D007` the register answering `reg status`; `D008` a `vercel.json` that restricts which branches build (`ignoreCommand`, or `git.deploymentEnabled` off for some branches); `D009` each `.github/workflows/*.yml` having a `concurrency` group, `timeout-minutes` on every job, and branch or path filters on `push` and `pull_request` triggers, with the YAML to add. `--offline` skips the checks that ask a gateway (`D004`, `D005`). `--fix` also applies the safe local fixes, asking before each: `.gitignore` negations, regenerating the context, the context pre-commit hook, and declaring auto-deploy (`--yes` applies all).
 - **`uninstall`** is a dry run unless `--apply` is given. It moves `.agents/acp/` to a backup, sets the profile's provider to `none` and keeps every record. It warns when a policy still governs the repository on the gateway, where the owner removes it with `policy-admin.py unregister`. `logout` removes the Keychain item, asking first.
 
-Repository owners run three commands on the gateway side, in `acp-gateway`, with their own Keychain credentials:
-- `scripts/policy-admin.py register OWNER/NAME` puts a repository under a policy.
+Repository owners run these on the gateway side, in `acp-gateway`, with their own credentials (Keychain, or a
+secret manager such as Latchkey supplying them to the process):
+- `scripts/policy-admin.py enroll OWNER/NAME` puts a repository under a policy and meters the providers that build
+  it, in one step that takes effect within seconds (`register` and `meter` do the two halves separately).
 - `grant` approves a pinned-file change that a released client does not already cover.
 - `repin` moves a pinned policy to the contained layout.
 
@@ -67,7 +72,7 @@ the path must be that Git worktree's root. It reads that repository's profile
 and ignored `.env.local`, and reports its actual branch and commit:
 
 ```bash
-python3 /path/to/formal-project-bootstrap/scripts/acp.py \
+python3 /path/to/formal-project-bootstrap/.agents/acp/acp \
   --project-root "$PWD" authorize --action production.deploy --environment production
 ```
 
@@ -121,6 +126,8 @@ Initialize the machine registry once. It stores endpoint URLs, Keychain account 
 .agents/acp/acp endpoints list
 ```
 
+When a set has more than one endpoint, `endpoints configure` first asks each endpoint's `/ready` and refuses to save the set unless every endpoint is ready on PostgreSQL and already reports the `--shared-state-id` you gave. It names each failing endpoint (unreachable, not ready, no state id, or a different one) with the next step, and writes nothing. A single-endpoint set is saved without probing.
+
 The currently verified production set contains only `https://acp-gateway.vercel.app`;
 it is a single endpoint, not failover. Do not add a secondary endpoint until it
 has HTTPS, an independently provisioned credential, a ready PostgreSQL-backed
@@ -139,6 +146,8 @@ Use a separate set for an explicitly selected loopback instance:
 Each project profile selects one set by name. The client probes each selected endpoint's unauthenticated `/ready` and accepts only HTTP 200 with `status: ready` and `storage: postgres`; each probe has a two-second cap. It never mixes endpoint sets or silently adds loopback. Each endpoint uses its own Keychain account. A multi-endpoint set requires one explicit `stateAuthorityId`; each `/ready` response must report the matching `ACP_SHARED_STATE_ID`, or the client stops without routing a request. This identifier catches configuration mismatches; release verification must still prove both instances use the same transactional database by comparing state and audit-chain results across instances. A read-only GET can fail over after a transport failure or a typed transient `UPSTREAM_FAILURE`, `TEMPORARY`, or `SERVICE_UNAVAILABLE` response. A 401, a valid ACP decision, an integrity/control-state error, or an unclassified server error stops routing. For POST routes, the client sends one `Idempotency-Key` and retries across ready endpoints only when `/ready` advertises idempotency version 1 for that exact route and matching state authority. The gateway advertises this only with PostgreSQL available and response-encryption configuration valid; its replay records and effects are shared transactionally. Unsupported routes are sent once and never retried. A valid ACP decision or any untyped error is returned without failover. Requests/responses are capped at 8 MiB and redirects are refused so bearer credentials cannot be forwarded to another host. Remote endpoint URLs require HTTPS; HTTP is allowed only for loopback endpoints explicitly marked local-only.
 
 Legacy profiles with one URL environment binding normalize to one endpoint at the client boundary. New profiles use `gatewayEndpointSet`; multi-endpoint project-local arrays are rejected so endpoint ordering and credentials have one machine-local source of truth.
+
+An endpoint whose `/ready` carries no `state_authority_id` fails closed with its own message: its gateway predates the field, or `ACP_SHARED_STATE_ID` is unset on that host, and the ACP operator sets it and redeploys. An endpoint that reports a different id fails closed as an identity mismatch, which the operator must verify. In both cases failover stops.
 
 Readiness failures identify the endpoint name, `/ready` path, HTTP status when
 received, response shape, and elapsed milliseconds for eligible failed probes.
@@ -189,6 +198,18 @@ When a hosting integration deploys a branch on every push, updating that ref is 
 
 Then `acp.py authorize --action git.protected_ref.update --ref refs/heads/main` also requests `production.deploy` for the same old and new SHA. It prints both decisions, `deploy_decision` beside the ref decision, and exits non-zero unless both are `ALLOW`. Where the owner has decided that the merge is the deploy decision, add `"decision": "merge"` and the client asks once. An undeclared repository with `vercel.json`, `.vercel/project.json` or `netlify.toml` gets a warning when `main` or `master` is updated, never a refusal.
 
+### Deploying from the command line
+
+A production deploy from the CLI (`railway up`, `vercel deploy --prod`) ships one commit, so ACP checks
+that commit: merged into the production branch (`NOT_ON_PRODUCTION_BRANCH` otherwise), its check runs
+passed (`CI_FAILED`), and still running ones answered `REVERIFY_REQUIRED` `CI_PENDING` with `retry_after`.
+`acp deploy railway|vercel [REV]` does this end to end: it asks for `hosted_build` of `REV` (default:
+origin's default branch), waits through `CI_PENDING` for up to `--wait-minutes` (30), then deploys a clean
+checkout of exactly that commit (`railway up <checkout> --path-as-root --ci`, with `--service` and
+`--environment` passed through, or `vercel deploy <checkout> --prod`), so uncommitted files never ship.
+The push guard refuses a raw `railway up` or `vercel --prod` from a working tree with uncommitted changes
+and points to `acp deploy`.
+
 ## Decisions and the required disposition
 
 | ACP decision | Code | Agent disposition |
@@ -205,6 +226,20 @@ Then `acp.py authorize --action git.protected_ref.update --ref refs/heads/main` 
 `repository_trust` (`VERIFIED` / `SELF_REPORTED` / `UNVERIFIED` / `QUARANTINED`) is evidence about the repository, not a decision. `SELF_REPORTED` is never sufficient for a protected action.
 
 An `ALLOW` or `RECOVERY_AUTHORIZED` carries `authorized_action` (action, ref, `old_sha`, `new_sha`) and, when the gateway holds a signing key, a short-lived `capability_token`. The token — not the `capability` object, which only describes it — is what `/internal/verify-capability` and `/internal/recovery/complete` accept. It is passed to the next step and never written to `records/`. A gateway without a signing key issues no token; nothing at the boundary can then verify the decision, and that gap is recorded rather than papered over.
+
+### Advice, retry and priority on metered decisions
+
+A metered decision (`hosted_build`, `production_merge`) may carry `advice`, and the client tolerates its absence. `advice.recommendations` are the gateway's suggestions (`{code, text}`); the push path prints each as `advice: <text>`. Refusals of reason `BUILD_PACED`, `BUILD_IN_FLIGHT`, `BUILD_BURST` or `SERVICE_AT_CAPACITY` carry `retry_after` seconds: wait that long, then run the same step again. The other `advice` parts (`project_usage`, `service`, `triggers`, `resets_at`, `usage_by_repository`) stay in the decision JSON that `acp authorize` prints.
+
+A refusal that priority can apply to carries `priority_request` (`field: context.priority`, the `blocking` values it accepts, `remaining_today`). To ask, send `context.priority` = `{"reason": <8 to 512 characters>, "blocking": "continue_work" | "release" | "fix"}`. ACP answers `ALLOW` / `PRIORITY_GRANTED` when it grants it. The client sends it from either of:
+
+```bash
+ACP_PRIORITY="continue_work: lane needs CI on this branch to continue" .agents/acp/acp push
+.agents/acp/acp push --priority continue_work --priority-reason "lane needs CI on this branch to continue"
+.agents/acp/acp authorize ... --priority fix --priority-reason "the release is blocked on this"
+```
+
+`--priority` wins over `ACP_PRIORITY`. Both are checked before anything is sent: a blocking value outside the three, a reason outside 8 to 512 characters, or `--priority` without `--priority-reason` exits 2 with what to change. Use it only for work that is actually blocked; ACP records the reason and counts each grant against the day's allowance. The harness's push guard reads the same `ACP_PRIORITY` (see `harness/README.md`).
 
 Decisions the client synthesizes locally are marked `synthetic: true` and are always `DENY`:
 
@@ -316,7 +351,7 @@ Formal Project Bootstrap is the canonical ACP client, project binding, checks, a
 
 For an existing project, run `python3 .agents/bootstrap/scripts/reconcile-project.py --project /path/to/project --pretty` before adoption. Its `acpIntegration` result identifies a bootstrap-owned integration, a likely existing or legacy integration, or no detected integration, and lists only the paths used as evidence. An endpoint set marked `configured` means only that its name exists in the machine registry; `credentialAuthentication: NOT_VERIFIED` means the bearer has not been checked. Run `.agents/acp/acp status --json` from the target project to verify endpoint health, authentication, board visibility, and whether an active policy governs the repository. Treat inventory as discovery, not proof of policy activation. Preserve any existing policy and enforcement while reconciling. If the project has a legacy client, migrate it through `.agents/bootstrap/docs/EXISTING_PROJECT_ADOPTION.md`; do not run two competing clients or change gateway policy as an incidental part of local adoption.
 
-Four steps; project-local setup creates the binding and proposal, while gateway registration and activation remain operator-controlled.
+Five steps; project-local setup creates the binding and proposal, while gateway registration and activation remain operator-controlled.
 
 ```bash
 # 1. in the bootstrap: bind (never writes the token)
@@ -326,9 +361,9 @@ python3 .agents/bootstrap/scripts/init-project.py --name "My Project" --id my-pr
     --acp-owner my-org --acp-project 3 \
     --acp-repository my-org/my-project
 
-# 2. configure ACP_GATEWAY_TOKEN through the approved secret store into the project's
-#    ignored .env.local or process environment; never place it in command arguments
-#    or committed files. Then confirm the board is readable through ACP.
+# 2. store the caller's token in the machine-local secret store (the Keychain, or a secret
+#    manager such as Latchkey) under the endpoint set's keychainAccount; never in command
+#    arguments or committed files. Then confirm the board is readable through ACP.
 cd ../my-project
 .agents/acp/acp board
 
@@ -337,8 +372,29 @@ cd ../my-project
 cat .agents/records/local/acp-policy-proposal.json
 
 # 4. after the policy is active on the bound deployment, in the project
-.agents/acp/acp status --record
+.agents/acp/acp status
+
+# 5. last: confirm the whole setup, and fix each gap it names
+.agents/acp/acp doctor
 ```
+
+### What a project needs before agents work in it
+
+A project is ready for agents when every row holds. `acp status --json` and `acp-check` report the first, third and
+fifth; the rest belong to the machine and the gateway. `acp doctor` checks all of them, and the build configuration too.
+
+| Requirement | Why | Who |
+| --- | --- | --- |
+| An active ACP policy names the repository | without it, protected effects are refused (fail-closed) | repository owner, on the gateway |
+| The policy meters the providers that build it (Vercel projects, Railway services, GitHub Actions) | paid builds are decided against budgets only for providers the policy names | repository owner, on the gateway |
+| ACP's GitHub App is installed on the repository's account | ACP verifies refs and history independently | repository owner |
+| The harness guards are installed on every machine that works on it (`harness/install.py`) | pushes, deploys, CI runs and merges ask ACP before they run | each machine's owner |
+| A caller credential exists and the endpoint set names it | agents act as a lane or coordinator, never with an owner credential | repository owner, on the gateway |
+
+With the reference gateway (`acp-gateway`), `scripts/policy-admin.py enroll OWNER/NAME --apply` covers the first two
+rows at once: it registers the repository, names the Vercel projects linked to it, and stores the result in the
+gateway's shared database, where both hosts load it within seconds. Until a repository is enrolled, the harness lets
+its pushes through only when nothing would build, and refuses the rest with that command.
 
 The registration command and deployment target are intentionally not hard-coded here: they belong to the active gateway deployment. Do not use a legacy Railway-only registration path when the project is bound to a different active gateway deployment. Registration must validate and sign the policy with the gateway's configured authority, preserve existing policies, activate the policy on the intended deployment, and verify the resulting repository and board binding.
 

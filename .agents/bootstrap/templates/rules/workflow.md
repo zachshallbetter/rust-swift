@@ -26,7 +26,7 @@ Every commit, branch, pull request, issue comment, and code review must reflect 
 
 ### Rule 1.3: Natural Language Over Synthetic Identifiers
 - Strictly forbid inventing private, synthetic tracking codes.
-- Use standard, discoverable tooling and domain terminology (`cargo test`, worktree isolation, dirty snapshotting).
+- Use standard, discoverable tooling and domain terminology (the project's test command, worktree isolation, dirty snapshotting).
 
 ### Rule 1.4: Natural Engineering Voice (Avoid Predictable Rhetoric)
 - Avoid repetitive contrast formulas such as opening paragraphs with *"However, this introduces..."*, *"While X is correct, Y remains..."*, *"The concern is not X, but Y"*, or *"This is not X; it is Y"*.

@@ -114,3 +114,7 @@ evidence; they never authorize a current effect.
 The coordinator selects from all currently Ready, unclaimed, dependency-satisfied items within authority and budget.
 
 A blocked item removes only itself and its dependents from the frontier unless the blocker is global.
+
+## Lanes
+
+A project that runs standing lane sessions adds two fields to its work items, **Lane** (the worker that owns the item) and **Blocked by** (dependencies). A lane's frontier is the Ready frontier filtered to its lane. A lane claims the top item of its frontier, moves status only on transitions (Ready to In progress, In progress to In review, In review to Done), and keeps notes in its state file. When a lane's frontier is empty the coordinator recomputes the global frontier and reassigns items by changing their Lane; the claim moves with the item. See `MULTI_AGENT_COORDINATION.md`, "Lane coordination".

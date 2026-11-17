@@ -10,9 +10,11 @@ import hashlib
 import json
 import os
 import platform
+import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -228,7 +230,7 @@ def cmd_status(args, cfg) -> int:
                 level = "FAIL" if cfg.get("fail_closed") else "WARN"
                 report.add("S008", "policy", level, f"no ACP policy governs {cfg['owner']}/{cfg['name']}; "
                            "protected actions are refused",
-                           f"the repository owner runs (acp-gateway) scripts/policy-admin.py register "
+                           f"the repository owner runs (acp-gateway) scripts/policy-admin.py enroll "
                            f"{cfg['owner']}/{cfg['name']} --apply")
             else:
                 state = body.get("authorization_state")
@@ -447,7 +449,32 @@ def run_pre_push(remote_ref: str, sha: str, old: str) -> bool:
     return result.returncode == 0
 
 
-def authorize_and_push(action: str, ref: str, old: str, new: str, summary: str) -> bool:
+PUSH_PRIORITY_COMMAND = ('acp push --priority {blocking} --priority-reason "<why, 8 to 512 characters>" '
+                         '(or ACP_PRIORITY="{blocking}: <why>")')
+
+
+def print_notes(decision: dict, refused: bool) -> None:
+    """What the gateway attached to a decision: its recommendations, when to retry, how to ask for priority."""
+    stream = sys.stderr if refused else sys.stdout
+    notes = acp.advice_lines(decision)
+    if refused:
+        notes += [note for note in (acp.retry_line(decision),
+                                    acp.priority_hint(decision, PUSH_PRIORITY_COMMAND)) if note]
+    for note in notes:
+        print(f"  {note}", file=stream)
+
+
+def stage_ref_for(stage: str | None, sha: str) -> str:
+    """Where a protected push publishes its commit first, so ACP can verify it on GitHub.
+
+    By default a ref outside refs/heads/ and refs/tags/: Vercel, Railway and GitHub Actions build
+    branches and tags only, so the temporary copy starts no build. Pushed under refs/heads/acp/ it
+    started a preview build of every protected push. --stage names a branch to keep instead."""
+    return f"refs/heads/{stage}" if stage else f"refs/acp/{sha[:12]}"
+
+
+def authorize_and_push(action: str, ref: str, old: str, new: str, summary: str,
+                       priority: tuple[str, ...] = ()) -> bool:
     for step in (["report", "--event", "PROTECTED_EFFECT_PENDING", "--checkpoint", "PRE_PUSH", "--action", action,
                   "--ref", ref], ["snapshot", "--checkpoint", "PRE_PUSH"]):
         code, _, err = run_acp(*step)
@@ -455,11 +482,13 @@ def authorize_and_push(action: str, ref: str, old: str, new: str, summary: str) 
             print(f"{step[0]} failed: {err.strip()[:300]}", file=sys.stderr)
             return False
     code, decision, err = run_acp("authorize", "--action", action, "--ref", ref, "--old-sha", old, "--new-sha", new,
-                                  "--summary", summary, "--provenance", "interactive_user")
+                                  "--summary", summary, "--provenance", "interactive_user", *priority)
     deploy = decision.get("deploy_decision")
     if deploy:
         print(f"  production.deploy: {deploy.get('decision')} {deploy.get('reason')} {deploy.get('request_id')}")
+        print_notes(deploy, deploy.get("decision") != "ALLOW")
     print(f"  {action} {ref}: {decision.get('decision')} {decision.get('reason')} {decision.get('request_id')}")
+    print_notes(decision, code != 0)
     if code != 0:
         for line in err.strip().splitlines()[-3:]:
             print(f"  {line}", file=sys.stderr)
@@ -487,6 +516,12 @@ def cmd_push(args, cfg) -> int:
         print("detached HEAD: name the branch to update with --to", file=sys.stderr)
         return 2
     target_ref = f"refs/heads/{target}"
+    try:
+        acp.priority_context(args.priority, args.priority_reason, os.environ.get("ACP_PRIORITY"))
+    except ValueError as exc:
+        print(exc, file=sys.stderr)
+        return 2
+    priority = ("--priority", args.priority, "--priority-reason", args.priority_reason) if args.priority else ()
     default = (git("symbolic-ref", "--quiet", "refs/remotes/origin/HEAD").stdout.strip().rsplit("/", 1)[-1]
                or "main")
     protected = target in (default, "main", "master") or bool(args.protected)
@@ -500,7 +535,7 @@ def cmd_push(args, cfg) -> int:
         print(f"{target} is already at {sha[:7]}")
         return 0
     if args.dry_run:
-        steps = ([f"publish {sha[:7]} to refs/heads/{args.stage or 'acp/' + sha[:12]} (git.remote.update)"]
+        steps = ([f"publish {sha[:7]} to {stage_ref_for(args.stage, sha)} (git.remote.update)"]
                  if protected else [])
         steps.append(f"update {target_ref} {old[:7]} → {sha[:7]} "
                      f"({'git.protected_ref.update' if protected else 'git.remote.update'})")
@@ -513,11 +548,11 @@ def cmd_push(args, cfg) -> int:
         return 3
     summary = args.summary or f"acp push {sha[:7]} to {target}"
     if protected:
-        stage = args.stage or f"acp/{sha[:12]}"
-        stage_ref = f"refs/heads/{stage}"
-        if not authorize_and_push("git.remote.update", stage_ref, remote_sha(stage_ref) or ZERO, sha, summary):
+        stage_ref = stage_ref_for(args.stage, sha)
+        stage = args.stage or stage_ref
+        if not authorize_and_push("git.remote.update", stage_ref, remote_sha(stage_ref) or ZERO, sha, summary, priority):
             return 4
-        if not authorize_and_push("git.protected_ref.update", target_ref, old, sha, summary):
+        if not authorize_and_push("git.protected_ref.update", target_ref, old, sha, summary, priority):
             return 4
         if not args.stage:
             code, decision, _ = run_acp("authorize", "--action", "git.remote.update", "--ref", stage_ref,
@@ -526,9 +561,86 @@ def cmd_push(args, cfg) -> int:
                 git("push", "--no-verify", "-q", "origin", f":{stage_ref}")
             else:
                 print(f"  kept {stage} on origin (ACP did not allow removing it: {decision.get('reason')})")
-    elif not authorize_and_push("git.remote.update", target_ref, old, sha, summary):
+    elif not authorize_and_push("git.remote.update", target_ref, old, sha, summary, priority):
         return 4
     return 0
+
+
+# ------------------------------------------------------------------ deploy
+
+DEPLOY_TRIGGER = {"railway": "railway_up", "vercel": "cli_deploy"}
+
+
+def deploy_command(provider: str, checkout: Path, args) -> list[str]:
+    """The provider CLI call that deploys exactly the files of `checkout`, from the linked project root."""
+    if provider == "railway":
+        command = ["railway", "up", str(checkout), "--path-as-root", "--ci"]
+        command += ["--service", args.service] if args.service else []
+        return command + (["--environment", args.environment] if args.environment else [])
+    return ["vercel", "deploy", str(checkout), "--prod", "--yes"]
+
+
+def cmd_deploy(args, cfg) -> int:
+    """Deploy one merged commit to production once ACP allows it: merged, CI green, within budget.
+
+    ACP checks the commit; this waits while its CI runs, then deploys a clean checkout of that
+    commit, so what ships is exactly what ACP checked, never uncommitted files."""
+    git("fetch", "-q", "origin")
+    default = (git("symbolic-ref", "--quiet", "refs/remotes/origin/HEAD").stdout.strip().rsplit("/", 1)[-1]
+               or "main")
+    rev = args.rev or f"origin/{default}"
+    sha = git("rev-parse", "--verify", "--quiet", f"{rev}^{{commit}}").stdout.strip()
+    if not sha:
+        print(f"no such revision: {rev}", file=sys.stderr)
+        return 2
+    trigger, ref = DEPLOY_TRIGGER[args.provider], f"refs/heads/{default}"
+    summary = args.summary or f"acp deploy {args.provider} {sha[:12]} from {default}"
+    if args.dry_run:
+        print(f"would: ask ACP for hosted_build ({trigger}) of {sha[:12]} on {default}, waiting up to "
+              f"{args.wait_minutes} minutes for its CI; then run "
+              + " ".join(deploy_command(args.provider, Path("<clean checkout>"), args)))
+        return 0
+    deadline = time.monotonic() + args.wait_minutes * 60
+    while True:
+        code, decision, err = run_acp("authorize", "--action", "hosted_build", "--trigger", trigger, "--ref", ref,
+                                      "--new-sha", sha, "--reason", summary, "--summary", summary,
+                                      "--provenance", "interactive_user")
+        print(f"  hosted_build {args.provider} {sha[:12]}: {decision.get('decision')} {decision.get('reason')} "
+              f"{decision.get('request_id')}")
+        if code == 0:
+            print_notes(decision, False)
+            break
+        wait = decision.get("retry_after")
+        remaining = deadline - time.monotonic()
+        if decision.get("reason") == "CI_PENDING" and type(wait) is int and remaining > 0:
+            print(f"  {decision.get('detail')} Asking again in {min(wait, int(remaining)) or 1}s.")
+            time.sleep(max(1, min(wait, remaining)))
+            continue
+        print_notes(decision, True)
+        for line in err.strip().splitlines()[-3:]:
+            print(f"  {line}", file=sys.stderr)
+        remedy = (decision.get("gateway_decision") or {}).get("remedy") or decision.get("remedy")
+        if remedy:
+            print(f"  remedy: {remedy}", file=sys.stderr)
+        return 4
+    scratch = Path(tempfile.mkdtemp(prefix=f"acp-deploy-{sha[:12]}-"))
+    checkout = scratch / "src"
+    try:
+        added = git("worktree", "add", "--detach", "-q", str(checkout), sha)
+        if added.returncode != 0:
+            print(f"  could not check out {sha[:12]}: {added.stderr.strip()[:300]}", file=sys.stderr)
+            return 5
+        if args.provider == "vercel" and (root() / ".vercel").is_dir():
+            shutil.copytree(root() / ".vercel", checkout / ".vercel")    # the project link
+        deployed = subprocess.run(deploy_command(args.provider, checkout, args), cwd=str(root()))
+        if deployed.returncode != 0:
+            print(f"  {args.provider} deploy of {sha[:12]} failed (exit {deployed.returncode})", file=sys.stderr)
+            return 5
+        print(f"  deployed {sha[:12]} to {args.provider}")
+        return 0
+    finally:
+        shutil.rmtree(scratch, ignore_errors=True)
+        git("worktree", "prune")
 
 
 # ------------------------------------------------------------------ record
@@ -572,6 +684,16 @@ def cmd_record(args, cfg) -> int:
 # ------------------------------------------------------------------ doctor
 
 def cmd_doctor(args, cfg) -> int:
+    local_fixes(args, cfg)
+    if args.fix:
+        cfg = acp.settings()
+    checks = DoctorChecks(cfg, args.offline)
+    checks.run()
+    checks.print(cfg)
+    return 0 if checks.passed() else 1
+
+
+def local_fixes(args, cfg) -> None:
     project = root()
     fixes = []
     gitignore = project / ".gitignore"
@@ -591,9 +713,6 @@ def cmd_doctor(args, cfg) -> int:
                           lambda: subprocess.run([sys.executable, str(tool), "--install-hook"], cwd=project)))
     if deploy_indicators() and not cfg.get("auto_deploy"):
         fixes.append(("declare that main deploys production (autoDeploy)", lambda: declare_auto_deploy()))
-    if not fixes:
-        print("nothing to fix locally; run .agents/acp/acp status for the full picture")
-        return 0
     for label, apply in fixes:
         if not args.fix:
             print(f"would: {label}")
@@ -602,9 +721,348 @@ def cmd_doctor(args, cfg) -> int:
             continue
         apply()
         print(f"done: {label}")
-    if not args.fix:
+    if fixes and not args.fix:
         print("pass --fix to apply (each is asked; --yes applies all)")
-    return 0
+
+
+# The guards the harness installer wires into ~/.claude/settings.json (harness/install.py WANTED).
+HARNESS_GUARDS = ("push_guard.py", "build_guard.py", "subagent_guard.py", "secret_guard.py")
+HARNESS_INSTALL = "python3 ~/Projects/_formal-project-bootstrap/harness/install.py"
+WORKFLOW_TRIGGER_FILTERS = {"push": ("branches", "branches-ignore", "tags", "tags-ignore", "paths", "paths-ignore"),
+                            "pull_request": ("branches", "branches-ignore", "paths", "paths-ignore")}
+CONCURRENCY_YAML = ("concurrency:\n  group: ${{ github.workflow }}-${{ github.ref }}\n"
+                    "  cancel-in-progress: true")
+TRIGGER_YAML = ("on:\n  push:\n    branches: [main]\n  pull_request:\n"
+                "    paths-ignore: ['**.md', 'docs/**']")
+PRUNE_DIRS = {"node_modules", ".git", "target", "dist", "build", ".next", ".turbo", "_worktrees"}
+
+
+def one_line(text: object, limit: int = 300) -> str:
+    return " ".join(str(text).split())[:limit]
+
+
+def yaml_lines(text: str) -> list[tuple[int, str]]:
+    """(indent, content) of each significant line: blank lines and comments are left out."""
+    out = []
+    for raw in text.splitlines():
+        stripped = raw.strip()
+        if stripped and not stripped.startswith("#"):
+            out.append((len(raw) - len(raw.lstrip(" ")), stripped))
+    return out
+
+
+def yaml_key(content: str) -> tuple[str, str] | None:
+    match = re.match(r"""^["']?([A-Za-z0-9_.-]+)["']?\s*:(?:\s+(.*)|$)""", content)
+    return (match.group(1), (match.group(2) or "").split(" #")[0].strip()) if match else None
+
+
+def yaml_children(lines: list[tuple[int, str]], index: int) -> list[tuple[int, str]]:
+    """The lines nested under lines[index]."""
+    indent, out = lines[index][0], []
+    for line in lines[index + 1:]:
+        if line[0] <= indent:
+            break
+        out.append(line)
+    return out
+
+
+def workflow_issues(text: str) -> list[tuple[str, str, str]]:
+    """(level, problem, fix) for one workflow file: concurrency, job timeouts and trigger filters."""
+    lines = yaml_lines(text)
+    top = {key[0]: i for i, (indent, content) in enumerate(lines)
+           if indent == 0 and (key := yaml_key(content))}
+    issues: list[tuple[str, str, str]] = []
+    jobs = {}
+    if "jobs" in top:
+        body = yaml_children(lines, top["jobs"])
+        if body:
+            job_indent = body[0][0]
+            starts = [i for i, (indent, content) in enumerate(body) if indent == job_indent and yaml_key(content)]
+            for n, start in enumerate(starts):
+                end = starts[n + 1] if n + 1 < len(starts) else len(body)
+                block = body[start + 1:end]
+                child_indent = block[0][0] if block else job_indent + 2
+                children = {key[0] for indent, content in block
+                            if indent == child_indent and (key := yaml_key(content))}
+                jobs[yaml_key(body[start][1])[0]] = children
+    if "concurrency" not in top and not any("concurrency" in children for children in jobs.values()):
+        issues.append(("FAIL", "no concurrency group, so a superseded run keeps using minutes",
+                       "add at the top level:\n" + CONCURRENCY_YAML))
+    for job, children in jobs.items():
+        if "timeout-minutes" not in children and "uses" not in children:
+            issues.append(("FAIL", f"job {job!r} has no timeout-minutes",
+                           f"add under jobs.{job}:\n  timeout-minutes: 10"))
+    on_key = next((name for name in ("on", "true") if name in top), None)
+    triggers: dict[str, bool] = {}          # event -> has a branch, tag or path filter
+    if on_key:
+        index = top[on_key]
+        inline = yaml_key(lines[index][1])[1]
+        if inline:
+            for event, filters in WORKFLOW_TRIGGER_FILTERS.items():
+                if re.search(rf"\b{event}\b", inline):
+                    flow = re.search(rf"\b{event}\s*:\s*\{{([^}}]*)\}}", inline)
+                    triggers[event] = bool(flow and any(name in flow.group(1) for name in filters))
+        else:
+            body = yaml_children(lines, index)
+            for n, (indent, content) in enumerate(body):
+                if indent != body[0][0]:
+                    continue
+                key = yaml_key(content)
+                event = key[0] if key else content.lstrip("- ").strip()
+                if event not in WORKFLOW_TRIGGER_FILTERS:
+                    continue
+                nested = {k[0] for i, c in yaml_children(body, n) if (k := yaml_key(c))}
+                triggers[event] = bool(nested & set(WORKFLOW_TRIGGER_FILTERS[event])) or bool(
+                    key and key[1].startswith("{") and any(name in key[1] for name in WORKFLOW_TRIGGER_FILTERS[event]))
+    if triggers.get("push") is False:
+        issues.append(("FAIL", "runs on a push to every branch",
+                       "restrict the triggers, for example:\n" + TRIGGER_YAML))
+    if triggers.get("pull_request") is False:
+        issues.append(("WARN", "runs on every pull request, docs-only changes included",
+                       "add a path filter, for example:\n" + TRIGGER_YAML))
+    return issues
+
+
+class DoctorChecks:
+    """The adoption check: every item is PASS, WARN or FAIL, and every gap names its fix."""
+
+    def __init__(self, cfg: dict, offline: bool):
+        self.cfg, self.offline = cfg, offline
+        self.items: list[tuple[str, str, str, list[str]]] = []
+
+    def add(self, level: str, code: str, message: str, *fixes: str) -> None:
+        self.items.append((level, code, one_line(message, 600), [fix for fix in fixes if fix]))
+
+    def passed(self) -> bool:
+        return all(level == "PASS" for level, *_ in self.items)
+
+    def print(self, cfg: dict) -> None:
+        for level, code, message, fixes in self.items:
+            print(acp.scrub(f"{level} {code} {message}", cfg))
+            for fix in fixes:
+                first, *rest = fix.splitlines()
+                print(acp.scrub(f"     fix: {first}", cfg))
+                for line in rest:
+                    print(acp.scrub(f"          {line}", cfg))
+        failing = sum(level == "FAIL" for level, *_ in self.items)
+        warning = sum(level == "WARN" for level, *_ in self.items)
+        print("doctor: all checks pass" if self.passed() else f"doctor: {failing} failing, {warning} to review")
+
+    def run(self) -> None:
+        self.profile()
+        self.registry()
+        self.accounts()
+        if not self.offline:
+            self.readiness()
+            self.coverage()
+        self.harness()
+        self.register()
+        self.vercel()
+        self.workflows()
+
+    def profile(self) -> None:
+        path, profile = read_profile()
+        label = str(path.relative_to(root())) if path.is_relative_to(root()) else str(path)
+        provider = profile.get("authorizationProvider") if isinstance(profile.get("authorizationProvider"), dict) else {}
+        if not profile or provider.get("name") != "acp-gateway":
+            self.add("FAIL", "D001", f"{label} does not bind acp-gateway as the authorization provider",
+                     ".agents/acp/acp init")
+        elif not isinstance(provider.get("gatewayEndpointSet"), str) or not provider["gatewayEndpointSet"]:
+            self.add("FAIL", "D001", f"{label} has no authorizationProvider.gatewayEndpointSet",
+                     ".agents/acp/acp init (writes gatewayEndpointSet: \"production\"), or set it to the name of a "
+                     "set in the machine endpoint registry")
+        else:
+            self.add("PASS", "D001", f"{label} selects endpoint set {provider['gatewayEndpointSet']!r}")
+
+    def registry(self) -> None:
+        cfg = self.cfg
+        if cfg.get("endpoint_problems"):
+            name = cfg.get("endpoint_set") or "production"
+            self.add("FAIL", "D002", "; ".join(cfg["endpoint_problems"]),
+                     f".agents/acp/acp endpoints configure --set-name {name} --shared-state-id <id> "
+                     "--endpoint <name> <https-url> <ACP_GATEWAY_TOKEN account> [--endpoint ...]")
+        else:
+            names = ", ".join(spec["name"] for spec in cfg.get("endpoint_specs", []))
+            self.add("PASS", "D002", f"registry {cfg.get('machine_registry_path')} has set "
+                     f"{cfg.get('endpoint_set')!r}: {names}")
+
+    def accounts(self) -> None:
+        cfg = self.cfg
+        specs = cfg.get("endpoint_specs") or []
+        if not specs:
+            self.add("WARN", "D003", "credentials not checked: no endpoint set could be read (D002)")
+            return
+        missing = set(cfg.get("missing_accounts") or [])
+        sources = {item["name"]: item["token_source"] for item in cfg.get("endpoints", [])}
+        for spec in specs:
+            account = spec["keychain_account"]
+            if account in missing:
+                self.add("FAIL", "D003", f"endpoint {spec['name']}: no credential for account {account}",
+                         f".agents/acp/acp login --account {account} (stores it in the macOS Keychain; elsewhere "
+                         f"set {account} in the environment)")
+            else:
+                self.add("PASS", "D003", f"endpoint {spec['name']}: credential present ({sources.get(spec['name'])})")
+
+    def readiness(self) -> None:
+        specs = self.cfg.get("endpoint_specs") or []
+        if not specs:
+            self.add("WARN", "D004", "endpoints not probed: no endpoint set could be read (D002)")
+        for spec in specs:
+            name, expected = spec["name"], spec.get("state_authority_id")
+            try:
+                status, body = acp.probe_ready({"name": name, "url": spec["url"]})
+            except acp.Unreachable as exc:
+                self.add("FAIL", "D004", f"endpoint {name} {spec['url']}: /ready is unreachable ({exc})",
+                         "retry (a cold endpoint takes a few seconds); if it stays down the ACP operator inspects "
+                         "the deployment, and protected effects stay blocked until it answers")
+                continue
+            if not (status == 200 and isinstance(body, dict) and body.get("status") == "ready"
+                    and body.get("storage") == "postgres"):
+                self.add("FAIL", "D004", f"endpoint {name}: /ready answered HTTP {status} and is not ready on PostgreSQL",
+                         "the ACP operator inspects the gateway's runtime and storage logs")
+                continue
+            reported = body.get("state_authority_id")
+            problem = acp.state_identity_problem(reported, expected) if expected else None
+            if not problem:
+                self.add("PASS", "D004", f"endpoint {name}: ready on PostgreSQL"
+                         + (f", state authority {expected}" if expected else ""))
+            elif not reported:
+                self.add("FAIL", "D004", f"endpoint {name}: {problem}",
+                         f"the ACP operator sets ACP_SHARED_STATE_ID={expected} on that host and redeploys")
+            else:
+                self.add("FAIL", "D004", f"endpoint {name}: {problem}",
+                         "the ACP operator confirms which database this endpoint uses; correct the registry only if "
+                         "its stateAuthorityId is wrong (.agents/acp/acp endpoints configure --replace-set ...)")
+
+    def coverage(self) -> None:
+        cfg = self.cfg
+        if cfg.get("endpoint_problems") or not cfg.get("endpoints"):
+            self.add("WARN", "D005", "enrollment not checked: no endpoint with a credential (D002, D003)")
+            return
+        if not (cfg.get("owner") and cfg.get("name")):
+            self.add("FAIL", "D005", "repository owner/name unknown (no origin remote)",
+                     "git remote add origin https://github.com/OWNER/NAME.git, then .agents/acp/acp init")
+            return
+        repository = f"{cfg['owner']}/{cfg['name']}"
+        status, body = gateway(cfg, "/internal/coverage?" + urlencode({"owner": cfg["owner"], "name": cfg["name"]}))
+        if status is None:
+            self.add("WARN", "D005", f"enrollment not checked: {body}", "retry once the gateway answers (D004)")
+        elif status == 404:
+            self.add("WARN", "D005", "enrollment not checked: this gateway is too old for the coverage check "
+                     "(no /internal/coverage)", "the ACP operator redeploys acp-gateway at a version that has it")
+        elif status == 401:
+            self.add("FAIL", "D005", "the gateway rejected the credential for the coverage check",
+                     ".agents/acp/acp login")
+        elif status != 200 or not isinstance(body, dict):
+            self.add("WARN", "D005", f"enrollment not checked: the gateway answered HTTP {status}")
+        else:
+            self.enrollment(repository, body)
+
+    def enrollment(self, repository: str, body: dict) -> None:
+        enroll = one_line(body.get("enroll_command") or
+                          f"the repository owner runs (acp-gateway) scripts/policy-admin.py enroll {repository} --apply")
+        projects = [item for item in body.get("projects") or [] if isinstance(item, dict)]
+        if body.get("governed") is not True:
+            self.add("FAIL", "D005", f"no ACP policy governs {repository}; protected actions are refused", enroll)
+        gaps = 0
+        for item in projects:
+            state = item.get("status")
+            if state == "METERED":
+                continue
+            gaps += 1
+            label = f"{item.get('provider')} project {item.get('name') or item.get('project_id')}"
+            linked = item.get("linked_repository")
+            fix = one_line(item.get("command") or enroll)
+            level = "FAIL" if state in ("UNMETERED_GOVERNED", "UNGOVERNED", "MISLINKED") else "WARN"
+            self.add(level, "D005", f"{label} is {one_line(state)}" + (f" (linked to {one_line(linked)})" if linked else ""),
+                     fix)
+        if body.get("governed") is True and not gaps:
+            self.add("PASS", "D005", f"{repository} is governed and "
+                     + (f"{len(projects)} provider project(s) are metered" if projects else "no provider project builds it"))
+
+    def harness(self) -> None:
+        claude = Path(os.environ.get("CLAUDE_CONFIG_DIR") or Path.home() / ".claude").expanduser()
+        hooks = Path(os.environ.get("HARNESS_HOME") or claude / "hooks").expanduser()
+        try:
+            wired = json.dumps((json.loads((claude / "settings.json").read_text(encoding="utf-8"))).get("hooks", {}))
+        except (OSError, ValueError, AttributeError):
+            wired = ""
+        missing = [name for name in HARNESS_GUARDS if name not in wired or not (hooks / name).exists()]
+        if missing:
+            self.add("FAIL", "D006", f"harness hooks not installed: {', '.join(missing)}",
+                     f"{HARNESS_INSTALL} --dry-run, then without --dry-run (from the main bootstrap checkout)")
+        else:
+            self.add("PASS", "D006", "push, build, subagent and secret guards are installed")
+
+    def register(self) -> None:
+        reg = Path(os.environ.get("HARNESS_REG") or Path.home() / "Projects/_worktrees/.register/reg").expanduser()
+        install = f"{HARNESS_INSTALL} (links the register to harness/reg)"
+        if not reg.exists():
+            self.add("FAIL", "D007", f"the register is not at {reg}", install)
+            return
+        try:
+            result = subprocess.run([str(reg), "status"], capture_output=True, text=True, timeout=30)
+        except (OSError, subprocess.SubprocessError) as exc:
+            self.add("FAIL", "D007", f"reg status could not run ({type(exc).__name__})", install)
+            return
+        if result.returncode == 0:
+            self.add("PASS", "D007", "the register answers (reg status exit 0)")
+        else:
+            lines = (result.stdout + result.stderr).strip().splitlines()
+            self.add("FAIL", "D007", f"reg status exited {result.returncode}: {lines[0] if lines else 'no output'}",
+                     "run `reg status` and follow what it prints")
+
+    def files(self, name: str) -> list[Path]:
+        found = []
+        for dirpath, dirnames, filenames in os.walk(root()):
+            depth = Path(dirpath).relative_to(root()).parts
+            dirnames[:] = [] if len(depth) >= 3 else [d for d in dirnames if d not in PRUNE_DIRS]
+            if name in filenames:
+                found.append(Path(dirpath) / name)
+        return sorted(found)
+
+    def vercel(self) -> None:
+        configs = self.files("vercel.json")
+        if not configs:
+            self.add("PASS", "D008", "no vercel.json: Vercel builds are configured outside this tree")
+        for path in configs:
+            label = str(path.relative_to(root()))
+            try:
+                config = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                self.add("FAIL", "D008", f"{label} is not valid JSON", f"fix the JSON in {label}")
+                continue
+            git_config = config.get("git") if isinstance(config, dict) and isinstance(config.get("git"), dict) else {}
+            enabled = git_config.get("deploymentEnabled", True)
+            restricted = (isinstance(config, dict) and bool(config.get("ignoreCommand"))) or enabled is False or (
+                isinstance(enabled, dict) and False in enabled.values())
+            if restricted:
+                self.add("PASS", "D008", f"{label} limits which branches Vercel builds")
+            else:
+                self.add("WARN", "D008", f"{label} lets every pushed branch build on Vercel",
+                         f"in {label} turn git deploys off, so deploys run on request through the CLI ACP meters:\n"
+                         '  "git": { "deploymentEnabled": false }\n'
+                         "or build only main:\n"
+                         '  "ignoreCommand": "[ \\"$VERCEL_GIT_COMMIT_REF\\" != \\"main\\" ]"')
+
+    def workflows(self) -> None:
+        folder = root() / ".github" / "workflows"
+        files = sorted(folder.glob("*.y*ml")) if folder.is_dir() else []
+        if not files:
+            self.add("PASS", "D009", "no GitHub Actions workflows")
+        for path in files:
+            label = str(path.relative_to(root()))
+            try:
+                issues = workflow_issues(path.read_text(encoding="utf-8"))
+            except (OSError, UnicodeError):
+                self.add("FAIL", "D009", f"{label} could not be read", f"check the permissions of {label}")
+                continue
+            if not issues:
+                self.add("PASS", "D009", f"{label}: concurrency, job timeouts and trigger filters are set")
+                continue
+            level = "FAIL" if any(item[0] == "FAIL" for item in issues) else "WARN"
+            self.add(level, "D009", f"{label}: " + "; ".join(item[1] for item in issues),
+                     *(f"{label}, {item[2]}" for item in issues))
 
 
 def append_gitignore(path: Path, existing: list[str]) -> None:
@@ -690,12 +1148,26 @@ def register(sub) -> None:
     p = sub.add_parser("push", help="publish a commit through ACP: hook, then one exact approval per step")
     p.add_argument("rev", nargs="?", default="HEAD")
     p.add_argument("--to", help="branch to update (default: the current branch)")
-    p.add_argument("--stage", help="branch to publish the commit on first (default: a temporary acp/<sha>)")
+    p.add_argument("--stage", help="branch to publish the commit on first and keep (default: a temporary "
+                                    "refs/acp/<sha>, which no provider builds)")
     p.add_argument("--protected", action="store_true", help="treat the target as a protected ref")
     p.add_argument("--summary", help="why, recorded with the decisions")
     p.add_argument("--no-verify", action="store_true", help="skip the pre-push hook (it is otherwise run first)")
+    p.add_argument("--priority", choices=acp.PRIORITY_BLOCKING,
+                   help="ask ACP to run this ahead of a metered limit because it blocks this work (default: ACP_PRIORITY)")
+    p.add_argument("--priority-reason", help="why, 8 to 512 characters; required with --priority")
     p.add_argument("--dry-run", action="store_true")
     p.set_defaults(fn=cmd_push)
+
+    p = sub.add_parser("deploy", help="deploy a merged commit to production once ACP finds its CI green")
+    p.add_argument("provider", choices=sorted(DEPLOY_TRIGGER))
+    p.add_argument("rev", nargs="?", help="commit to deploy (default: origin's default branch)")
+    p.add_argument("--service", help="Railway service (default: the linked one)")
+    p.add_argument("--environment", help="Railway environment (default: the linked one)")
+    p.add_argument("--summary", help="why, 8 to 512 characters, recorded with the decision")
+    p.add_argument("--wait-minutes", type=int, default=30, help="how long to wait for CI to finish (default 30)")
+    p.add_argument("--dry-run", action="store_true")
+    p.set_defaults(fn=cmd_deploy)
 
     p = sub.add_parser("record", help="list this machine's ACP decisions, or copy chosen ones into the evidence ledger")
     p.add_argument("request_id", nargs="*")
@@ -704,9 +1176,10 @@ def register(sub) -> None:
     p.add_argument("--limit", type=int, default=20)
     p.set_defaults(fn=cmd_record)
 
-    p = sub.add_parser("doctor", help="find safe local fixes; --fix applies them")
-    p.add_argument("--fix", action="store_true")
-    p.add_argument("--yes", action="store_true")
+    p = sub.add_parser("doctor", help="check this project is set up for ACP, with the exact fix for each gap")
+    p.add_argument("--fix", action="store_true", help="also apply the safe local fixes, asking before each")
+    p.add_argument("--yes", action="store_true", help="with --fix, apply every fix without asking")
+    p.add_argument("--offline", action="store_true", help="skip the checks that ask a gateway")
     p.set_defaults(fn=cmd_doctor)
 
     p = sub.add_parser("uninstall", help="remove the ACP client from this project (dry run unless --apply)")
