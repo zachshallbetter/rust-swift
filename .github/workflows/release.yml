@@ -16,15 +16,16 @@ permissions:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build-binaries:
-    timeout-minutes: 15
     name: Build Binary (${{ matrix.target }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
     strategy:
       fail-fast: false
+      max-parallel: 2
       matrix:
         include:
           - os: macos-14
@@ -67,10 +68,10 @@ jobs:
             rust-swift-${{ matrix.target }}.tar.gz.sha256
 
   publish-release:
-    timeout-minutes: 15
     name: Publish GitHub Release
     needs: build-binaries
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
