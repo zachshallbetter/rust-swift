@@ -1,0 +1,18 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "rust-swift"
+abstract: >-
+  A source-to-source compiler that translates a constrained, formally specified
+  subset of Rust into standalone Swift packages with no C-FFI bridging.
+type: software
+authors:
+  - family-names: Shallbetter
+    given-names: Zach
+version: "0.1.0"
+license: MIT OR Apache-2.0
+repository-code: "https://github.com/zachshallbetter/rust-swift"
+keywords:
+  - rust
+  - swift
+  - compiler
+  - source-to-source

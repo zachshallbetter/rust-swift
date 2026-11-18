@@ -8,7 +8,7 @@
 [![Rust: 1.80+ (2021)](https://img.shields.io/badge/rust-1.80%2B%20%C2%B7%202021-orange.svg)](https://www.rust-lang.org/)
 [![Swift: 5.9+ / 6.0](https://img.shields.io/badge/swift-5.9%2B%20%C2%B7%206.0-brightgreen.svg)](https://swift.org/)
 [![Zero-FFI: 100% Native Swift](https://img.shields.io/badge/architecture-100%25%20Zero--FFI%20Native%20Swift-2dd4bf)](#the-idea)
-[![Qualification: 16 Suites · 100% Green](https://img.shields.io/badge/qualification-16%20suites%20%C2%B7%20100%25%20green-2dd4bf)](#verification--gates-that-cannot-fail)
+[![Qualification: 16 Suites · 100% Green](https://img.shields.io/badge/qualification-16%20suites%20%C2%B7%20100%25%20green-2dd4bf)](#verification)
 [![Agent Protocol: MCP Ready](https://img.shields.io/badge/agents-MCP%20stdio%20ready-blueviolet)](#ai-agent--mcp-integration-claude-codex-cursor-antigravity)
 
 > The `rust-swift` compiler translates algorithmic Rust core logic, finite state machines, data structures, and state models into clean, standalone Swift 5.9+ packages. The output compiles directly with `swiftc` or Swift Package Manager—with **zero C-FFI bridging**, **zero intermediate shims**, and **full formal preservation of memory, arithmetic, and contract invariants**.
@@ -32,7 +32,7 @@ Most cross-language bridging stories either rely on fragile C-FFI pointer gymnas
 
 ---
 
-## What is here
+## Repository map
 
 | Path | Role |
 |---|---|
@@ -429,7 +429,7 @@ Agents read the `suggested_remedy`, apply the fix in-memory, and converge autono
 
 ---
 
-## Verification & "Gates That Cannot Fail"
+## Verification
 
 ```bash
 # 1. Format Check
@@ -538,7 +538,10 @@ rust-swift bench
 
 ---
 
-## Operating Doctrine & Status Honesty
+## Status and limitations
+
+- The workspace is pre-1.0 (version `0.1.0` in `Cargo.toml`).
+- Only the admitted Rust subset compiles. Any other construct is rejected with a diagnostic (`E0001` to `E0015`); see the feature matrix and rejection policy above.
 
 This repository enforces the **Four-Tier Claim Taxonomy**:
 
