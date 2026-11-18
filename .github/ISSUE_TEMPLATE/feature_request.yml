@@ -1,0 +1,26 @@
+name: Feature request
+description: Propose a new admitted Rust construct, lowering, command or integration.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: >
+        The compiler admits a constrained Rust subset and rejects the rest with a diagnostic.
+        Tell us the construct or behavior you need and how you would check that the generated Swift
+        behaves the same as the Rust.
+  - type: textarea
+    id: problem
+    attributes:
+      label: The behavior you want
+      description: The Rust you want to compile, or the workflow you want to support.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: How you imagine it
+      description: The Swift you would expect, or the command or option you would add.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered

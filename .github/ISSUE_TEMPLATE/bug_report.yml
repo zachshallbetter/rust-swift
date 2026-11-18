@@ -1,0 +1,54 @@
+name: Bug report
+description: The compiler, CLI, MCP server or SwiftPM plugin is not behaving as documented.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for the report. A minimal Rust input that reproduces the problem is the fastest path to a fix.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `rust-swift --version`, or the commit if you built from source.
+      placeholder: rust-swift 0.1.0
+    validations:
+      required: true
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options:
+        - Compiler (compile / check)
+        - Qualification (diff-test / eval / bench / proof / sync)
+        - MCP server
+        - SwiftPM build tool plugin
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+      description: What should have happened. Quote the contract or docs section if relevant.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened instead
+      description: Include diagnostics (`E0001` to `E0015`) or compiler output.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction
+      description: The Rust source and the exact command you ran.
+    validations:
+      required: true
+  - type: input
+    id: env
+    attributes:
+      label: Environment
+      placeholder: macOS or Linux version, Rust version, Swift version
