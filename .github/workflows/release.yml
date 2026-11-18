@@ -14,8 +14,13 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-binaries:
+    timeout-minutes: 15
     name: Build Binary (${{ matrix.target }})
     runs-on: ${{ matrix.os }}
     strategy:
@@ -62,6 +67,7 @@ jobs:
             rust-swift-${{ matrix.target }}.tar.gz.sha256
 
   publish-release:
+    timeout-minutes: 15
     name: Publish GitHub Release
     needs: build-binaries
     runs-on: ubuntu-latest
