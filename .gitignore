@@ -84,3 +84,9 @@ auth.json
 # formal-project-bootstrap: per-machine ACP state and upgrade backups
 .agents/records/local/
 .agents/.upgrades/
+
+# Agent / chat thread backups (local only)
+.agents/thread/
+.agents/threads/
+.agents/images/
+.agents/memory/claude-import/
