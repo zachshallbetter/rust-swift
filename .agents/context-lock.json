@@ -6,9 +6,9 @@
   "selectedPaths": [],
   "sourceSelection": {
     "includedCount": 210,
-    "includedBytes": 1867999,
+    "includedBytes": 1868439,
     "excludedCounts": {
-      "extension": 42
+      "extension": 43
     }
   },
   "repositoryState": {
@@ -17,14 +17,14 @@
     "repositories": [
       {
         "path": ".",
-        "commit": "fefd122bd5d3135673f1efdcf05e08309fd7631b",
-        "branch": "docs/public-governance",
-        "dirty": true,
+        "commit": "3fbce71621c2dc72c252d66ceb2fc5db417ae321",
+        "branch": "rebuild/fix/agents-rules-path",
+        "dirty": false,
         "remote": "https://github.com/zachshallbetter/rust-swift.git"
       }
     ]
   },
-  "aggregateSourceDigest": "5d680428d3f7fd4456d8a26c62339ca1c7e5d2548b95c72fa42f6d262a789303",
+  "aggregateSourceDigest": "3489a88c42b086dd7a6f82dfa747185f6e52c61563275155f40158ba1ccbd4c5",
   "sources": [
     {
       "path": ".agents/AGENTS.md",
@@ -768,8 +768,8 @@
     },
     {
       "path": "AGENTS.md",
-      "bytes": 11822,
-      "sha256": "8d5076250d28a4b3b320a96362e2474583848a84cb9e8a4e0847852f99269372"
+      "bytes": 12262,
+      "sha256": "c8f37f17397bdcdc72cc1fe8e363f4bf208385111b9b4ba8930ac353653bf103"
     },
     {
       "path": "CHANGELOG.md",
